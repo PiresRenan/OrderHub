@@ -24,11 +24,13 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      # Pinned to actions/checkout v7.0.1.
+      # Full history is required because pull request hygiene checks compare
+      # the proposed integration state against the exact base commit.
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+          fetch-depth: 0
 
       # Pinned to actions/setup-java v6.0.0.
       - name: Configure Java
