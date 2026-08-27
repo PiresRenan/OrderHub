@@ -1,0 +1,23 @@
+# Normalize text files in the repository
+* text=auto eol=lf
+
+# Windows-native command scripts
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Unix shell scripts
+*.sh text eol=lf
+
+# Maven Wrapper
+mvnw text eol=lf
+mvnw.cmd text eol=crlf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.jar binary
+*.zip binary
+*.pdf binary
