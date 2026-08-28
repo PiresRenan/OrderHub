@@ -1,0 +1,62 @@
+name: Branch Policy
+
+on:
+  pull_request:
+    branches:
+      - main
+      - pre-release
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - edited
+
+permissions:
+  contents: read
+
+jobs:
+  policy:
+    name: branch-policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    env:
+      BASE_BRANCH: ${{ github.base_ref }}
+      HEAD_BRANCH: ${{ github.head_ref }}
+      PR_TITLE: ${{ github.event.pull_request.title }}
+
+    steps:
+      - name: Validate branch flow
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "$BASE_BRANCH" == "main" ]]; then
+            if [[ "$HEAD_BRANCH" != "pre-release" ]]; then
+              echo "::error::main accepts pull requests only from pre-release."
+              exit 1
+            fi
+          fi
+
+          if [[ "$BASE_BRANCH" == "pre-release" ]]; then
+            BRANCH_PATTERN='^(feat|fix|sec|perf|refactor|test|docs|chore|build|ci|hotfix|integration|release)/OH-[0-9]+-[a-z0-9][a-z0-9-]*$'
+
+            if [[ ! "$HEAD_BRANCH" =~ $BRANCH_PATTERN ]]; then
+              echo "::error::Invalid task branch: $HEAD_BRANCH"
+              echo "Expected: <type>/OH-<number>-<description>"
+              exit 1
+            fi
+          fi
+
+      - name: Validate pull request title
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TITLE_PATTERN='^(feat|fix|sec|perf|refactor|test|docs|chore|build|ci|revert)(\([a-z0-9._/-]+\))?!?:[[:space:]].+'
+
+          if [[ ! "$PR_TITLE" =~ $TITLE_PATTERN ]]; then
+            echo "::error::Pull request title does not follow Conventional Commit format."
+            echo "Example: feat(orders): add order idempotency"
+            exit 1
+          fi
