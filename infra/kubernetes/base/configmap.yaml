@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: orderhub-runtime-config
+  labels:
+    app.kubernetes.io/name: orderhub
+    app.kubernetes.io/part-of: orderhub
+data:
+  # Technical protection limits. These remain operational safeguards rather
+  # than commercial/business order limits.
+  ORDERHUB_JSON_MAX_DOCUMENT_LENGTH: "1048576"
+  ORDERHUB_JSON_MAX_NESTING_DEPTH: "64"
+  ORDERHUB_JSON_MAX_TOKEN_COUNT: "100000"
+  ORDERHUB_ORDERS_HTTP_MAX_ITEMS: "1000"
