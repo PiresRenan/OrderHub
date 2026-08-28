@@ -1,6 +1,6 @@
 # ADR-0004 — Containerized Development and Runtime Platform
 
-Status: DESIGNED
+Status: TESTED
 
 ## Context
 
@@ -357,6 +357,78 @@ original process has not actually stopped.
 Custom failover timing is therefore deferred until shared persistence,
 idempotency and concurrency guarantees exist and can be tested under duplicate
 execution and partition scenarios.
+
+## Rolling-replacement evidence
+
+OH-006 also exercised a Kubernetes rolling replacement independently from the
+initial Deployment rollout.
+
+The experiment started with two Ready and Available OrderHub replicas and
+triggered a new Deployment revision using `kubectl rollout restart`.
+
+Health was sampled continuously through the Kubernetes Service abstraction
+rather than by addressing an individual Pod.
+
+Observed behavior:
+
+- the initial Deployment reported two Ready and two Available replicas;
+- the rolling replacement completed successfully;
+- the minimum number of Available replicas observed during the rollout was two;
+- the minimum number of Ready replicas observed during the rollout was two;
+- no Service health failures were observed during the sampled requests;
+- old and new ReplicaSets coexisted temporarily while the replacement
+  progressed;
+- the previous ReplicaSet converged to zero replicas;
+- the new ReplicaSet converged to two Ready replicas;
+- the final EndpointSlice contained the two replacement Pod endpoints;
+- the PodDisruptionBudget returned to one allowed disruption after convergence.
+
+The experiment also observed up to four Pod objects temporarily while old Pods
+were terminating. This does not imply four serving replicas or a violation of
+`maxSurge: 1`; terminating Pods can remain present while replacement Pods are
+created and become Ready.
+
+This evidence satisfies the OH-006 requirement that rolling replacement can
+complete without clients being directly coupled to an individual Pod. The
+result demonstrates the configured rollout behavior under the tested local
+environment and is not a production availability or capacity guarantee.
+
+## CI acceptance evidence
+
+The platform baseline was independently validated on a clean GitHub-hosted
+runner through the `platform-validation` workflow.
+
+The successful CI execution verified:
+
+- repository whitespace consistency;
+- pinned kind installation and checksum verification;
+- pinned kubectl installation and official checksum verification;
+- Docker Compose configuration rendering;
+- Kustomize rendering for both local and scale overlays;
+- construction of the production-oriented OrderHub OCI image;
+- non-root runtime identity and reduced runtime tool surface;
+- Docker Compose readiness, immutable root filesystem, writable ephemeral
+  storage and graceful shutdown;
+- reproducible creation of the single-node development kind cluster;
+- Restricted Pod Security admission;
+- two Ready OrderHub replicas and Service endpoints;
+- effective non-root Kubernetes execution and immutable root filesystem;
+- absence of an automatically mounted service-account token;
+- PodDisruptionBudget availability;
+- reproducible creation of the three-node scale cluster;
+- scheduling of the two OrderHub replicas across two distinct
+  workload-eligible worker nodes;
+- successful cleanup of disposable Compose and kind resources.
+
+The independent Java CI suite and branch-policy workflow also completed
+successfully for the same pull-request revision.
+
+Destructive abrupt-node-loss timing remains acceptance evidence rather than an
+every-commit CI test because it measures platform convergence behavior and does
+not yet protect a durable distributed-state invariant.
+
+With both local failure experiments and clean-runner platform verification
+completed, ADR-0004 is considered TESTED for the scope defined by OH-006.
 
 ## Consequences
 
