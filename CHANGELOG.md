@@ -23,3 +23,8 @@ The project follows Semantic Versioning.
 
 - GitHub Actions dependencies are pinned to immutable commit SHAs.
 - Production promotion requires validation before reaching `main`.
+
+### Fixed
+
+- Pull request CI now fetches the Git history required to compare changes
+  against the exact pull request base commit during repository hygiene checks.
