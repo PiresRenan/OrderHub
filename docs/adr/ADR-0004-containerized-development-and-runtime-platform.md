@@ -1,6 +1,6 @@
 # ADR-0004 — Containerized Development and Runtime Platform
 
-Status: DESIGNED
+Status: TESTED
 
 ## Context
 
@@ -357,6 +357,43 @@ original process has not actually stopped.
 Custom failover timing is therefore deferred until shared persistence,
 idempotency and concurrency guarantees exist and can be tested under duplicate
 execution and partition scenarios.
+
+## CI acceptance evidence
+
+The platform baseline was independently validated on a clean GitHub-hosted
+runner through the `platform-validation` workflow.
+
+The successful CI execution verified:
+
+- repository whitespace consistency;
+- pinned kind installation and checksum verification;
+- pinned kubectl installation and official checksum verification;
+- Docker Compose configuration rendering;
+- Kustomize rendering for both local and scale overlays;
+- construction of the production-oriented OrderHub OCI image;
+- non-root runtime identity and reduced runtime tool surface;
+- Docker Compose readiness, immutable root filesystem, writable ephemeral
+  storage and graceful shutdown;
+- reproducible creation of the single-node development kind cluster;
+- Restricted Pod Security admission;
+- two Ready OrderHub replicas and Service endpoints;
+- effective non-root Kubernetes execution and immutable root filesystem;
+- absence of an automatically mounted service-account token;
+- PodDisruptionBudget availability;
+- reproducible creation of the three-node scale cluster;
+- scheduling of the two OrderHub replicas across two distinct
+  workload-eligible worker nodes;
+- successful cleanup of disposable Compose and kind resources.
+
+The independent Java CI suite and branch-policy workflow also completed
+successfully for the same pull-request revision.
+
+Destructive abrupt-node-loss timing remains acceptance evidence rather than an
+every-commit CI test because it measures platform convergence behavior and does
+not yet protect a durable distributed-state invariant.
+
+With both local failure experiments and clean-runner platform verification
+completed, ADR-0004 is considered TESTED for the scope defined by OH-006.
 
 ## Consequences
 
