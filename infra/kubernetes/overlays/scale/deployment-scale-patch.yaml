@@ -1,0 +1,11 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orderhub
+spec:
+  template:
+    spec:
+      # Scale/failure experiments must execute application replicas on worker
+      # nodes so losing a worker represents an actual workload failure domain.
+      nodeSelector:
+        orderhub-workload: "true"

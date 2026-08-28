@@ -54,7 +54,20 @@ spec:
         fsGroupChangePolicy: OnRootMismatch
 
         seccompProfile:
-          type: RuntimeDefault
+          type:
+            RuntimeDefault
+
+      # Replicas should be distributed across distinct nodes whenever multiple
+      # eligible node domains exist. On a single-node development cluster this
+      # constraint remains satisfiable without inventing additional capacity.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: orderhub
+              app.kubernetes.io/component: api
 
       containers:
         - name: orderhub

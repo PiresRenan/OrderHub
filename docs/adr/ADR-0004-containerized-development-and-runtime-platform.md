@@ -309,6 +309,55 @@ OH-006 must prove at minimum:
 
 Performance and maximum-capacity claims require later benchmark evidence.
 
+## Node-failure evidence
+
+OH-006 validated abrupt worker loss using a three-node kind cluster with one
+control-plane and two workload-eligible workers.
+
+The OrderHub replicas were distributed across distinct
+`kubernetes.io/hostname` topology domains before the experiment.
+
+A worker hosting one OrderHub replica was terminated abruptly with SIGKILL,
+without Kubernetes drain or graceful node shutdown.
+
+Observed behavior:
+
+- the surviving replica remained healthy on the second worker;
+- Service traffic experienced transient failures before endpoint convergence;
+- EndpointSlice converged to one Ready backend after approximately 40.7 seconds;
+- the affected Node was recorded as `NotReady` approximately 45.96 seconds
+  after the simulated failure;
+- after convergence, 20 consecutive Service health requests succeeded;
+- the affected Pod contained the Kubernetes default 300-second `NoExecute`
+  tolerations for both `node.kubernetes.io/not-ready` and
+  `node.kubernetes.io/unreachable`;
+- no replacement Pod was observed during the initial 80-second failure window;
+- the worker recovered before the 300-second toleration expired;
+- Kubernetes cancelled the pending TaintManager eviction and recreated the
+  affected Pod sandbox/container on the recovered worker;
+- the Deployment returned to two Ready replicas and the Service returned to two
+  Ready endpoints.
+
+The four transient Service failures observed during this local kind experiment
+are evidence of convergence behavior, not a production availability SLO or
+capacity benchmark.
+
+### Failover policy decision
+
+OH-006 intentionally retains the Kubernetes default node-failure tolerations.
+
+Shorter application-specific tolerations could reduce the time before
+rescheduling after a prolonged node failure, but they do not directly remove
+the earlier node/endpoint convergence window observed by this experiment.
+
+Aggressive rescheduling also increases the importance of correctness under
+network partitions, where the control plane may replace a workload whose
+original process has not actually stopped.
+
+Custom failover timing is therefore deferred until shared persistence,
+idempotency and concurrency guarantees exist and can be tested under duplicate
+execution and partition scenarios.
+
 ## Consequences
 
 The repository gains additional infrastructure-as-code and container build
