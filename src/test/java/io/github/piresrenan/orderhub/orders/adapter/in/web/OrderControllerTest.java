@@ -36,349 +36,648 @@ import io.github.piresrenan.orderhub.orders.domain.model.OrderItem;
 @WebMvcTest(OrderController.class)
 class OrderControllerTest {
 
-    @Autowired
-    private MockMvc mockMvc;
+        @Autowired
+        private MockMvc mockMvc;
 
-    @MockitoBean
-    private CreateOrderUseCase createOrderUseCase;
+        @MockitoBean
+        private CreateOrderUseCase createOrderUseCase;
 
-    @Test
-    void createsOrderFromValidRequest() throws Exception {
-        // Why: establishes the canonical successful HTTP contract.
-        // Covers: JSON binding, header mapping, command mapping and response serialization.
-        // Prevents: silent contract drift between API clients and the application layer.
+        @Test
+        void createsOrderFromValidRequest() throws Exception {
+                // Why: establishes the canonical successful HTTP contract.
+                // Covers: JSON binding, header mapping, command mapping and response
+                // serialization.
+                // Prevents: silent contract drift between API clients and the application
+                // layer.
 
-        var orderId = UUID.randomUUID();
-        var tenantId = UUID.randomUUID();
-        var customerId = UUID.randomUUID();
-        var productId = UUID.randomUUID();
+                var orderId = UUID.randomUUID();
+                var tenantId = UUID.randomUUID();
+                var customerId = UUID.randomUUID();
+                var productId = UUID.randomUUID();
 
-        var order = Order.create(
-                orderId,
-                tenantId,
-                customerId,
-                List.of(new OrderItem(productId, 2)));
+                var order = Order.create(
+                                orderId,
+                                tenantId,
+                                customerId,
+                                List.of(new OrderItem(productId, 2)));
 
-        when(createOrderUseCase.create(any(CreateOrderCommand.class)))
-                .thenReturn(order);
+                when(createOrderUseCase.create(any(CreateOrderCommand.class)))
+                                .thenReturn(order);
 
-        mockMvc.perform(post("/orders")
-                        .header("X-Tenant-Id", tenantId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(validBody(customerId, productId)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").value(orderId.toString()))
-                .andExpect(jsonPath("$.tenantId").value(tenantId.toString()))
-                .andExpect(jsonPath("$.customerId").value(customerId.toString()))
-                .andExpect(jsonPath("$.status").value("CREATED"))
-                .andExpect(jsonPath("$.items[0].productId")
-                        .value(productId.toString()))
-                .andExpect(jsonPath("$.items[0].quantity").value(2));
+                mockMvc.perform(post("/orders")
+                                .header("X-Tenant-Id", tenantId)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(validBody(customerId, productId)))
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.id").value(orderId.toString()))
+                                .andExpect(jsonPath("$.tenantId").value(tenantId.toString()))
+                                .andExpect(jsonPath("$.customerId").value(customerId.toString()))
+                                .andExpect(jsonPath("$.status").value("CREATED"))
+                                .andExpect(jsonPath("$.items[0].productId")
+                                                .value(productId.toString()))
+                                .andExpect(jsonPath("$.items[0].quantity").value(2));
 
-        var captor = ArgumentCaptor.forClass(CreateOrderCommand.class);
+                var captor = ArgumentCaptor.forClass(CreateOrderCommand.class);
 
-        verify(createOrderUseCase).create(captor.capture());
+                verify(createOrderUseCase).create(captor.capture());
 
-        assertThat(captor.getValue().tenantId()).isEqualTo(tenantId);
-        assertThat(captor.getValue().customerId()).isEqualTo(customerId);
-        assertThat(captor.getValue().items()).hasSize(1);
-    }
+                assertThat(captor.getValue().tenantId()).isEqualTo(tenantId);
+                assertThat(captor.getValue().customerId()).isEqualTo(customerId);
+                assertThat(captor.getValue().items()).hasSize(1);
+        }
 
-    @Test
-    void rejectsMissingTenantHeader() throws Exception {
-        // Why: requests without tenant context must never reach business processing.
-        // Covers: mandatory request metadata.
-        // Prevents: creation of future unscoped or ambiguous tenant data.
+        @Test
+        void rejectsMissingTenantHeader() throws Exception {
+                // Why: requests without tenant context must never reach business processing.
+                // Covers: mandatory request metadata.
+                // Prevents: creation of future unscoped or ambiguous tenant data.
 
-        mockMvc.perform(post("/orders")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(validBody(UUID.randomUUID(), UUID.randomUUID())))
-                .andExpect(status().isBadRequest())
-                .andExpect(content().contentTypeCompatibleWith(
-                        MediaType.APPLICATION_PROBLEM_JSON))
-                .andExpect(jsonPath("$.code")
-                        .value("REQUEST_BINDING_FAILED"));
+                mockMvc.perform(post("/orders")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(validBody(UUID.randomUUID(), UUID.randomUUID())))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(content().contentTypeCompatibleWith(
+                                                MediaType.APPLICATION_PROBLEM_JSON))
+                                .andExpect(jsonPath("$.code")
+                                                .value("REQUEST_BINDING_FAILED"));
 
-        verifyNoInteractions(createOrderUseCase);
-    }
+                verifyNoInteractions(createOrderUseCase);
+        }
 
-    @Test
-    void rejectsInvalidTenantUuid() throws Exception {
-        // Why: syntactically invalid tenant identifiers are common client/input errors.
-        // Covers: HTTP type conversion.
-        // Prevents: malformed identity values propagating into application logic.
+        @Test
+        void rejectsInvalidTenantUuid() throws Exception {
+                // Why: syntactically invalid tenant identifiers are common client/input errors.
+                // Covers: HTTP type conversion.
+                // Prevents: malformed identity values propagating into application logic.
 
-        mockMvc.perform(post("/orders")
-                        .header("X-Tenant-Id", "not-a-uuid")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(validBody(UUID.randomUUID(), UUID.randomUUID())))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("TYPE_MISMATCH"));
+                mockMvc.perform(post("/orders")
+                                .header("X-Tenant-Id", "not-a-uuid")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(validBody(UUID.randomUUID(), UUID.randomUUID())))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.code").value("TYPE_MISMATCH"));
 
-        verifyNoInteractions(createOrderUseCase);
-    }
+                verifyNoInteractions(createOrderUseCase);
+        }
 
-    @Test
-    void rejectsMissingBody() throws Exception {
-        // Why: empty requests can originate from broken clients, proxies or integrations.
-        // Covers: mandatory JSON body handling.
-        // Prevents: null access and ambiguous application failures.
+        @Test
+        void rejectsMissingBody() throws Exception {
+                // Why: empty requests can originate from broken clients, proxies or
+                // integrations.
+                // Covers: mandatory JSON body handling.
+                // Prevents: null access and ambiguous application failures.
 
-        mockMvc.perform(post("/orders")
-                        .header("X-Tenant-Id", UUID.randomUUID())
-                        .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
+                mockMvc.perform(post("/orders")
+                                .header("X-Tenant-Id", UUID.randomUUID())
+                                .contentType(MediaType.APPLICATION_JSON))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
 
-        verifyNoInteractions(createOrderUseCase);
-    }
+                verifyNoInteractions(createOrderUseCase);
+        }
 
-    @Test
-    void rejectsMalformedJson() throws Exception {
-        // Why: malformed payloads are common at public API boundaries.
-        // Covers: JSON parser failures.
-        // Prevents: parser internals leaking to clients or business code receiving garbage.
+        @Test
+        void rejectsMalformedJson() throws Exception {
+                // Why: malformed payloads are common at public API boundaries.
+                // Covers: JSON parser failures.
+                // Prevents: parser internals leaking to clients or business code receiving
+                // garbage.
 
-        mockMvc.perform(post("/orders")
-                        .header("X-Tenant-Id", UUID.randomUUID())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"customerId":
-                                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
+                mockMvc.perform(post("/orders")
+                                .header("X-Tenant-Id", UUID.randomUUID())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                                {"customerId":
+                                                """))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
 
-        verifyNoInteractions(createOrderUseCase);
-    }
+                verifyNoInteractions(createOrderUseCase);
+        }
 
-    @Test
-    void rejectsUnsupportedContentType() throws Exception {
-        // Why: explicit media contracts avoid ambiguous parser behavior.
-        // Covers: Content-Type enforcement.
-        // Prevents: accidental handling of unsupported representations.
+        @Test
+        void rejectsUnsupportedContentType() throws Exception {
+                // Why: explicit media contracts avoid ambiguous parser behavior.
+                // Covers: Content-Type enforcement.
+                // Prevents: accidental handling of unsupported representations.
 
-        mockMvc.perform(post("/orders")
-                        .header("X-Tenant-Id", UUID.randomUUID())
-                        .contentType(MediaType.TEXT_PLAIN)
-                        .content("invalid"))
-                .andExpect(status().isUnsupportedMediaType())
-                .andExpect(jsonPath("$.code")
-                        .value("UNSUPPORTED_MEDIA_TYPE"));
+                mockMvc.perform(post("/orders")
+                                .header("X-Tenant-Id", UUID.randomUUID())
+                                .contentType(MediaType.TEXT_PLAIN)
+                                .content("invalid"))
+                                .andExpect(status().isUnsupportedMediaType())
+                                .andExpect(jsonPath("$.code")
+                                                .value("UNSUPPORTED_MEDIA_TYPE"));
 
-        verifyNoInteractions(createOrderUseCase);
-    }
+                verifyNoInteractions(createOrderUseCase);
+        }
 
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("invalidRequestBodies")
-    void rejectsStructurallyInvalidOrders(
-            String scenario,
-            String requestBody) throws Exception {
+        @ParameterizedTest(name = "{0}")
+        @MethodSource("invalidRequestBodies")
+        void rejectsStructurallyInvalidOrders(
+                        String scenario,
+                        String requestBody) throws Exception {
 
-        // Why: every malformed field combination must stop at the API boundary.
-        // Covers: Jakarta Bean Validation including nested collection elements.
-        // Prevents: unnecessary domain/database work and inconsistent client behavior.
+                // Why: every malformed field combination must stop at the API boundary.
+                // Covers: Jakarta Bean Validation including nested collection elements.
+                // Prevents: unnecessary domain/database work and inconsistent client behavior.
 
-        mockMvc.perform(post("/orders")
-                        .header("X-Tenant-Id", UUID.randomUUID())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code")
-                        .value("REQUEST_VALIDATION_FAILED"))
-                .andExpect(jsonPath("$.errors").isArray());
+                mockMvc.perform(post("/orders")
+                                .header("X-Tenant-Id", UUID.randomUUID())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(requestBody))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.code")
+                                                .value("REQUEST_VALIDATION_FAILED"))
+                                .andExpect(jsonPath("$.errors").isArray());
 
-        verifyNoInteractions(createOrderUseCase);
-    }
+                verifyNoInteractions(createOrderUseCase);
+        }
 
-    @Test
-    void rejectsUnknownJsonProperties() throws Exception {
-        // Why: silently ignored fields hide typos and API contract drift.
-        // Covers: strict JSON deserialization.
-        // Prevents: clients believing that an ignored field was processed.
+        @Test
+        void rejectsUnknownJsonProperties() throws Exception {
+                // Why: silently ignored fields hide typos and API contract drift.
+                // Covers: strict JSON deserialization.
+                // Prevents: clients believing that an ignored field was processed.
 
-        var customerId = UUID.randomUUID();
-        var productId = UUID.randomUUID();
+                var customerId = UUID.randomUUID();
+                var productId = UUID.randomUUID();
 
-        var body = """
-                {
-                  "customerId": "%s",
-                  "unexpectedField": "ignored-by-loose-parsers",
-                  "items": [
-                    {
-                      "productId": "%s",
-                      "quantity": 2
-                    }
-                  ]
-                }
-                """.formatted(customerId, productId);
+                var body = """
+                                {
+                                  "customerId": "%s",
+                                  "unexpectedField": "ignored-by-loose-parsers",
+                                  "items": [
+                                    {
+                                      "productId": "%s",
+                                      "quantity": 2
+                                    }
+                                  ]
+                                }
+                                """.formatted(customerId, productId);
 
-        mockMvc.perform(post("/orders")
-                        .header("X-Tenant-Id", UUID.randomUUID())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
+                mockMvc.perform(post("/orders")
+                                .header("X-Tenant-Id", UUID.randomUUID())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
 
-        verifyNoInteractions(createOrderUseCase);
-    }
+                verifyNoInteractions(createOrderUseCase);
+        }
 
-    @Test
-    void doesNotEchoRejectedValuesInErrorResponses() throws Exception {
-        // Why: error handling must not become a secondary personal-data disclosure path.
-        // Covers: privacy-safe malformed input response.
-        // Prevents: accidental reflection of passwords, identifiers or sensitive values.
+        @Test
+        void doesNotEchoRejectedValuesInErrorResponses() throws Exception {
+                // Why: error handling must not become a secondary personal-data disclosure
+                // path.
+                // Covers: privacy-safe malformed input response.
+                // Prevents: accidental reflection of passwords, identifiers or sensitive
+                // values.
 
-        var privateMarker = "synthetic-private-value-do-not-return";
+                var privateMarker = "synthetic-private-value-do-not-return";
 
-        var body = """
-                {
-                  "customerId": "%s",
-                  "items": []
-                }
-                """.formatted(privateMarker);
+                var body = """
+                                {
+                                  "customerId": "%s",
+                                  "items": []
+                                }
+                                """.formatted(privateMarker);
 
-        mockMvc.perform(post("/orders")
-                        .header("X-Tenant-Id", UUID.randomUUID())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
-                .andExpect(status().isBadRequest())
-                .andExpect(content().string(
-                        not(containsString(privateMarker))));
+                mockMvc.perform(post("/orders")
+                                .header("X-Tenant-Id", UUID.randomUUID())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(content().string(
+                                                not(containsString(privateMarker))));
 
-        verifyNoInteractions(createOrderUseCase);
-    }
+                verifyNoInteractions(createOrderUseCase);
+        }
 
-    @Test
-    void rejectsUnsupportedHttpMethod() throws Exception {
-        // Why: API operations must expose only explicitly designed semantics.
-        // Covers: HTTP method contract.
-        // Prevents: accidental resource operations created by configuration drift.
+        @Test
+        void rejectsUnsupportedHttpMethod() throws Exception {
+                // Why: API operations must expose only explicitly designed semantics.
+                // Covers: HTTP method contract.
+                // Prevents: accidental resource operations created by configuration drift.
 
-        mockMvc.perform(get("/orders"))
-                .andExpect(status().isMethodNotAllowed())
-                .andExpect(jsonPath("$.code").value("METHOD_NOT_ALLOWED"));
+                mockMvc.perform(get("/orders"))
+                                .andExpect(status().isMethodNotAllowed())
+                                .andExpect(jsonPath("$.code").value("METHOD_NOT_ALLOWED"));
 
-        verifyNoInteractions(createOrderUseCase);
-    }
+                verifyNoInteractions(createOrderUseCase);
+        }
 
-    /**
-     * Supplies malformed but syntactically valid JSON scenarios so that validation
-     * behavior remains explicit without duplicating HTTP setup in every test.
-     */
-    private static Stream<Arguments> invalidRequestBodies() {
+        @ParameterizedTest(name = "{0}")
+        @MethodSource("nonDeserializableRequestBodies")
+        void rejectsNonDeserializableRequestBodies(
+                        String scenario,
+                        String requestBody,
+                        String rejectedValueMarker) throws Exception {
 
-        return Stream.of(
-                // Why: an order must always identify its customer.
-                Arguments.of(
-                        "missing customerId",
-                        """
-                        {
-                          "items": [{
-                            "productId": "33333333-3333-3333-3333-333333333333",
-                            "quantity": 2
-                          }]
-                        }
-                        """),
+                // Why: syntactically valid JSON can still contain values incompatible with
+                // the public contract and must fail before application processing.
+                // Covers: UUID conversion, scalar-type mismatch, fractional integers and
+                // numeric overflow during Jackson deserialization.
+                // Prevents: coercion surprises, truncated quantities, implementation leakage
+                // and malformed values reaching business logic.
 
-                // Why: null collection and empty collection are distinct client errors.
-                Arguments.of(
-                        "null items",
-                        """
-                        {
-                          "customerId": "22222222-2222-2222-2222-222222222222",
-                          "items": null
-                        }
-                        """),
+                stubSuccessfulOrder();
 
-                // Why: empty orders are invalid before reaching the domain.
-                Arguments.of(
-                        "empty items",
-                        """
-                        {
-                          "customerId": "22222222-2222-2222-2222-222222222222",
-                          "items": []
-                        }
-                        """),
+                mockMvc.perform(post("/orders")
+                                .header("X-Tenant-Id", UUID.randomUUID())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(requestBody))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(content().contentTypeCompatibleWith(
+                                                MediaType.APPLICATION_PROBLEM_JSON))
+                                .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"))
+                                .andExpect(content().string(
+                                                not(containsString(rejectedValueMarker))));
 
-                // Why: null collection elements otherwise cause delayed runtime failures.
-                Arguments.of(
-                        "null item",
-                        """
-                        {
-                          "customerId": "22222222-2222-2222-2222-222222222222",
-                          "items": [null]
-                        }
-                        """),
+                verifyNoInteractions(createOrderUseCase);
+        }
 
-                // Why: every order item must reference a concrete product.
-                Arguments.of(
-                        "missing productId",
-                        """
-                        {
-                          "customerId": "22222222-2222-2222-2222-222222222222",
-                          "items": [{
-                            "quantity": 2
-                          }]
-                        }
-                        """),
+        @ParameterizedTest(name = "{0}")
+        @MethodSource("duplicateFieldBodies")
+        void rejectsDuplicateJsonProperties(
+                        String scenario,
+                        String requestBody,
+                        String rejectedValueMarker) throws Exception {
 
-                // Why: absent quantity must not silently become zero.
-                Arguments.of(
-                        "missing quantity",
-                        """
-                        {
-                          "customerId": "22222222-2222-2222-2222-222222222222",
-                          "items": [{
-                            "productId": "33333333-3333-3333-3333-333333333333"
-                          }]
-                        }
-                        """),
+                // Why: duplicate JSON properties create ambiguous interpretation because
+                // different parsers or consumers may choose different occurrences.
+                // Covers: duplicate fields at root and nested-object levels.
+                // Prevents: parser differential behavior, validation bypass and clients
+                // exploiting "first value vs last value" interpretation differences.
 
-                // Why: zero quantity has no valid ordering semantics.
-                Arguments.of(
-                        "zero quantity",
-                        """
-                        {
-                          "customerId": "22222222-2222-2222-2222-222222222222",
-                          "items": [{
-                            "productId": "33333333-3333-3333-3333-333333333333",
-                            "quantity": 0
-                          }]
-                        }
-                        """),
+                stubSuccessfulOrder();
 
-                // Why: negative quantities could otherwise corrupt future stock calculations.
-                Arguments.of(
-                        "negative quantity",
-                        """
-                        {
-                          "customerId": "22222222-2222-2222-2222-222222222222",
-                          "items": [{
-                            "productId": "33333333-3333-3333-3333-333333333333",
-                            "quantity": -1
-                          }]
-                        }
-                        """));
-    }
+                mockMvc.perform(post("/orders")
+                                .header("X-Tenant-Id", UUID.randomUUID())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(requestBody))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(content().contentTypeCompatibleWith(
+                                                MediaType.APPLICATION_PROBLEM_JSON))
+                                .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"))
+                                .andExpect(content().string(
+                                                not(containsString(rejectedValueMarker))));
 
-    /**
-     * Produces the canonical valid payload used by tests that vary request metadata
-     * instead of the JSON structure.
-     */
-    private static String validBody(
-            UUID customerId,
-            UUID productId) {
+                verifyNoInteractions(createOrderUseCase);
+        }
 
-        return """
-                {
-                  "customerId": "%s",
-                  "items": [
-                    {
-                      "productId": "%s",
-                      "quantity": 2
-                    }
-                  ]
-                }
-                """.formatted(customerId, productId);
-    }
+        @Test
+        void rejectsUnacceptableResponseMediaType() throws Exception {
+                // Why: clients must receive deterministic behavior when they explicitly
+                // refuse every representation produced by the resource.
+                // Covers: HTTP Accept negotiation and 406 handling.
+                // Prevents: accidental content negotiation drift and uncontrolled framework
+                // error representations.
+                //
+                // This assertion is intentionally strict during RED. If Spring cannot
+                // serialize Problem Details because the caller also rejects that media type,
+                // the evidence will be used to refine the 406 contract rather than hiding it.
+
+                mockMvc.perform(post("/orders")
+                                .header("X-Tenant-Id", UUID.randomUUID())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .accept(MediaType.APPLICATION_XML)
+                                .content(validBody(
+                                                UUID.randomUUID(),
+                                                UUID.randomUUID())))
+                                .andExpect(status().isNotAcceptable())
+                                .andExpect(content().contentTypeCompatibleWith(
+                                                MediaType.APPLICATION_PROBLEM_JSON))
+                                .andExpect(jsonPath("$.code").value("NOT_ACCEPTABLE"));
+
+                verifyNoInteractions(createOrderUseCase);
+        }
+
+        @Test
+        void acceptsApplicationJsonWithCharsetParameter() throws Exception {
+                // Why: application/json remains valid when a client supplies a charset
+                // media-type parameter commonly added by HTTP libraries.
+                // Covers: request Content-Type compatibility.
+                // Prevents: unnecessarily rejecting standards-compatible client requests.
+
+                var customerId = UUID.randomUUID();
+                var productId = UUID.randomUUID();
+
+                stubSuccessfulOrder();
+
+                mockMvc.perform(post("/orders")
+                                .header("X-Tenant-Id", UUID.randomUUID())
+                                .contentType(MediaType.parseMediaType(
+                                                "application/json;charset=UTF-8"))
+                                .accept(MediaType.APPLICATION_JSON)
+                                .content(validBody(customerId, productId)))
+                                .andExpect(status().isCreated());
+
+                verify(createOrderUseCase).create(any(CreateOrderCommand.class));
+        }
+
+        /**
+         * Supplies syntactically valid JSON whose field values cannot safely be bound
+         * to
+         * the create-order contract.
+         */
+        private static Stream<Arguments> nonDeserializableRequestBodies() {
+
+                return Stream.of(
+                                Arguments.of(
+                                                "malformed customer UUID",
+                                                """
+                                                                {
+                                                                  "customerId": "synthetic-invalid-customer-uuid",
+                                                                  "items": [{
+                                                                    "productId": "33333333-3333-3333-3333-333333333333",
+                                                                    "quantity": 2
+                                                                  }]
+                                                                }
+                                                                """,
+                                                "synthetic-invalid-customer-uuid"),
+
+                                Arguments.of(
+                                                "malformed product UUID",
+                                                """
+                                                                {
+                                                                  "customerId": "22222222-2222-2222-2222-222222222222",
+                                                                  "items": [{
+                                                                    "productId": "synthetic-invalid-product-uuid",
+                                                                    "quantity": 2
+                                                                  }]
+                                                                }
+                                                                """,
+                                                "synthetic-invalid-product-uuid"),
+
+                                Arguments.of(
+                                                "numeric customerId instead of UUID string",
+                                                """
+                                                                {
+                                                                  "customerId": 987654321,
+                                                                  "items": [{
+                                                                    "productId": "33333333-3333-3333-3333-333333333333",
+                                                                    "quantity": 2
+                                                                  }]
+                                                                }
+                                                                """,
+                                                "987654321"),
+
+                                Arguments.of(
+                                                "object productId instead of UUID string",
+                                                """
+                                                                {
+                                                                  "customerId": "22222222-2222-2222-2222-222222222222",
+                                                                  "items": [{
+                                                                    "productId": {
+                                                                      "raw": "synthetic-product-object-marker"
+                                                                    },
+                                                                    "quantity": 2
+                                                                  }]
+                                                                }
+                                                                """,
+                                                "synthetic-product-object-marker"),
+
+                                Arguments.of(
+                                                "decimal quantity",
+                                                """
+                                                                {
+                                                                  "customerId": "22222222-2222-2222-2222-222222222222",
+                                                                  "items": [{
+                                                                    "productId": "33333333-3333-3333-3333-333333333333",
+                                                                    "quantity": 2.75
+                                                                  }]
+                                                                }
+                                                                """,
+                                                "2.75"),
+
+                                Arguments.of(
+                                                "quantity above Integer maximum",
+                                                """
+                                                                {
+                                                                  "customerId": "22222222-2222-2222-2222-222222222222",
+                                                                  "items": [{
+                                                                    "productId": "33333333-3333-3333-3333-333333333333",
+                                                                    "quantity": 2147483648
+                                                                  }]
+                                                                }
+                                                                """,
+                                                "2147483648"),
+
+                                Arguments.of(
+                                                "quantity below Integer minimum",
+                                                """
+                                                                {
+                                                                  "customerId": "22222222-2222-2222-2222-222222222222",
+                                                                  "items": [{
+                                                                    "productId": "33333333-3333-3333-3333-333333333333",
+                                                                    "quantity": -2147483649
+                                                                  }]
+                                                                }
+                                                                """,
+                                                "-2147483649"));
+        }
+
+        /**
+         * Supplies duplicate JSON properties at different contract levels to verify
+         * that
+         * ambiguous payloads are rejected instead of resolved by parser ordering.
+         */
+        private static Stream<Arguments> duplicateFieldBodies() {
+
+                return Stream.of(
+                                Arguments.of(
+                                                "duplicate customerId",
+                                                """
+                                                                {
+                                                                  "customerId": "11111111-1111-1111-1111-111111111111",
+                                                                  "customerId": "22222222-2222-2222-2222-222222222222",
+                                                                  "items": [{
+                                                                    "productId": "33333333-3333-3333-3333-333333333333",
+                                                                    "quantity": 2
+                                                                  }]
+                                                                }
+                                                                """,
+                                                "22222222-2222-2222-2222-222222222222"),
+
+                                Arguments.of(
+                                                "duplicate productId",
+                                                """
+                                                                {
+                                                                  "customerId": "22222222-2222-2222-2222-222222222222",
+                                                                  "items": [{
+                                                                    "productId": "33333333-3333-3333-3333-333333333333",
+                                                                    "productId": "44444444-4444-4444-4444-444444444444",
+                                                                    "quantity": 2
+                                                                  }]
+                                                                }
+                                                                """,
+                                                "44444444-4444-4444-4444-444444444444"),
+
+                                Arguments.of(
+                                                "duplicate quantity",
+                                                """
+                                                                {
+                                                                  "customerId": "22222222-2222-2222-2222-222222222222",
+                                                                  "items": [{
+                                                                    "productId": "33333333-3333-3333-3333-333333333333",
+                                                                    "quantity": 2,
+                                                                    "quantity": 999999937
+                                                                  }]
+                                                                }
+                                                                """,
+                                                "999999937"));
+        }
+
+        /**
+         * Supplies malformed but syntactically valid JSON scenarios so that validation
+         * behavior remains explicit without duplicating HTTP setup in every test.
+         */
+        private static Stream<Arguments> invalidRequestBodies() {
+
+                return Stream.of(
+                                // Why: explicit null is semantically different from an omitted field
+                                // at the JSON boundary even though both violate the contract.
+                                Arguments.of(
+                                                "null quantity",
+                                                """
+                                                                {
+                                                                  "customerId": "22222222-2222-2222-2222-222222222222",
+                                                                  "items": [{
+                                                                    "productId": "33333333-3333-3333-3333-333333333333",
+                                                                    "quantity": null
+                                                                  }]
+                                                                }
+                                                                """),
+                                Arguments.of(
+                                                "missing customerId",
+                                                """
+                                                                {
+                                                                  "items": [{
+                                                                    "productId": "33333333-3333-3333-3333-333333333333",
+                                                                    "quantity": 2
+                                                                  }]
+                                                                }
+                                                                """),
+
+                                // Why: null collection and empty collection are distinct client errors.
+                                Arguments.of(
+                                                "null items",
+                                                """
+                                                                {
+                                                                  "customerId": "22222222-2222-2222-2222-222222222222",
+                                                                  "items": null
+                                                                }
+                                                                """),
+
+                                // Why: empty orders are invalid before reaching the domain.
+                                Arguments.of(
+                                                "empty items",
+                                                """
+                                                                {
+                                                                  "customerId": "22222222-2222-2222-2222-222222222222",
+                                                                  "items": []
+                                                                }
+                                                                """),
+
+                                // Why: null collection elements otherwise cause delayed runtime failures.
+                                Arguments.of(
+                                                "null item",
+                                                """
+                                                                {
+                                                                  "customerId": "22222222-2222-2222-2222-222222222222",
+                                                                  "items": [null]
+                                                                }
+                                                                """),
+
+                                // Why: every order item must reference a concrete product.
+                                Arguments.of(
+                                                "missing productId",
+                                                """
+                                                                {
+                                                                  "customerId": "22222222-2222-2222-2222-222222222222",
+                                                                  "items": [{
+                                                                    "quantity": 2
+                                                                  }]
+                                                                }
+                                                                """),
+
+                                // Why: absent quantity must not silently become zero.
+                                Arguments.of(
+                                                "missing quantity",
+                                                """
+                                                                {
+                                                                  "customerId": "22222222-2222-2222-2222-222222222222",
+                                                                  "items": [{
+                                                                    "productId": "33333333-3333-3333-3333-333333333333"
+                                                                  }]
+                                                                }
+                                                                """),
+
+                                // Why: zero quantity has no valid ordering semantics.
+                                Arguments.of(
+                                                "zero quantity",
+                                                """
+                                                                {
+                                                                  "customerId": "22222222-2222-2222-2222-222222222222",
+                                                                  "items": [{
+                                                                    "productId": "33333333-3333-3333-3333-333333333333",
+                                                                    "quantity": 0
+                                                                  }]
+                                                                }
+                                                                """),
+
+                                // Why: negative quantities could otherwise corrupt future stock calculations.
+                                Arguments.of(
+                                                "negative quantity",
+                                                """
+                                                                {
+                                                                  "customerId": "22222222-2222-2222-2222-222222222222",
+                                                                  "items": [{
+                                                                    "productId": "33333333-3333-3333-3333-333333333333",
+                                                                    "quantity": -1
+                                                                  }]
+                                                                }
+                                                                """));
+        }
+
+        /**
+         * Configures a valid application response so parser tests fail because of the
+         * HTTP contract itself rather than because an unstubbed mock returned null.
+         */
+        private void stubSuccessfulOrder() {
+
+                var order = Order.create(
+                                UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                                UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+                                UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc"),
+                                List.of(new OrderItem(
+                                                UUID.fromString(
+                                                                "dddddddd-dddd-dddd-dddd-dddddddddddd"),
+                                                2)));
+
+                when(createOrderUseCase.create(any(CreateOrderCommand.class)))
+                                .thenReturn(order);
+        }
+
+        /**
+         * Produces the canonical valid payload used by tests that vary request metadata
+         * instead of the JSON structure.
+         */
+        private static String validBody(
+                        UUID customerId,
+                        UUID productId) {
+
+                return """
+                                {
+                                  "customerId": "%s",
+                                  "items": [
+                                    {
+                                      "productId": "%s",
+                                      "quantity": 2
+                                    }
+                                  ]
+                                }
+                                """.formatted(customerId, productId);
+        }
 }

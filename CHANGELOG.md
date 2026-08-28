@@ -14,6 +14,8 @@ The project follows Semantic Versioning.
 - Automated branch-source and pull-request-title policies.
 - Pull request engineering template.
 - Semantic Versioning and immutable release-tag policy.
+- Hardened Orders create-order HTTP vertical slice with explicit application ports, RFC 9457 errors and architecture verification.
+- Configurable JSON parser and Orders request resource-safety limits.
 
 ### Changed
 
@@ -23,6 +25,10 @@ The project follows Semantic Versioning.
 
 - GitHub Actions dependencies are pinned to immutable commit SHAs.
 - Production promotion requires validation before reaching `main`.
+- Orders rejects duplicate JSON properties, unsafe numeric coercion and
+  excessive parser/request resource consumption.
+- API error responses avoid reflecting rejected private values and internal
+  exception details.
 
 ### Fixed
 
