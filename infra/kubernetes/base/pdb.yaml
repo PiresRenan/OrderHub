@@ -1,0 +1,18 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: orderhub
+  labels:
+    app.kubernetes.io/name: orderhub
+    app.kubernetes.io/part-of: orderhub
+spec:
+  maxUnavailable: 1
+
+  # Unhealthy replicas must not indefinitely block voluntary node maintenance.
+  # Healthy replicas remain protected by the disruption budget.
+  unhealthyPodEvictionPolicy: AlwaysAllow
+
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: orderhub
+      app.kubernetes.io/component: api

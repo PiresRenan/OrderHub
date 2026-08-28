@@ -1,0 +1,18 @@
+# Deny by default. The application image build receives only the files required
+# to produce the runtime artifact.
+**
+
+# Maven project descriptor.
+!pom.xml
+
+# Linux Maven Wrapper script and its pinned distribution configuration.
+!mvnw
+!.mvn/
+!.mvn/wrapper/
+!.mvn/wrapper/maven-wrapper.properties
+
+# Only production application sources/resources belong in the image build
+# context. Tests are executed independently by the CI verification stage.
+!src/
+!src/main/
+!src/main/**

@@ -1,0 +1,43 @@
+services:
+  orderhub:
+    # Local development image. `docker compose up --build` rebuilds it from the
+    # repository Dockerfile while preserving a stable local image reference.
+    image: orderhub:oh-006
+
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_VERSION: ${ORDERHUB_APP_VERSION:-0.1.0-SNAPSHOT}
+        VCS_REF: ${ORDERHUB_VCS_REF:-development}
+
+    # Binding only to loopback avoids exposing the development API to other
+    # interfaces on the host by default.
+    ports:
+      - "127.0.0.1:${ORDERHUB_HTTP_PORT:-8080}:8080"
+
+    # Reinforces the immutable identity already defined by the runtime image.
+    user: "10001:10001"
+
+    # Application runtime is expected to be immutable. Spring/Tomcat/JVM
+    # temporary files receive an explicit ephemeral filesystem instead.
+    read_only: true
+    tmpfs:
+      - "/tmp:rw,noexec,nosuid,mode=1777,uid=10001,gid=10001"
+
+    # The application requires no Linux capabilities for its current HTTP
+    # workload and must not gain new privileges at runtime.
+    cap_drop:
+      - ALL
+
+    security_opt:
+      - no-new-privileges:true
+
+    # Keep Compose lifecycle aligned with the Docker image and the application's
+    # bounded 25-second graceful shutdown phase.
+    stop_signal: SIGTERM
+    stop_grace_period: 30s
+
+    # Local development failures remain visible instead of being hidden behind
+    # automatic restart loops. Kubernetes will own restart policy later.
+    restart: "no"
