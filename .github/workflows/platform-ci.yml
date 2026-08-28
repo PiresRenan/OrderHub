@@ -1,0 +1,442 @@
+name: Platform CI
+
+on:
+  pull_request:
+    branches:
+      - main
+      - pre-release
+
+  push:
+    branches:
+      - main
+      - pre-release
+
+permissions:
+  contents: read
+
+concurrency:
+  group: platform-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  KIND_VERSION: v0.33.0
+
+  # Official Linux AMD64 release digest for kind v0.33.0.
+  KIND_LINUX_AMD64_SHA256: aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d
+
+  KUBECTL_VERSION: v1.36.1
+  ORDERHUB_IMAGE: orderhub:oh-006
+
+jobs:
+  platform:
+    name: platform-validation
+
+    # Use an explicit runner generation instead of following ubuntu-latest.
+    runs-on: ubuntu-24.04
+
+    timeout-minutes: 20
+
+    steps:
+      # Full history keeps repository validation behavior consistent with the
+      # primary Java CI workflow.
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Verify repository whitespace
+        run: git diff --check
+
+      # kind is pinned by release version and immutable SHA-256. kubectl is
+      # pinned by version and verified against the official Kubernetes checksum.
+      - name: Install pinned Kubernetes tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          curl \
+            --fail \
+            --location \
+            --silent \
+            --show-error \
+            --retry 5 \
+            --output /tmp/kind \
+            "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64"
+
+          echo "${KIND_LINUX_AMD64_SHA256}  /tmp/kind" |
+            sha256sum --check
+
+          sudo install \
+            --mode 0755 \
+            /tmp/kind \
+            /usr/local/bin/kind
+
+          curl \
+            --fail \
+            --location \
+            --silent \
+            --show-error \
+            --retry 5 \
+            --output /tmp/kubectl \
+            "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+
+          curl \
+            --fail \
+            --location \
+            --silent \
+            --show-error \
+            --retry 5 \
+            --output /tmp/kubectl.sha256 \
+            "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl.sha256"
+
+          echo "$(cat /tmp/kubectl.sha256)  /tmp/kubectl" |
+            sha256sum --check
+
+          sudo install \
+            --mode 0755 \
+            /tmp/kubectl \
+            /usr/local/bin/kubectl
+
+          kind version
+          kubectl version --client
+
+      # These checks require no running workload and catch malformed Compose or
+      # Kustomize configuration before consuming resources on container builds.
+      - name: Validate platform definitions
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker compose config --quiet
+
+          kubectl kustomize \
+            infra/kubernetes/overlays/local \
+            > /tmp/orderhub-local.yaml
+
+          kubectl kustomize \
+            infra/kubernetes/overlays/scale \
+            > /tmp/orderhub-scale.yaml
+
+          test -s /tmp/orderhub-local.yaml
+          test -s /tmp/orderhub-scale.yaml
+
+      # CI verification and image packaging remain intentionally separate.
+      # The Java CI job owns clean verify; this job validates the deployable
+      # artifact produced by the repository Dockerfile.
+      - name: Build OrderHub image
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker buildx build \
+            --load \
+            --platform linux/amd64 \
+            --tag "${ORDERHUB_IMAGE}" \
+            .
+
+      # Validate properties of the actual final OCI image rather than assuming
+      # Dockerfile declarations produced the intended runtime surface.
+      - name: Verify hardened image
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          runtime_user="$(
+            docker image inspect \
+              "${ORDERHUB_IMAGE}" \
+              --format '{{.Config.User}}'
+          )"
+
+          test "${runtime_user}" = "10001:10001"
+
+          exposed_ports="$(
+            docker image inspect \
+              "${ORDERHUB_IMAGE}" \
+              --format '{{json .Config.ExposedPorts}}'
+          )"
+
+          echo "${exposed_ports}" |
+            grep --fixed-strings '"8080/tcp"'
+
+          docker run \
+            --rm \
+            --entrypoint sh \
+            "${ORDERHUB_IMAGE}" \
+            -c '
+              test ! -e /application/src &&
+              ! command -v mvn >/dev/null 2>&1 &&
+              ! command -v javac >/dev/null 2>&1 &&
+              ! command -v unzip >/dev/null 2>&1
+            '
+
+      # Compose verifies the hardened runtime contract outside Kubernetes:
+      # loopback exposure, non-root execution, immutable root filesystem,
+      # writable ephemeral tmpfs and graceful termination.
+      - name: Verify Docker Compose runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker compose up \
+            --detach \
+            --no-build
+
+          ready=false
+
+          for attempt in $(seq 1 40); do
+            if curl \
+              --fail \
+              --silent \
+              --show-error \
+              http://127.0.0.1:8080/readyz |
+              grep --quiet '"status":"UP"'
+            then
+              ready=true
+              break
+            fi
+
+            sleep 1
+          done
+
+          if [ "${ready}" != "true" ]; then
+            docker compose logs orderhub
+            exit 1
+          fi
+
+          test "$(
+            docker compose exec \
+              --no-TTY \
+              orderhub \
+              id -u
+          )" = "10001"
+
+          if docker compose exec \
+            --no-TTY \
+            orderhub \
+            sh -c 'touch /application/ci-should-not-exist 2>/dev/null'
+          then
+            echo "Read-only root filesystem unexpectedly accepted a write."
+            exit 1
+          fi
+
+          docker compose exec \
+            --no-TTY \
+            orderhub \
+            sh -c 'touch /tmp/orderhub-ci && rm /tmp/orderhub-ci'
+
+          for endpoint in livez readyz actuator/health; do
+            curl \
+              --fail \
+              --silent \
+              --show-error \
+              "http://127.0.0.1:8080/${endpoint}" |
+              grep --quiet '"status":"UP"'
+          done
+
+          docker compose stop
+
+          docker compose logs orderhub |
+            grep --quiet 'Graceful shutdown complete'
+
+          docker compose down \
+            --remove-orphans
+
+      # The development profile proves that the smallest reproducible cluster
+      # can admit the Restricted workload and run two healthy replicas.
+      - name: Verify development Kubernetes profile
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          kind create cluster \
+            --config infra/kubernetes/kind/dev.yaml \
+            --wait 120s
+
+          kind load docker-image \
+            "${ORDERHUB_IMAGE}" \
+            --name orderhub-dev
+
+          kubectl apply \
+            -f infra/kubernetes/overlays/local/namespace.yaml
+
+          kubectl apply \
+            --dry-run=server \
+            -k infra/kubernetes/overlays/local
+
+          kubectl apply \
+            -k infra/kubernetes/overlays/local
+
+          kubectl rollout status \
+            deployment/orderhub \
+            --namespace orderhub-local \
+            --timeout 120s
+
+          test "$(
+            kubectl get deployment orderhub \
+              --namespace orderhub-local \
+              --output jsonpath='{.status.availableReplicas}'
+          )" = "2"
+
+          pod="$(
+            kubectl get pods \
+              --namespace orderhub-local \
+              --selector app.kubernetes.io/name=orderhub \
+              --output jsonpath='{.items[0].metadata.name}'
+          )"
+
+          test "$(
+            kubectl exec \
+              --namespace orderhub-local \
+              "${pod}" \
+              -- id -u
+          )" = "10001"
+
+          if kubectl exec \
+            --namespace orderhub-local \
+            "${pod}" \
+            -- sh -c 'touch /application/ci-should-not-exist 2>/dev/null'
+          then
+            echo "Kubernetes root filesystem unexpectedly accepted a write."
+            exit 1
+          fi
+
+          kubectl exec \
+            --namespace orderhub-local \
+            "${pod}" \
+            -- sh -c 'touch /tmp/orderhub-ci && rm /tmp/orderhub-ci'
+
+          kubectl exec \
+            --namespace orderhub-local \
+            "${pod}" \
+            -- sh -c '
+              test ! -e \
+                /var/run/secrets/kubernetes.io/serviceaccount/token
+            '
+
+          kubectl get \
+            --raw \
+            '/api/v1/namespaces/orderhub-local/services/http:orderhub:8080/proxy/readyz' |
+            grep --quiet '"status":"UP"'
+
+          endpoint_count="$(
+            kubectl get endpointslice \
+              --namespace orderhub-local \
+              --selector kubernetes.io/service-name=orderhub \
+              --output jsonpath='{range .items[*].endpoints[*]}{.addresses[0]}{"\n"}{end}' |
+              sed '/^$/d' |
+              wc -l
+          )"
+
+          test "${endpoint_count}" -eq 2
+
+          disruptions_allowed="$(
+            kubectl get pdb orderhub \
+              --namespace orderhub-local \
+              --output jsonpath='{.status.disruptionsAllowed}'
+          )"
+
+          test "${disruptions_allowed}" = "1"
+
+      # Delete the small cluster before creating the three-node profile so both
+      # environments never consume runner resources simultaneously.
+      - name: Remove development Kubernetes profile
+        if: success()
+        shell: bash
+        run: |
+          kind delete cluster \
+            --name orderhub-dev
+
+      # The scale profile verifies actual cross-node scheduling. Destructive
+      # node-failure timing remains an acceptance experiment rather than an
+      # every-commit CI workload.
+      - name: Verify scale Kubernetes profile
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          kind create cluster \
+            --config infra/kubernetes/kind/scale.yaml \
+            --wait 120s
+
+          kind load docker-image \
+            "${ORDERHUB_IMAGE}" \
+            --name orderhub-scale
+
+          kubectl apply \
+            -f infra/kubernetes/overlays/scale/namespace.yaml
+
+          kubectl apply \
+            --dry-run=server \
+            -k infra/kubernetes/overlays/scale
+
+          kubectl apply \
+            -k infra/kubernetes/overlays/scale
+
+          kubectl rollout status \
+            deployment/orderhub \
+            --namespace orderhub-scale \
+            --timeout 120s
+
+          scheduled_nodes="$(
+            kubectl get pods \
+              --namespace orderhub-scale \
+              --selector app.kubernetes.io/name=orderhub \
+              --output jsonpath='{range .items[*]}{.spec.nodeName}{"\n"}{end}'
+          )"
+
+          echo "${scheduled_nodes}"
+
+          distinct_nodes="$(
+            printf '%s\n' "${scheduled_nodes}" |
+              sed '/^$/d' |
+              sort --unique |
+              wc -l
+          )"
+
+          test "${distinct_nodes}" -eq 2
+
+          if printf '%s\n' "${scheduled_nodes}" |
+            grep --quiet 'control-plane'
+          then
+            echo "OrderHub was unexpectedly scheduled on the control-plane."
+            exit 1
+          fi
+
+          while read -r node; do
+            test "$(
+              kubectl get node "${node}" \
+                --output jsonpath='{.metadata.labels.orderhub-workload}'
+            )" = "true"
+          done <<< "${scheduled_nodes}"
+
+          kubectl get \
+            --raw \
+            '/api/v1/namespaces/orderhub-scale/services/http:orderhub:8080/proxy/readyz' |
+            grep --quiet '"status":"UP"'
+
+          endpoint_count="$(
+            kubectl get endpointslice \
+              --namespace orderhub-scale \
+              --selector kubernetes.io/service-name=orderhub \
+              --output jsonpath='{range .items[*].endpoints[*]}{.addresses[0]}{"\n"}{end}' |
+              sed '/^$/d' |
+              wc -l
+          )"
+
+          test "${endpoint_count}" -eq 2
+
+      # Cleanup is intentionally unconditional because a failed assertion must
+      # not leave kind nodes or Compose workloads consuming runner resources.
+      - name: Cleanup platform resources
+        if: always()
+        shell: bash
+        run: |
+          docker compose down \
+            --remove-orphans || true
+
+          kind delete cluster \
+            --name orderhub-dev || true
+
+          kind delete cluster \
+            --name orderhub-scale || true
