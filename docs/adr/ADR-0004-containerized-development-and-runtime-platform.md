@@ -358,6 +358,41 @@ Custom failover timing is therefore deferred until shared persistence,
 idempotency and concurrency guarantees exist and can be tested under duplicate
 execution and partition scenarios.
 
+## Rolling-replacement evidence
+
+OH-006 also exercised a Kubernetes rolling replacement independently from the
+initial Deployment rollout.
+
+The experiment started with two Ready and Available OrderHub replicas and
+triggered a new Deployment revision using `kubectl rollout restart`.
+
+Health was sampled continuously through the Kubernetes Service abstraction
+rather than by addressing an individual Pod.
+
+Observed behavior:
+
+- the initial Deployment reported two Ready and two Available replicas;
+- the rolling replacement completed successfully;
+- the minimum number of Available replicas observed during the rollout was two;
+- the minimum number of Ready replicas observed during the rollout was two;
+- no Service health failures were observed during the sampled requests;
+- old and new ReplicaSets coexisted temporarily while the replacement
+  progressed;
+- the previous ReplicaSet converged to zero replicas;
+- the new ReplicaSet converged to two Ready replicas;
+- the final EndpointSlice contained the two replacement Pod endpoints;
+- the PodDisruptionBudget returned to one allowed disruption after convergence.
+
+The experiment also observed up to four Pod objects temporarily while old Pods
+were terminating. This does not imply four serving replicas or a violation of
+`maxSurge: 1`; terminating Pods can remain present while replacement Pods are
+created and become Ready.
+
+This evidence satisfies the OH-006 requirement that rolling replacement can
+complete without clients being directly coupled to an individual Pod. The
+result demonstrates the configured rollout behavior under the tested local
+environment and is not a production availability or capacity guarantee.
+
 ## CI acceptance evidence
 
 The platform baseline was independently validated on a clean GitHub-hosted
