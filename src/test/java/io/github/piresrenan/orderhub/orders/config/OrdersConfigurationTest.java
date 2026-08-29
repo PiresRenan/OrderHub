@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Import;
 
 
 import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
-import io.github.piresrenan.orderhub.orders.adapter.out.persistence.memory.InMemoryOrderRepository;
+import io.github.piresrenan.orderhub.orders.adapter.out.persistence.postgresql.PostgreSqlOrderRepository;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderIdGenerator;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderRepository;
@@ -36,7 +36,7 @@ class OrdersConfigurationTest {
         // Prevents: missing beans, ambiguous dependencies and accidental adapter
         // replacement.
         assertThat(createOrderUseCase).isNotNull();
-        assertThat(orderRepository).isInstanceOf(InMemoryOrderRepository.class);
+        assertThat(orderRepository).isInstanceOf(PostgreSqlOrderRepository.class);
         assertThat(orderIdGenerator).isNotNull();
     }
 }
