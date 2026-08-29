@@ -22,6 +22,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
+import io.github.piresrenan.orderhub.orders.application.port.out.OrderPersistenceException;
 import io.github.piresrenan.orderhub.orders.domain.model.Order;
 import io.github.piresrenan.orderhub.orders.domain.model.OrderItem;
 import io.github.piresrenan.orderhub.orders.domain.model.OrderStatus;
@@ -339,7 +340,8 @@ class PostgreSqlOrderRepositoryTest {
                     transactionTemplate);
 
             assertThatThrownBy(() -> repository.save(order))
-                    .isInstanceOf(DataIntegrityViolationException.class);
+                    .isInstanceOf(OrderPersistenceException.class)
+                    .hasCauseInstanceOf(DataIntegrityViolationException.class);
 
             var persistedRoots = jdbcTemplate.queryForObject("""
                     SELECT COUNT(*)

@@ -4,9 +4,12 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.TransactionException;
 import org.springframework.transaction.support.TransactionOperations;
 
+import io.github.piresrenan.orderhub.orders.application.port.out.OrderPersistenceException;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderRepository;
 import io.github.piresrenan.orderhub.orders.domain.model.Order;
 import io.github.piresrenan.orderhub.orders.domain.model.OrderItem;
@@ -94,15 +97,20 @@ public final class PostgreSqlOrderRepository implements OrderRepository {
      *
      * @param order valid aggregate to persist
      * @return the same aggregate after successful persistence
+     * @throws OrderPersistenceException when the aggregate cannot be persisted
      */
     @Override
     public Order save(Order order) {
-        transactionOperations.executeWithoutResult(transactionStatus -> {
-            insertOrderRoot(order);
-            insertOrderItems(order);
-        });
+        try {
+            transactionOperations.executeWithoutResult(transactionStatus -> {
+                insertOrderRoot(order);
+                insertOrderItems(order);
+            });
 
-        return order;
+            return order;
+        } catch (DataAccessException | TransactionException exception) {
+            throw new OrderPersistenceException(exception);
+        }
     }
 
     /**
@@ -117,33 +125,38 @@ public final class PostgreSqlOrderRepository implements OrderRepository {
      * @param orderId aggregate identifier
      * @return reconstructed Order when found in the requested tenant, otherwise
      *         an empty Optional
+     * @throws OrderPersistenceException when the lookup cannot be completed
      */
     @Override
     public Optional<Order> findById(
             UUID tenantId,
             UUID orderId) {
 
-        var root = loadOrderRoot(
-                tenantId,
-                orderId);
+        try {
+            var root = loadOrderRoot(
+                    tenantId,
+                    orderId);
 
-        if (root.isEmpty()) {
-            return Optional.empty();
+            if (root.isEmpty()) {
+                return Optional.empty();
+            }
+
+            var persistedRoot = root.orElseThrow();
+
+            var items = loadOrderItems(
+                    tenantId,
+                    orderId);
+
+            return Optional.of(
+                    Order.rehydrate(
+                            persistedRoot.id(),
+                            persistedRoot.tenantId(),
+                            persistedRoot.customerId(),
+                            items,
+                            persistedRoot.status()));
+        } catch (DataAccessException exception) {
+            throw new OrderPersistenceException(exception);
         }
-
-        var persistedRoot = root.orElseThrow();
-
-        var items = loadOrderItems(
-                tenantId,
-                orderId);
-
-        return Optional.of(
-                Order.rehydrate(
-                        persistedRoot.id(),
-                        persistedRoot.tenantId(),
-                        persistedRoot.customerId(),
-                        items,
-                        persistedRoot.status()));
     }
 
     /**

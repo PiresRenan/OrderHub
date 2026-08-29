@@ -17,6 +17,8 @@ public interface OrderRepository {
      *
      * @param order valid aggregate to persist
      * @return the persisted aggregate
+     * @throws OrderPersistenceException when the configured persistence mechanism
+     *         cannot complete the aggregate write
      */
     Order save(Order order);
 
@@ -31,6 +33,8 @@ public interface OrderRepository {
      * @param orderId Order aggregate identifier
      * @return the matching aggregate when it exists inside the requested tenant,
      *         otherwise an empty Optional
+     * @throws OrderPersistenceException when the configured persistence mechanism
+     *         cannot complete the lookup
      */
     Optional<Order> findById(
             UUID tenantId,
