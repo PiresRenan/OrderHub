@@ -1,6 +1,6 @@
 # ADR-0005 — PostgreSQL Persistence and Transaction Boundaries
 
-Status: DESIGNED
+Status: TESTED
 
 ## Context
 
@@ -552,28 +552,42 @@ constraint and transaction behavior directly visible and testable.
 A future use case requiring atomic coordination across multiple output ports
 will require re-evaluation of the repository-owned transaction boundary.
 
-## Verification Required Before TESTED
+## Verification Evidence
 
-ADR-0005 remains DESIGNED until evidence proves:
+ADR-0005 is TESTED based on the implementation and acceptance evidence produced
+during OH-007.
 
-- PostgreSQL 18.6 starts using the pinned image;
-- Flyway creates the complete Orders schema from an empty database;
-- existing application tests remain green;
-- PostgreSQL adapter tests use a real Testcontainers PostgreSQL instance;
-- one Order with multiple items commits atomically;
-- forced item failure rolls back the root and all item writes;
-- persisted state can be rehydrated into the domain;
-- tenant-scoped lookup cannot return an Order belonging to another tenant;
-- database constraints reject invalid persisted state;
-- Compose starts the application and PostgreSQL using synthetic configuration;
-- readiness reacts correctly to database availability;
-- liveness remains process-oriented;
-- no database implementation details leak through HTTP error responses;
-- `git diff --check` succeeds;
-- `mvnw clean verify` succeeds;
-- required CI and platform checks succeed.
+The verified evidence includes:
 
-Only after this evidence exists may ADR-0005 become TESTED.
+- PostgreSQL 18.6 started from the digest-pinned image defined by this ADR;
+- Flyway created the complete Orders schema from an empty PostgreSQL database;
+- persistence integration tests executed against a real Testcontainers
+  PostgreSQL instance;
+- complete Orders with multiple items were persisted and reconstructed;
+- tenant-scoped lookup prevented retrieval across tenant boundaries;
+- database constraints rejected invalid persisted state;
+- forced failure during item persistence rolled back the Order root and all
+  previously written items;
+- runtime database failure was translated into a framework-neutral application
+  persistence failure;
+- request-time database outage produced a privacy-safe RFC 9457 HTTP response
+  without SQL, JDBC, PostgreSQL, request identifier or stack-trace disclosure;
+- Docker Compose started OrderHub and PostgreSQL using externally supplied
+  synthetic configuration;
+- Kubernetes development and scale profiles were validated against a disposable
+  PostgreSQL CI fixture while keeping database deployment outside the product
+  topology;
+- database availability affected readiness while liveness remained
+  process-oriented;
+- application startup and outage logging were validated without JDBC URL or
+  concrete PostgreSQL connection leakage;
+- `git diff --check` succeeded;
+- `.\mvnw.cmd clean verify` completed with 83 tests, 0 failures, 0 errors and
+  0 skipped;
+- PR #13 required Branch Policy, CI and Platform CI validation completed
+  successfully before integration into `pre-release`.
+
+This evidence satisfies the verification requirements established by this ADR.
 
 ## Follow-up Decisions
 
