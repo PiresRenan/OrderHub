@@ -26,6 +26,11 @@ env:
 
   KUBECTL_VERSION: v1.36.1
   ORDERHUB_IMAGE: orderhub:oh-006
+  # Synthetic database configuration used only by automated platform
+  # validation. These values are not production credentials.
+  ORDERHUB_DB_NAME: orderhub_ci
+  ORDERHUB_DB_USER: orderhub_ci
+  ORDERHUB_DB_PASSWORD: synthetic-ci-password
 
 jobs:
   platform:
@@ -260,6 +265,33 @@ jobs:
           kubectl apply \
             -f infra/kubernetes/overlays/local/namespace.yaml
 
+          # The application owns only the database connectivity contract.
+          # CI supplies a synthetic Secret and disposable PostgreSQL fixture
+          # for the lifetime of this validation cluster.
+          kubectl create secret generic orderhub-database \
+            --namespace orderhub-local \
+            --from-literal="url=jdbc:postgresql://orderhub-postgres-fixture:5432/${ORDERHUB_DB_NAME}" \
+            --from-literal="database=${ORDERHUB_DB_NAME}" \
+            --from-literal="username=${ORDERHUB_DB_USER}" \
+            --from-literal="password=${ORDERHUB_DB_PASSWORD}" \
+            --dry-run=client \
+            --output yaml |
+            kubectl apply --filename -
+
+          kubectl apply \
+            --dry-run=server \
+            --namespace orderhub-local \
+            --filename infra/kubernetes/ci/postgres-fixture.yaml
+
+          kubectl apply \
+            --namespace orderhub-local \
+            --filename infra/kubernetes/ci/postgres-fixture.yaml
+
+          kubectl rollout status \
+            deployment/orderhub-postgres-fixture \
+            --namespace orderhub-local \
+            --timeout 120s
+
           kubectl apply \
             --dry-run=server \
             -k infra/kubernetes/overlays/local
@@ -365,6 +397,32 @@ jobs:
 
           kubectl apply \
             -f infra/kubernetes/overlays/scale/namespace.yaml
+
+          # The scale profile uses the same external database contract while
+          # keeping the PostgreSQL validation fixture outside product overlays.
+          kubectl create secret generic orderhub-database \
+            --namespace orderhub-scale \
+            --from-literal="url=jdbc:postgresql://orderhub-postgres-fixture:5432/${ORDERHUB_DB_NAME}" \
+            --from-literal="database=${ORDERHUB_DB_NAME}" \
+            --from-literal="username=${ORDERHUB_DB_USER}" \
+            --from-literal="password=${ORDERHUB_DB_PASSWORD}" \
+            --dry-run=client \
+            --output yaml |
+            kubectl apply --filename -
+
+          kubectl apply \
+            --dry-run=server \
+            --namespace orderhub-scale \
+            --filename infra/kubernetes/ci/postgres-fixture.yaml
+
+          kubectl apply \
+            --namespace orderhub-scale \
+            --filename infra/kubernetes/ci/postgres-fixture.yaml
+
+          kubectl rollout status \
+            deployment/orderhub-postgres-fixture \
+            --namespace orderhub-scale \
+            --timeout 120s
 
           kubectl apply \
             --dry-run=server \

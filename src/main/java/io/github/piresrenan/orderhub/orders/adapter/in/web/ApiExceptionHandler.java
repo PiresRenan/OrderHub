@@ -21,6 +21,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import io.github.piresrenan.orderhub.orders.application.port.out.OrderPersistenceException;
+
 @RestControllerAdvice
 public final class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
@@ -44,6 +46,31 @@ public final class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                                 "Request too large",
                                 "The request exceeds the supported processing limits.",
                                 "REQUEST_TOO_LARGE");
+
+                return ResponseEntity
+                                .status(status)
+                                .body(problem);
+        }
+
+        /**
+         * Converts an application persistence failure into a stable internal-error
+         * contract without exposing storage technology, identifiers or exception
+         * internals.
+         *
+         * @return privacy-safe RFC 9457 response for a persistence operation that
+         *         could not be completed
+         */
+        @ExceptionHandler(OrderPersistenceException.class)
+        protected ResponseEntity<Object> handleOrderPersistenceFailure() {
+
+                var status = HttpStatus.INTERNAL_SERVER_ERROR;
+
+                var problem = problem(
+                                status,
+                                "internal-error",
+                                "Internal server error",
+                                "The request could not be completed.",
+                                "INTERNAL_ERROR");
 
                 return ResponseEntity
                                 .status(status)
