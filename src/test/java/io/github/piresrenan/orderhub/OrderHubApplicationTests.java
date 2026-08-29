@@ -1,9 +1,14 @@
 package io.github.piresrenan.orderhub;
 
 import org.junit.jupiter.api.Test;
+
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
+
+import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
 
 @SpringBootTest
+@Import(PostgreSqlTestConfiguration.class)
 class OrderHubApplicationTests {
 
     @Test

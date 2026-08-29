@@ -5,13 +5,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 
+
+import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
 import io.github.piresrenan.orderhub.orders.adapter.out.persistence.memory.InMemoryOrderRepository;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderIdGenerator;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderRepository;
 
 @SpringBootTest
+@Import(PostgreSqlTestConfiguration.class)
 class OrdersConfigurationTest {
 
     @Autowired

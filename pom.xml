@@ -5,13 +5,25 @@
 
     <modelVersion>4.0.0</modelVersion>
 
+    <!-- ==================================================================
+         PARENT
+         Spring Boot's parent POM provides curated dependency management for
+         every Spring-managed library and the default plugin configuration.
+         Local <version> tags are therefore only declared for artifacts the
+         parent does not already manage.
+         ================================================================== -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
         <version>4.1.1</version>
+        <!-- Empty relativePath forces resolution from the repository instead
+             of walking up the local directory tree. -->
         <relativePath/>
     </parent>
 
+    <!-- ==================================================================
+         PROJECT COORDINATES AND METADATA
+         ================================================================== -->
     <groupId>io.github.piresrenan</groupId>
     <artifactId>orderhub</artifactId>
     <version>0.1.0-SNAPSHOT</version>
@@ -19,13 +31,32 @@
     <name>OrderHub</name>
     <description>B2B multi-tenant order management platform</description>
 
+    <!-- ==================================================================
+         BUILD PROPERTIES
+         Toolchain level and the versions of third-party BOMs that are not
+         governed by the Spring Boot parent.
+         ================================================================== -->
     <properties>
+        <!-- Language level and bytecode target for compilation and tests. -->
         <java.version>21</java.version>
+
+        <!-- Spring Modulith release train; must stay aligned with the
+             Spring Boot generation declared in <parent>. -->
         <spring-modulith.version>2.1.1</spring-modulith.version>
     </properties>
 
+    <!-- ==================================================================
+         DEPENDENCY MANAGEMENT (BOM IMPORTS)
+         Centralizes versions for dependency families outside the Spring Boot
+         parent, so the <dependencies> block below stays version-free.
+         ================================================================== -->
     <dependencyManagement>
         <dependencies>
+            <!--
+                Spring Modulith BOM: aligns the versions of every
+                spring-modulith-* artifact (core, test, observability) to a
+                single release train.
+            -->
             <dependency>
                 <groupId>org.springframework.modulith</groupId>
                 <artifactId>spring-modulith-bom</artifactId>
@@ -37,47 +68,197 @@
     </dependencyManagement>
 
     <dependencies>
+
+        <!-- ==============================================================
+             1. WEB / INBOUND ADAPTER LAYER
+             HTTP entry points exposed by the application.
+             ============================================================== -->
+
+        <!--
+            Servlet stack: Spring MVC, embedded Tomcat, JSON serialization and
+            the HTTP message converters used by the REST controllers.
+            In Spring Boot 4 this artifact replaces spring-boot-starter-web.
+        -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc</artifactId>
         </dependency>
 
+        <!--
+            Jakarta Bean Validation (Hibernate Validator implementation).
+            Enables constraint annotations on request payloads and application
+            commands, validated declaratively via @Valid / @Validated.
+        -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
+        <!-- ==============================================================
+             2. OBSERVABILITY / OPERATIONS
+             Endpoints consumed by orchestrators and the deployment pipeline.
+             ============================================================== -->
+
+        <!--
+            Actuator endpoints (health, info, metrics). Backs container
+            liveness and readiness probes and post-deploy smoke checks.
+        -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
+        <!-- ==============================================================
+             3. ARCHITECTURE / MODULARITY
+             Runtime support for the modular monolith structure.
+             ============================================================== -->
+
+        <!--
+            Spring Modulith runtime: application module metadata, module
+            detection and the programming model that keeps inter-module
+            boundaries explicit rather than conventional.
+        -->
         <dependency>
             <groupId>org.springframework.modulith</groupId>
             <artifactId>spring-modulith-starter-core</artifactId>
         </dependency>
 
+        <!-- ==============================================================
+             4. PERSISTENCE
+             JDBC access, schema versioning and the database driver.
+             ============================================================== -->
+
+        <!--
+            Provides JdbcTemplate, DataSource autoconfiguration and imperative
+            JDBC transaction infrastructure without introducing an ORM.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc</artifactId>
+        </dependency>
+
+        <!--
+            Integrates Flyway with Spring Boot so the versioned migration
+            history becomes the single application-managed schema authority.
+            Required in Spring Boot 4: the presence of flyway-core alone no
+            longer triggers autoconfiguration.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
+        </dependency>
+
+        <!--
+            Flyway's PostgreSQL-specific database support, shipped as a
+            separate module since Flyway 10 and required by the PostgreSQL 18
+            persistence target.
+        -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+        </dependency>
+
+        <!--
+            JDBC driver. Runtime scope keeps PostgreSQL-specific driver APIs
+            off the compile classpath of the domain and application layers.
+        -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- ==============================================================
+             5. TEST — CORE
+             Base assertion, mocking and Spring context test infrastructure.
+             ============================================================== -->
+
+        <!--
+            Core test stack: JUnit 5, AssertJ, Mockito, Awaitility, JSONassert
+            and Spring Boot's test context support (@SpringBootTest).
+        -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
 
+        <!-- ==============================================================
+             6. TEST — SLICES
+             Narrow-scope tests for individual layers.
+             ============================================================== -->
+
+        <!--
+            MockMvc and the @WebMvcTest slice. In Spring Boot 4 the web test
+            infrastructure ships as its own starter instead of being bundled
+            into spring-boot-starter-test.
+        -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc-test</artifactId>
             <scope>test</scope>
         </dependency>
 
+        <!--
+            Module verification support: ApplicationModules.verify() for
+            architecture assertions and @ApplicationModuleTest to bootstrap a
+            single module in isolation.
+        -->
         <dependency>
             <groupId>org.springframework.modulith</groupId>
             <artifactId>spring-modulith-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- ==============================================================
+             7. TEST — INTEGRATION INFRASTRUCTURE
+             Disposable real dependencies for integration tests.
+             ============================================================== -->
+
+        <!--
+            Runs persistence integration tests against a real PostgreSQL
+            engine instead of H2 or mocked JDBC behavior. The testcontainers-
+            prefixed artifact ID is the Testcontainers 2.x naming.
+        -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            Integrates Testcontainers with Spring Boot ConnectionDetails so
+            full-context tests receive their PostgreSQL DataSource and Flyway
+            connection from a real disposable database.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            JUnit Jupiter extension (@Testcontainers / @Container) that binds
+            container startup and shutdown to the test lifecycle.
+        -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+
     </dependencies>
 
+    <!-- ==================================================================
+         BUILD
+         ================================================================== -->
     <build>
         <plugins>
+            <!--
+                Repackages the artifact into an executable fat jar and
+                provides the spring-boot:run and spring-boot:build-image
+                goals. Version and configuration inherited from the parent.
+            -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
