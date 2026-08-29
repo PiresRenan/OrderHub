@@ -442,16 +442,38 @@ application shutdown.
 
 ## Kubernetes Scope
 
-OH-007 does not deploy PostgreSQL into the current kind Kubernetes manifests.
+OH-007 does not make PostgreSQL part of the OrderHub application Kubernetes
+topology.
 
-The existing Kubernetes profiles model the application workload, not a
-production database topology.
+The committed application manifests model the OrderHub workload and may define
+the configuration contract required to reach an externally supplied database,
+but they must not claim ownership of PostgreSQL deployment, storage,
+replication, failover or high-availability topology.
 
-Running a single unmanaged PostgreSQL Pod merely to make the manifests appear
-complete would create misleading availability semantics.
+The OrderHub Deployment therefore receives database connectivity through
+externally supplied Kubernetes configuration. Database credentials must not be
+committed to application manifests.
 
-Database orchestration, HA and production topology require their own explicit
-decision.
+The local and scale Kustomize overlays must not include a PostgreSQL Deployment,
+StatefulSet, persistent volume or equivalent database workload as part of the
+application topology.
+
+Platform CI may provision a disposable PostgreSQL instance exclusively as a
+validation fixture so the real OrderHub Kubernetes workload can be exercised
+against its required database dependency.
+
+Such a fixture:
+
+- contains synthetic credentials only;
+- uses the PostgreSQL image pinned by this ADR;
+- is created only for the lifetime of the CI validation environment;
+- provides no durability or availability guarantees;
+- is not included by the application Kustomize base or overlays;
+- must not be presented as a production database architecture.
+
+This testing fixture does not decide database orchestration, HA, backup,
+replication or production topology. Those concerns require a separate decision
+when a concrete deployment requirement exists.
 
 ## Health Semantics
 
