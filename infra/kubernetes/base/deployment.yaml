@@ -6,6 +6,7 @@ metadata:
     app.kubernetes.io/name: orderhub
     app.kubernetes.io/component: api
     app.kubernetes.io/part-of: orderhub
+
 spec:
   # Two replicas establish the first horizontal application baseline.
   replicas: 2
@@ -34,7 +35,6 @@ spec:
         app.kubernetes.io/name: orderhub
         app.kubernetes.io/component: api
         app.kubernetes.io/part-of: orderhub
-
     spec:
       # OrderHub does not currently call the Kubernetes API.
       automountServiceAccountToken: false
@@ -82,6 +82,31 @@ spec:
           envFrom:
             - configMapRef:
                 name: orderhub-runtime-config
+
+          # Database connectivity is supplied by the deployment environment.
+          # The application manifests declare this contract but do not own or
+          # commit concrete database endpoints or credentials.
+          env:
+            - name: SPRING_DATASOURCE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: orderhub-database
+                  key: url
+                  optional: false
+
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: orderhub-database
+                  key: username
+                  optional: false
+
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: orderhub-database
+                  key: password
+                  optional: false
 
           securityContext:
             allowPrivilegeEscalation: false
