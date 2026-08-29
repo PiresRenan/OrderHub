@@ -1,4 +1,31 @@
 services:
+  postgres:
+    # Local durable-storage dependency for OrderHub development. The exact
+    # PostgreSQL release and OCI index are pinned to prevent floating runtime
+    # changes between developer machines and CI environments.
+    image: postgres:18.6-trixie@sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280
+
+    environment:
+      POSTGRES_DB: ${ORDERHUB_DB_NAME:?ORDERHUB_DB_NAME is required}
+      POSTGRES_USER: ${ORDERHUB_DB_USER:?ORDERHUB_DB_USER is required}
+      POSTGRES_PASSWORD: ${ORDERHUB_DB_PASSWORD:?ORDERHUB_DB_PASSWORD is required}
+
+    # PostgreSQL is intentionally not published to a host port. OrderHub reaches
+    # it through the private Compose network using the service DNS name.
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready --username=$${POSTGRES_USER} --dbname=$${POSTGRES_DB}"
+        ]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+      start_period: 3s
+
+    # Local failures remain observable rather than being hidden by restart loops.
+    restart: "no"
+
   orderhub:
     # Local development image. `docker compose up --build` rebuilds it from the
     # repository Dockerfile while preserving a stable local image reference.
@@ -10,6 +37,21 @@ services:
       args:
         APP_VERSION: ${ORDERHUB_APP_VERSION:-0.1.0-SNAPSHOT}
         VCS_REF: ${ORDERHUB_VCS_REF:-development}
+
+    # Initial application startup waits until PostgreSQL reports that it accepts
+    # connections. Runtime dependency loss remains an application-readiness
+    # concern rather than a Compose restart-policy concern.
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    # Spring receives database connectivity entirely from the runtime
+    # environment. No credentials or environment-specific addresses are baked
+    # into application.properties or the OCI image.
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${ORDERHUB_DB_NAME:?ORDERHUB_DB_NAME is required}
+      SPRING_DATASOURCE_USERNAME: ${ORDERHUB_DB_USER:?ORDERHUB_DB_USER is required}
+      SPRING_DATASOURCE_PASSWORD: ${ORDERHUB_DB_PASSWORD:?ORDERHUB_DB_PASSWORD is required}
 
     # Binding only to loopback avoids exposing the development API to other
     # interfaces on the host by default.
@@ -39,5 +81,6 @@ services:
     stop_grace_period: 30s
 
     # Local development failures remain visible instead of being hidden behind
-    # automatic restart loops. Kubernetes will own restart policy later.
+    # automatic restart loops. Kubernetes owns restart policy in orchestrated
+    # environments.
     restart: "no"
