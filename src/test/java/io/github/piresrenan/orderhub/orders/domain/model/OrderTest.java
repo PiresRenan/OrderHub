@@ -82,7 +82,8 @@ class OrderTest {
     void rejectsNullItemsInsideCollection() {
         // Why: collection cardinality alone does not guarantee valid elements.
         // Covers: null element validation.
-        // Prevents: delayed NullPointerExceptions in pricing, persistence or serialization.
+        // Prevents: delayed NullPointerExceptions in pricing, persistence or
+        // serialization.
 
         var items = new ArrayList<OrderItem>();
         items.add(null);
@@ -139,4 +140,114 @@ class OrderTest {
                         UUID.randomUUID(),
                         1));
     }
+
+    @Test
+    void rehydratesPersistedOrderState() {
+        // Why: loading an existing Order is not the same business operation as creating
+        // a new Order and must reconstruct the state supplied by persistence.
+        // Covers: explicit aggregate rehydration, persisted identity, lifecycle state
+        // and defensive ownership of the reconstructed item collection.
+        // Prevents: repositories pretending persisted Orders are new aggregates or
+        // mutating private domain state through persistence-specific mechanisms.
+
+        var id = UUID.randomUUID();
+        var tenantId = UUID.randomUUID();
+        var customerId = UUID.randomUUID();
+        var persistedItems = new ArrayList<>(validItems());
+
+        var order = Order.rehydrate(
+                id,
+                tenantId,
+                customerId,
+                persistedItems,
+                OrderStatus.CREATED);
+
+        persistedItems.clear();
+
+        assertThat(order.id())
+                .isEqualTo(id);
+
+        assertThat(order.tenantId())
+                .isEqualTo(tenantId);
+
+        assertThat(order.customerId())
+                .isEqualTo(customerId);
+
+        assertThat(order.items())
+                .hasSize(1);
+
+        assertThat(order.status())
+                .isEqualTo(OrderStatus.CREATED);
+    }
+
+    @Test
+    void rejectsRehydrationWithoutStatus() {
+        // Why: an existing aggregate cannot be reconstructed without a lifecycle state.
+        // Covers: status validation specific to Order.rehydrate(...).
+        // Prevents: persisted rows with missing lifecycle information entering the
+        // domain.
+
+        assertThatThrownBy(() -> Order.rehydrate(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                validItems(),
+                null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Order status is required");
+    }
+
+    @Test
+    void rejectsRehydrationWithoutOrderId() {
+        // Why: persistence reconstruction must not bypass the aggregate identity
+        // invariant.
+        // Covers: shared structural validation invoked by Order.rehydrate(...).
+        // Prevents: corrupted persisted rows becoming identity-less domain aggregates.
+
+        assertThatThrownBy(() -> Order.rehydrate(
+                null,
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                validItems(),
+                OrderStatus.CREATED))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Order id is required");
+    }
+
+    @Test
+    void rejectsRehydrationWithoutItems() {
+        // Why: loading persisted state must preserve the minimum-content invariant.
+        // Covers: empty item collection validation during reconstruction.
+        // Prevents: persistence defects creating aggregates that could never be created
+        // legitimately through the domain.
+
+        assertThatThrownBy(() -> Order.rehydrate(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                List.of(),
+                OrderStatus.CREATED))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Order must contain at least one item");
+    }
+
+    @Test
+    void rejectsRehydrationWithNullItem() {
+        // Why: persisted collection cardinality does not guarantee valid line contents.
+        // Covers: null item validation during aggregate reconstruction.
+        // Prevents: malformed persistence mappings introducing delayed null failures.
+
+        var items = new ArrayList<OrderItem>();
+        items.add(null);
+
+        assertThatThrownBy(() -> Order.rehydrate(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                items,
+                OrderStatus.CREATED))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Order items must not contain null values");
+    }
+
 }
