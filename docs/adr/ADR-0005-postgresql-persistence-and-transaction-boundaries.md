@@ -205,10 +205,20 @@ customer/product data, so OH-007 will not invent persistence columns for them.
 
 Identifiers will use PostgreSQL native `uuid`.
 
-The Order identifier remains the primary key.
+The persistence identity of an Order is the pair:
 
-Tenant-scoped lookup will be structurally supported through the tenant and order
-identifier pair.
+- `tenant_id`;
+- `id`.
+
+The root table therefore uses the composite primary key:
+
+`PRIMARY KEY (tenant_id, id)`
+
+This makes tenant ownership part of the relational identity instead of relying
+only on query conventions.
+
+The domain `Order.id` remains a UUID aggregate identifier, but persisted
+relationships and lookups must scope that identifier by tenant.
 
 ## Multi-Tenant Persistence Boundary
 
@@ -258,6 +268,17 @@ No `UNIQUE(order_id, product_id)` constraint will therefore be introduced.
 
 The item identity inside persistence is the owning Order plus its line number.
 
+The child table therefore uses the composite primary key:
+
+`PRIMARY KEY (tenant_id, order_id, line_number)`
+
+and references the owning root through:
+
+`FOREIGN KEY (tenant_id, order_id) REFERENCES orders.orders (tenant_id, id)`
+
+This prevents an item row from being relationally attached to an Order under a
+different tenant.
+
 ## Database Constraints
 
 The initial schema will enforce at least:
@@ -268,7 +289,7 @@ The initial schema will enforce at least:
 - non-null `tenant_id`;
 - non-null `customer_id`;
 - non-null `status`;
-- primary-key uniqueness;
+- composite primary-key uniqueness across `tenant_id` and `id`;
 - status restricted to domain-supported persisted values.
 
 ### Order item
