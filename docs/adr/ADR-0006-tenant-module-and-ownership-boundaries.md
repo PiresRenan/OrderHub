@@ -1,6 +1,6 @@
 # ADR-0006 — Tenant Module and Ownership Boundaries
 
-Status: DESIGNED
+Status: TESTED
 
 ## Context
 
