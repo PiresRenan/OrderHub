@@ -12,6 +12,8 @@ public interface TenantRepository {
      *
      * @param tenant valid aggregate to persist
      * @return persisted Tenant aggregate
+     * @throws TenantPersistenceException when the configured persistence mechanism
+     *                                    cannot complete the write
      */
     Tenant save(Tenant tenant);
 
@@ -20,6 +22,8 @@ public interface TenantRepository {
      *
      * @param tenantId Tenant identifier
      * @return Tenant when present, otherwise empty
+     * @throws TenantPersistenceException when the configured persistence mechanism
+     *                                    cannot complete the lookup
      */
     Optional<Tenant> findById(UUID tenantId);
 }
