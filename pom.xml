@@ -168,6 +168,16 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!--
+            OAuth2 Resource Server support for validating externally issued
+            JWT bearer access tokens at the HTTP authentication boundary.
+            Signature, temporal claims and cryptographic processing remain
+            delegated to Spring Security rather than application code.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security-oauth2-resource-server</artifactId>
+        </dependency>
         <!-- ==============================================================
              5. TEST — CORE
              Base assertion, mocking and Spring context test infrastructure.
