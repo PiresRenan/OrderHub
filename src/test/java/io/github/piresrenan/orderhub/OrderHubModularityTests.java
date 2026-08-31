@@ -7,51 +7,67 @@ import org.springframework.modulith.core.ApplicationModules;
 
 class OrderHubModularityTests {
 
-    /**
-     * Verifies the structural rules enforced across every detected application
-     * module.
-     */
-    @Test
-    void verifiesApplicationModuleBoundaries() {
-        // Why: architectural violations often compile and survive normal unit tests.
-        // Covers: module cycles and illegal access to module internals.
-        // Prevents: gradual erosion of the intended modular/hexagonal architecture.
+        /**
+         * Verifies the structural rules enforced across every detected application
+         * module.
+         */
+        @Test
+        void verifiesApplicationModuleBoundaries() {
+                // Why: architectural violations often compile and survive normal unit tests.
+                // Covers: module cycles and illegal access to module internals.
+                // Prevents: gradual erosion of the intended modular/hexagonal architecture.
 
-        ApplicationModules
-                .of(OrderHubApplication.class)
-                .verify();
-    }
+                ApplicationModules
+                                .of(OrderHubApplication.class)
+                                .verify();
+        }
 
-    /**
-     * Verifies that the expected top-level business capabilities are recognized
-     * as independent Spring Modulith application modules.
-     */
-    @Test
-    void detectsOrdersAndTenantsAsApplicationModules() {
-        // Why: package organization alone does not prove that Spring Modulith
-        // recognizes a capability as an application module.
-        // Covers: explicit discovery of the Orders and Tenants module roots.
-        // Prevents: structural refactoring silently collapsing or excluding one of
-        // the intended module boundaries.
+        /**
+         * Verifies that the expected top-level business capabilities are recognized
+         * as independent Spring Modulith application modules.
+         */
+        @Test
+        void detectsOrdersTenantsAndUsersAsApplicationModules() {
+                // Why: package organization alone does not prove that Spring Modulith
+                // recognizes each business capability as an independent application module.
+                // Covers: explicit discovery and distinct identity of Orders, Tenants and
+                // Users module roots.
+                // Prevents: structural refactoring silently collapsing or excluding an
+                // intended module boundary.
 
-        var modules = ApplicationModules.of(
-                OrderHubApplication.class);
+                var modules = ApplicationModules.of(
+                                OrderHubApplication.class);
 
-        var ordersModule = modules.getModuleByName(
-                "orders");
+                var ordersModule = modules.getModuleByName(
+                                "orders");
 
-        var tenantsModule = modules.getModuleByName(
-                "tenants");
+                var tenantsModule = modules.getModuleByName(
+                                "tenants");
 
-        assertThat(ordersModule)
-                .as("Orders must be detected as an application module")
-                .isPresent();
+                var usersModule = modules.getModuleByName(
+                                "users");
 
-        assertThat(tenantsModule)
-                .as("Tenants must be detected as an application module")
-                .isPresent();
+                assertThat(ordersModule)
+                                .as("Orders must be detected as an application module")
+                                .isPresent();
 
-        assertThat(ordersModule.orElseThrow())
-                .isNotSameAs(tenantsModule.orElseThrow());
-    }
+                assertThat(tenantsModule)
+                                .as("Tenants must be detected as an application module")
+                                .isPresent();
+
+                assertThat(usersModule)
+                                .as("Users must be detected as an application module")
+                                .isPresent();
+
+                var orders = ordersModule.orElseThrow();
+                var tenants = tenantsModule.orElseThrow();
+                var users = usersModule.orElseThrow();
+
+                assertThat(orders)
+                                .isNotSameAs(tenants)
+                                .isNotSameAs(users);
+
+                assertThat(tenants)
+                                .isNotSameAs(users);
+        }
 }
