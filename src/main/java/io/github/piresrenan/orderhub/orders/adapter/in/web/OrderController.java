@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Value;
 
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
+import io.github.piresrenan.orderhub.security.application.model.TrustedTenantContext;
 import jakarta.validation.Valid;
 
 @RestController
@@ -54,18 +55,18 @@ public final class OrderController {
          * into the application command.
          *
          * <p>
-         * The tenant identifier currently represents request context only. It must
-         * not be considered an authorization mechanism until authenticated tenant
-         * resolution is implemented.
+         * The Tenant context is supplied only after Security has authenticated the
+         * caller and verified membership for the requested Tenant. The controller
+         * never treats raw request metadata as Tenant authority.
          * </p>
          *
-         * @param tenantId tenant context supplied by the caller
+         * @param tenantContext trusted Tenant context established by Security
          * @param request  validated HTTP payload
          * @return the created order represented by the public HTTP response contract
          */
         @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
         public ResponseEntity<OrderResponse> create(
-                        @RequestHeader("X-Tenant-Id") UUID tenantId,
+                        TrustedTenantContext tenantContext,
                         @Valid @RequestBody CreateOrderRequest request) {
                 if (request.items().size() > maxItems) {
                         throw new OrderRequestTooLargeException();
@@ -78,7 +79,7 @@ public final class OrderController {
                                 .toList();
 
                 var command = new CreateOrderCommand(
-                                tenantId,
+                                tenantContext.tenantId(),
                                 request.customerId(),
                                 items);
 

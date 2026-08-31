@@ -83,6 +83,12 @@ spec:
             - configMapRef:
                 name: orderhub-runtime-config
 
+            # JWT trust configuration belongs to the deployment environment.
+            # The reusable base declares the dependency but owns no issuer/JWK values.
+            - configMapRef:
+                name: orderhub-security
+                optional: false
+
           # Database connectivity is supplied by the deployment environment.
           # The application manifests declare this contract but do not own or
           # commit concrete database endpoints or credentials.

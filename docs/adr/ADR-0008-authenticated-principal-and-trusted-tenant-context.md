@@ -776,34 +776,60 @@ OH-010.
 
 ## Verification
 
-ADR-0008 becomes TESTED only after evidence proves:
+ADR-0008 becomes TESTED only after evidence proves all acceptance criteria below.
 
-- Spring Security Resource Server protects Orders
-- JWT signature and temporal validation are active
-- issuer validation is active
-- audience validation is active
-- production security configuration fails closed
-- validated external identity resolves through the Users application boundary
-- unknown external identity is rejected without enumeration leakage
-- authenticated principal exposes internal User identity rather than raw JWT
-  claims
-- V5 creates durable external identity binding from an empty real PostgreSQL
+### Local verification evidence — 2026-08-31
+
+The implementation has passed the complete local acceptance suite for OH-010:
+
+- [x] Spring Security Resource Server protects Orders
+- [x] JWT signature and temporal validation are active
+- [x] issuer validation is active
+- [x] audience validation is active
+- [x] production security configuration fails closed when required JWT trust
+  configuration is absent
+- [x] issuer, audience and JWK Set URI are supplied explicitly by the deployment
+  environment rather than by insecure application defaults
+- [x] validated external identity resolves through the Users application boundary
+- [x] unknown external identity is rejected without enumeration leakage
+- [x] authenticated principal exposes only internal User identity rather than raw
+  JWT claims
+- [x] V5 creates durable external identity binding from an empty real PostgreSQL
   database
-- V1 through V4 remain unchanged
-- external identity binding cannot reference a nonexistent internal User
-- `(issuer, subject)` cannot resolve to multiple Users
-- valid User/Tenant membership produces trusted Tenant context
-- absent membership returns a privacy-safe denial
-- changing only Tenant selector cannot cross Tenant boundaries
-- Orders application/domain imports no Spring Security/JWT/OAuth2 types
-- no cross-module database foreign key is introduced
-- module dependencies remain acyclic and Spring Modulith verification passes
-- health/readiness probes remain usable
-- existing Orders, Tenants and Users behavior remains green
-- synthetic security tests require no live identity provider
-- `git diff --check` passes
-- `mvnw clean verify` passes
-- repository-required CI checks pass
+- [x] V1 through V4 remain unchanged
+- [x] external identity binding cannot reference a nonexistent internal User
+- [x] `(issuer, subject)` cannot resolve to multiple Users
+- [x] valid User/Tenant membership produces trusted Tenant context
+- [x] absent membership returns a privacy-safe denial
+- [x] changing only the Tenant selector cannot cross Tenant boundaries
+- [x] Orders application/domain imports no Spring Security/JWT/OAuth2 types
+- [x] no cross-module database foreign key is introduced
+- [x] module dependencies remain acyclic and Spring Modulith verification passes
+- [x] health/readiness probes remain usable without authentication
+- [x] existing Orders, Tenants and Users behavior remains green
+- [x] synthetic security tests require no live identity provider
+- [x] real JWT HTTP tests exercise cryptographic token validation
+- [x] real JWT-to-Orders end-to-end tests exercise the complete authentication and
+  trusted-Tenant path
+- [x] Docker Compose boots with explicit synthetic JWT trust configuration while
+  preserving fail-closed behavior when that configuration is absent
+- [x] Kubernetes development profile runs two healthy replicas with the external
+  JWT trust contract, non-root execution, read-only root filesystem, writable
+  `/tmp`, no service-account token, two Service endpoints and the expected PDB
+- [x] Kubernetes scale profile runs two healthy replicas on two distinct labelled
+  worker nodes, excludes the control-plane and exposes two Service endpoints
+- [x] `git diff --check` passes
+- [x] `mvnw clean verify` passes with 298 tests, zero failures, zero errors and
+  zero skipped tests
+- [x] local reproduction of the repository `branch-policy`, `ci-build` and
+  `platform-validation` workflows passes
+- [ ] repository-required CI checks have passed on the remote GitHub branch/PR
+
+The final unchecked item intentionally keeps this ADR in `DESIGNED` status.
+
+Local workflow reproduction is strong pre-push evidence, but it is not substituted
+for the repository's actual remote required checks. The ADR may be promoted to
+`TESTED` after those checks complete successfully.
 
 ## Follow-up
 

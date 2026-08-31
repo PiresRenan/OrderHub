@@ -53,6 +53,12 @@ services:
       SPRING_DATASOURCE_USERNAME: ${ORDERHUB_DB_USER:?ORDERHUB_DB_USER is required}
       SPRING_DATASOURCE_PASSWORD: ${ORDERHUB_DB_PASSWORD:?ORDERHUB_DB_PASSWORD is required}
 
+      # JWT trust policy is supplied explicitly by each runtime environment.
+      # No issuer, audience or JWK endpoint is baked into the application image.
+      ORDERHUB_SECURITY_JWT_ISSUER: ${ORDERHUB_SECURITY_JWT_ISSUER:?ORDERHUB_SECURITY_JWT_ISSUER is required}
+      ORDERHUB_SECURITY_JWT_AUDIENCE: ${ORDERHUB_SECURITY_JWT_AUDIENCE:?ORDERHUB_SECURITY_JWT_AUDIENCE is required}
+      ORDERHUB_SECURITY_JWT_JWK_SET_URI: ${ORDERHUB_SECURITY_JWT_JWK_SET_URI:?ORDERHUB_SECURITY_JWT_JWK_SET_URI is required}
+
     # Binding only to loopback avoids exposing the development API to other
     # interfaces on the host by default.
     ports:
