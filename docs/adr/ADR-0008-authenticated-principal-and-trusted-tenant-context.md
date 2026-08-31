@@ -1,6 +1,6 @@
 # ADR-0008 — Authenticated Principal and Trusted Tenant Context
 
-Status: DESIGNED
+Status: TESTED
 
 ## Context
 
@@ -776,11 +776,11 @@ OH-010.
 
 ## Verification
 
-ADR-0008 becomes TESTED only after evidence proves all acceptance criteria below.
+ADR-0008 is TESTED after evidence proved all acceptance criteria below.
 
-### Local verification evidence — 2026-08-31
+### Verification evidence — 2026-08-31
 
-The implementation has passed the complete local acceptance suite for OH-010:
+The implementation passed the complete acceptance suite for OH-010:
 
 - [x] Spring Security Resource Server protects Orders
 - [x] JWT signature and temporal validation are active
@@ -823,13 +823,10 @@ The implementation has passed the complete local acceptance suite for OH-010:
   zero skipped tests
 - [x] local reproduction of the repository `branch-policy`, `ci-build` and
   `platform-validation` workflows passes
-- [ ] repository-required CI checks have passed on the remote GitHub branch/PR
+- [x] repository-required CI checks passed on PR #21 for the remote GitHub branch
 
-The final unchecked item intentionally keeps this ADR in `DESIGNED` status.
-
-Local workflow reproduction is strong pre-push evidence, but it is not substituted
-for the repository's actual remote required checks. The ADR may be promoted to
-`TESTED` after those checks complete successfully.
+Remote `branch-policy`, `ci-build` and `platform-validation` all completed with
+`success` on commit `92a84b6dfb590963b4151f1009ffe78506664b26`.
 
 ## Follow-up
 
