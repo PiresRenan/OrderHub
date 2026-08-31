@@ -77,6 +77,12 @@ Its state is:
 
 The pair `(tenantId, userId)` must be unique.
 
+A persisted membership must reference an existing internal User.
+
+Because User and TenantMembership are both owned by the `users` module, this
+invariant is enforced durably through a same-module database foreign key from
+`users.tenant_memberships.user_id` to `users.users.id`.
+
 Membership represents only the fact that a User belongs to a Tenant.
 
 It does not express authorization.
@@ -107,14 +113,17 @@ The module receives its own PostgreSQL schema:
 
 `users`
 
-Schema evolution is introduced through Flyway V3.
+The initial Users schema is introduced through Flyway V3.
 
 Accepted migrations remain immutable:
 
 - V1: Orders;
-- V2: Tenants.
+- V2: Tenants;
+- V3: initial Users schema.
 
-Once V3 is accepted/shared, subsequent changes must use V4 or later.
+The User-membership referential-integrity constraint is introduced through V4.
+
+Once V4 is accepted/shared, subsequent schema changes must use V5 or later.
 
 Persistence continues to use Spring JDBC with explicit SQL.
 
@@ -211,6 +220,7 @@ Positive:
 - explicit ownership of User/Tenant relationships;
 - authentication can evolve without changing core User identity;
 - Users and Tenants remain independently owned modules.
+- durable prevention of orphan memberships referencing non-existing internal Users;
 
 Trade-offs:
 
@@ -231,8 +241,11 @@ ADR-0007 becomes TESTED only after evidence proves:
 - TenantMembership invariants are unit-tested;
 - duplicate membership is rejected;
 - application services remain Spring-independent;
-- V3 reconstructs the schema from an empty real PostgreSQL database;
-- V1 and V2 remain unchanged;
+- V1 through V4 reconstruct the database from an empty real PostgreSQL database;
+- V1, V2 and V3 remain unchanged;
+- membership persistence rejects references to non-existing internal Users;
+- the User-reference foreign key remains internal to the `users` module;
+- no foreign key is introduced from `users` to the `tenants` schema;
 - PostgreSQL adapters persist and reconstruct state correctly;
 - persistence exceptions are sanitized at the application boundary;
 - Users imports no Tenant domain/persistence internals;

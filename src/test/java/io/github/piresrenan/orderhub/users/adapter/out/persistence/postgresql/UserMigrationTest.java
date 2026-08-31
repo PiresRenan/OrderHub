@@ -14,87 +14,86 @@ import org.testcontainers.utility.DockerImageName;
 @Testcontainers
 class UserMigrationTest {
 
-    private static final DockerImageName POSTGRES_IMAGE = DockerImageName.parse(
-            "postgres:18.6-trixie@sha256:"
-                    + "4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280")
-            .asCompatibleSubstituteFor("postgres");
+        private static final DockerImageName POSTGRES_IMAGE = DockerImageName.parse(
+                        "postgres:18.6-trixie@sha256:"
+                                        + "4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280")
+                        .asCompatibleSubstituteFor("postgres");
 
-    @Container
-    private static final PostgreSQLContainer POSTGRES =
-            new PostgreSQLContainer(POSTGRES_IMAGE)
-                    .withDatabaseName("orderhub_test")
-                    .withUsername("orderhub_test")
-                    .withPassword("synthetic-test-password");
+        @Container
+        private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(POSTGRES_IMAGE)
+                        .withDatabaseName("orderhub_test")
+                        .withUsername("orderhub_test")
+                        .withPassword("synthetic-test-password");
 
-    @Test
-    void migratesEmptyDatabaseIntoUsersSchema() {
-        // Why: the complete database must be reconstructible from immutable Flyway
-        // history as the Users module becomes durable.
-        // Covers: cumulative V1, V2 and required V3 execution plus Users schema/table
-        // creation.
-        // Prevents: Users persistence depending on manual database preparation or
-        // modification of accepted migrations.
+        @Test
+        void migratesEmptyDatabaseIntoUsersSchema() {
+                // Why: the complete database must be reconstructible from immutable Flyway
+                // history including the User-membership referential-integrity migration.
+                // Covers: cumulative V1 through V4 execution plus Users schema/table creation.
+                // Prevents: Users persistence depending on manual database preparation,
+                // modification of accepted migrations or omission of the User-reference
+                // constraint migration.
 
-        var dataSource = new DriverManagerDataSource(
-                POSTGRES.getJdbcUrl(),
-                POSTGRES.getUsername(),
-                POSTGRES.getPassword());
+                var dataSource = new DriverManagerDataSource(
+                                POSTGRES.getJdbcUrl(),
+                                POSTGRES.getUsername(),
+                                POSTGRES.getPassword());
 
-        Flyway.configure()
-                .dataSource(dataSource)
-                .locations("classpath:db/migration")
-                .load()
-                .migrate();
+                Flyway.configure()
+                                .dataSource(dataSource)
+                                .locations("classpath:db/migration")
+                                .load()
+                                .migrate();
 
-        var jdbcTemplate = new JdbcTemplate(dataSource);
+                var jdbcTemplate = new JdbcTemplate(dataSource);
 
-        var requiredMigrationsApplied = jdbcTemplate.queryForObject("""
-                SELECT COUNT(*)
-                FROM public.flyway_schema_history
-                WHERE version IN ('1', '2', '3')
-                  AND success = TRUE
-                """,
-                Integer.class);
+                var requiredMigrationsApplied = jdbcTemplate.queryForObject("""
+                                SELECT COUNT(*)
+                                FROM public.flyway_schema_history
+                                WHERE version IN ('1', '2', '3', '4')
+                                  AND success = TRUE
+                                """,
+                                Integer.class);
 
-        var usersSchemaExists = jdbcTemplate.queryForObject("""
-                SELECT EXISTS (
-                    SELECT 1
-                    FROM information_schema.schemata
-                    WHERE schema_name = 'users'
-                )
-                """,
-                Boolean.class);
+                var usersSchemaExists = jdbcTemplate.queryForObject("""
+                                SELECT EXISTS (
+                                    SELECT 1
+                                    FROM information_schema.schemata
+                                    WHERE schema_name = 'users'
+                                )
+                                """,
+                                Boolean.class);
 
-        var usersTableExists = jdbcTemplate.queryForObject("""
-                SELECT EXISTS (
-                    SELECT 1
-                    FROM information_schema.tables
-                    WHERE table_schema = 'users'
-                      AND table_name = 'users'
-                )
-                """,
-                Boolean.class);
+                var usersTableExists = jdbcTemplate.queryForObject("""
+                                SELECT EXISTS (
+                                    SELECT 1
+                                    FROM information_schema.tables
+                                    WHERE table_schema = 'users'
+                                      AND table_name = 'users'
+                                )
+                                """,
+                                Boolean.class);
 
-        var membershipsTableExists = jdbcTemplate.queryForObject("""
-                SELECT EXISTS (
-                    SELECT 1
-                    FROM information_schema.tables
-                    WHERE table_schema = 'users'
-                      AND table_name = 'tenant_memberships'
-                )
-                """,
-                Boolean.class);
+                var membershipsTableExists = jdbcTemplate.queryForObject("""
+                                SELECT EXISTS (
+                                    SELECT 1
+                                    FROM information_schema.tables
+                                    WHERE table_schema = 'users'
+                                      AND table_name = 'tenant_memberships'
+                                )
+                                """,
+                                Boolean.class);
 
-        assertThat(requiredMigrationsApplied)
-                .isEqualTo(3);
+                assertThat(requiredMigrationsApplied)
+                                .isEqualTo(4);
 
-        assertThat(usersSchemaExists)
-                .isTrue();
+                assertThat(usersSchemaExists)
+                                .isTrue();
 
-        assertThat(usersTableExists)
-                .isTrue();
+                assertThat(usersTableExists)
+                                .isTrue();
 
-        assertThat(membershipsTableExists)
-                .isTrue();
-    }
+                assertThat(membershipsTableExists)
+                                .isTrue();
+        }
 }

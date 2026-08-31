@@ -9,9 +9,11 @@ import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
@@ -26,11 +28,10 @@ class UserSchemaConstraintsTest {
             .asCompatibleSubstituteFor("postgres");
 
     @Container
-    private static final PostgreSQLContainer POSTGRES =
-            new PostgreSQLContainer(POSTGRES_IMAGE)
-                    .withDatabaseName("orderhub_test")
-                    .withUsername("orderhub_test")
-                    .withPassword("synthetic-test-password");
+    private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(POSTGRES_IMAGE)
+            .withDatabaseName("orderhub_test")
+            .withUsername("orderhub_test")
+            .withPassword("synthetic-test-password");
 
     private static JdbcTemplate jdbcTemplate;
 
@@ -38,7 +39,8 @@ class UserSchemaConstraintsTest {
     static void migrateDatabase() {
         // Why: schema constraints must be verified against the exact cumulative
         // Flyway history used by production.
-        // Covers: creation of a clean PostgreSQL database through V1, V2 and V3.
+        // Covers: creation of a clean PostgreSQL database through the current
+        // accepted migration history.
         // Prevents: constraint tests silently depending on manually prepared schema.
 
         var dataSource = new DriverManagerDataSource(
@@ -72,10 +74,9 @@ class UserSchemaConstraintsTest {
         // Covers: NOT NULL / primary-key protection for users.users.id.
         // Prevents: identity-less User rows entering durable state.
 
-        assertThatThrownBy(() ->
-                jdbcTemplate.update(
-                        "INSERT INTO users.users (id) VALUES (?)",
-                        new Object[] { null }))
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                "INSERT INTO users.users (id) VALUES (?)",
+                new Object[] { null }))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -91,10 +92,9 @@ class UserSchemaConstraintsTest {
                 "INSERT INTO users.users (id) VALUES (?)",
                 userId);
 
-        assertThatThrownBy(() ->
-                jdbcTemplate.update(
-                        "INSERT INTO users.users (id) VALUES (?)",
-                        userId))
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                "INSERT INTO users.users (id) VALUES (?)",
+                userId))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -104,16 +104,16 @@ class UserSchemaConstraintsTest {
         // Covers: NOT NULL protection for tenant_memberships.user_id.
         // Prevents: structurally incomplete membership rows.
 
-        assertThatThrownBy(() ->
-                jdbcTemplate.update("""
-                        INSERT INTO users.tenant_memberships (
-                            user_id,
-                            tenant_id
-                        )
-                        VALUES (?, ?)
-                        """,
-                        null,
-                        UUID.randomUUID()))
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                """
+                INSERT INTO users.tenant_memberships (
+                    user_id,
+                    tenant_id
+                )
+                VALUES (?, ?)
+                """,
+                null,
+                UUID.randomUUID()))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -123,16 +123,16 @@ class UserSchemaConstraintsTest {
         // Covers: NOT NULL protection for tenant_memberships.tenant_id.
         // Prevents: structurally incomplete membership rows.
 
-        assertThatThrownBy(() ->
-                jdbcTemplate.update("""
-                        INSERT INTO users.tenant_memberships (
-                            user_id,
-                            tenant_id
-                        )
-                        VALUES (?, ?)
-                        """,
-                        UUID.randomUUID(),
-                        null))
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                """
+                INSERT INTO users.tenant_memberships (
+                    user_id,
+                    tenant_id
+                )
+                VALUES (?, ?)
+                """,
+                UUID.randomUUID(),
+                null))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -147,7 +147,10 @@ class UserSchemaConstraintsTest {
         var userId = UUID.randomUUID();
         var tenantId = UUID.randomUUID();
 
-        jdbcTemplate.update("""
+        persistUser(userId);
+
+        jdbcTemplate.update(
+                """
                 INSERT INTO users.tenant_memberships (
                     user_id,
                     tenant_id
@@ -157,16 +160,16 @@ class UserSchemaConstraintsTest {
                 userId,
                 tenantId);
 
-        assertThatThrownBy(() ->
-                jdbcTemplate.update("""
-                        INSERT INTO users.tenant_memberships (
-                            user_id,
-                            tenant_id
-                        )
-                        VALUES (?, ?)
-                        """,
-                        userId,
-                        tenantId))
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                """
+                INSERT INTO users.tenant_memberships (
+                    user_id,
+                    tenant_id
+                )
+                VALUES (?, ?)
+                """,
+                userId,
+                tenantId))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -177,8 +180,13 @@ class UserSchemaConstraintsTest {
         // Prevents: accidentally constraining user_id globally in memberships.
 
         var userId = UUID.randomUUID();
+        var firstTenantId = UUID.randomUUID();
+        var secondTenantId = UUID.randomUUID();
 
-        jdbcTemplate.update("""
+        persistUser(userId);
+
+        jdbcTemplate.update(
+                """
                 INSERT INTO users.tenant_memberships (
                     user_id,
                     tenant_id
@@ -186,9 +194,10 @@ class UserSchemaConstraintsTest {
                 VALUES (?, ?)
                 """,
                 userId,
-                UUID.randomUUID());
+                firstTenantId);
 
-        jdbcTemplate.update("""
+        jdbcTemplate.update(
+                """
                 INSERT INTO users.tenant_memberships (
                     user_id,
                     tenant_id
@@ -196,7 +205,7 @@ class UserSchemaConstraintsTest {
                 VALUES (?, ?)
                 """,
                 userId,
-                UUID.randomUUID());
+                secondTenantId);
 
         var count = jdbcTemplate.queryForObject(
                 """
@@ -217,26 +226,33 @@ class UserSchemaConstraintsTest {
         // Covers: uniqueness being scoped to the complete User/Tenant pair.
         // Prevents: accidentally constraining tenant_id globally.
 
+        var firstUserId = UUID.randomUUID();
+        var secondUserId = UUID.randomUUID();
         var tenantId = UUID.randomUUID();
 
-        jdbcTemplate.update("""
+        persistUser(firstUserId);
+        persistUser(secondUserId);
+
+        jdbcTemplate.update(
+                """
                 INSERT INTO users.tenant_memberships (
                     user_id,
                     tenant_id
                 )
                 VALUES (?, ?)
                 """,
-                UUID.randomUUID(),
+                firstUserId,
                 tenantId);
 
-        jdbcTemplate.update("""
+        jdbcTemplate.update(
+                """
                 INSERT INTO users.tenant_memberships (
                     user_id,
                     tenant_id
                 )
                 VALUES (?, ?)
                 """,
-                UUID.randomUUID(),
+                secondUserId,
                 tenantId);
 
         var count = jdbcTemplate.queryForObject(
@@ -261,7 +277,8 @@ class UserSchemaConstraintsTest {
         // Prevents: an accidental cross-module relational dependency bypassing
         // application/module boundaries.
 
-        var crossModuleForeignKeys = jdbcTemplate.queryForObject("""
+        var crossModuleForeignKeys = jdbcTemplate.queryForObject(
+                """
                 SELECT COUNT(*)
                 FROM information_schema.table_constraints tc
                 JOIN information_schema.constraint_column_usage ccu
@@ -276,5 +293,48 @@ class UserSchemaConstraintsTest {
 
         assertThat(crossModuleForeignKeys)
                 .isZero();
+    }
+
+    @Test
+    void rejectsMembershipForNonExistingUser() {
+        // Why: a durable membership must always reference an internal User owned by
+        // the Users module.
+        // Covers: database-level referential integrity between tenant_memberships
+        // and users.
+        // Prevents: orphan memberships being persisted for arbitrary or stale User
+        // identifiers.
+
+        var unknownUserId = UUID.randomUUID();
+        var tenantId = UUID.randomUUID();
+
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                """
+                INSERT INTO users.tenant_memberships (
+                    user_id,
+                    tenant_id
+                )
+                VALUES (?, ?)
+                """,
+                unknownUserId,
+                tenantId))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    /**
+     * Persists one synthetic internal User required by membership constraints.
+     *
+     * @param userId synthetic internal User identifier used by the current test
+     */
+    private void persistUser(
+            UUID userId) {
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO users.users (
+                    id
+                )
+                VALUES (?)
+                """,
+                userId);
     }
 }

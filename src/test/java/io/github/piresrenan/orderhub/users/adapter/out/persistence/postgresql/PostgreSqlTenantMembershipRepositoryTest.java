@@ -40,8 +40,8 @@ class PostgreSqlTenantMembershipRepositoryTest {
     @BeforeAll
     static void migrateDatabase() {
         // Why: repository behavior must be verified against the accepted cumulative
-        // Flyway history and the real PostgreSQL uniqueness constraint.
-        // Covers: database construction through immutable V1, V2 and V3.
+        // Flyway history and real PostgreSQL constraints.
+        // Covers: database construction through the current migration history.
         // Prevents: repository tests relying on an artificial schema.
 
         var dataSource = new DriverManagerDataSource(
@@ -59,20 +59,21 @@ class PostgreSqlTenantMembershipRepositoryTest {
     }
 
     @BeforeEach
-    void clearMemberships() {
+    void clearUsersSchema() {
         // Why: every repository scenario needs deterministic persisted state.
-        // Covers: isolation of tenant_memberships between tests.
-        // Prevents: previous membership rows changing later test outcomes.
+        // Covers: isolation of Users and TenantMembership rows between tests.
+        // Prevents: previous Users or memberships changing later test outcomes.
 
         jdbcTemplate.update(
-                "TRUNCATE TABLE users.tenant_memberships");
+                "TRUNCATE TABLE users.tenant_memberships, users.users");
     }
 
     @Test
     void savesAndReconstructsMembership() {
         // Why: persistence must round-trip the complete association through the
         // domain reconstruction boundary.
-        // Covers: save plus exact-pair lookup against PostgreSQL.
+        // Covers: save plus exact-pair lookup against PostgreSQL for an existing
+        // internal User.
         // Prevents: SQL or row-mapping defects bypassing TenantMembership.rehydrate.
 
         var repository = new PostgreSqlTenantMembershipRepository(
@@ -80,6 +81,8 @@ class PostgreSqlTenantMembershipRepositoryTest {
 
         var userId = UUID.randomUUID();
         var tenantId = UUID.randomUUID();
+
+        persistUser(userId);
 
         var membership = TenantMembership.create(
                 userId,
@@ -132,6 +135,8 @@ class PostgreSqlTenantMembershipRepositoryTest {
         var userId = UUID.randomUUID();
         var storedTenantId = UUID.randomUUID();
 
+        persistUser(userId);
+
         repository.save(
                 TenantMembership.create(
                         userId,
@@ -149,8 +154,9 @@ class PostgreSqlTenantMembershipRepositoryTest {
     void rejectsDuplicateMembershipDeterministically() {
         // Why: concurrent or repeated establishment of the same membership must
         // produce one stable application-level conflict.
-        // Covers: translation of PostgreSQL pair uniqueness violation.
-        // Prevents: database-specific duplicate-key exceptions leaking through the
+        // Covers: translation of PostgreSQL pair uniqueness conflict for a valid
+        // existing User.
+        // Prevents: database-specific duplicate-key behavior leaking through the
         // repository contract.
 
         var repository = new PostgreSqlTenantMembershipRepository(
@@ -158,6 +164,8 @@ class PostgreSqlTenantMembershipRepositoryTest {
 
         var userId = UUID.randomUUID();
         var tenantId = UUID.randomUUID();
+
+        persistUser(userId);
 
         repository.save(
                 TenantMembership.create(
@@ -186,6 +194,8 @@ class PostgreSqlTenantMembershipRepositoryTest {
         var userId = UUID.randomUUID();
         var tenantId = UUID.randomUUID();
 
+        persistUser(userId);
+
         repository.save(
                 TenantMembership.create(
                         userId,
@@ -208,6 +218,45 @@ class PostgreSqlTenantMembershipRepositoryTest {
                                     .doesNotContainIgnoringCase("insert")
                                     .doesNotContainIgnoringCase(
                                             "tenant_memberships")
+                                    .doesNotContainIgnoringCase("postgres");
+                        });
+    }
+
+    @Test
+    void rejectsMembershipForNonExistingUserWithoutLeakingPersistenceDetails() {
+        // Why: the adapter must preserve the database-level User existence
+        // invariant without exposing relational implementation details.
+        // Covers: translation of a membership INSERT rejected by the User foreign
+        // key.
+        // Prevents: arbitrary or stale User identifiers becoming durable
+        // memberships or leaking through persistence errors.
+
+        var repository = new PostgreSqlTenantMembershipRepository(
+                jdbcTemplate);
+
+        var unknownUserId = UUID.randomUUID();
+        var tenantId = UUID.randomUUID();
+
+        assertThatThrownBy(() ->
+                repository.save(
+                        TenantMembership.create(
+                                unknownUserId,
+                                tenantId)))
+                .isInstanceOfSatisfying(
+                        TenantMembershipPersistenceException.class,
+                        exception -> {
+
+                            assertThat(exception.getMessage())
+                                    .isEqualTo(
+                                            "Tenant membership persistence operation failed.")
+                                    .doesNotContain(unknownUserId.toString())
+                                    .doesNotContain(tenantId.toString())
+                                    .doesNotContainIgnoringCase("insert")
+                                    .doesNotContainIgnoringCase(
+                                            "tenant_memberships")
+                                    .doesNotContainIgnoringCase("foreign key")
+                                    .doesNotContainIgnoringCase(
+                                            "fk_tenant_memberships_user")
                                     .doesNotContainIgnoringCase("postgres");
                         });
     }
@@ -291,5 +340,23 @@ class PostgreSqlTenantMembershipRepositoryTest {
                     RENAME TO tenant_memberships
                     """);
         }
+    }
+
+    /**
+     * Persists one synthetic internal User required by membership persistence.
+     *
+     * @param userId synthetic internal User identifier used by the current test
+     */
+    private void persistUser(
+            UUID userId) {
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO users.users (
+                    id
+                )
+                VALUES (?)
+                """,
+                userId);
     }
 }
