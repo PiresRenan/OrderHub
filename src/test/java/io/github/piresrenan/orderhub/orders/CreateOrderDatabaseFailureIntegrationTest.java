@@ -3,11 +3,14 @@ package io.github.piresrenan.orderhub.orders;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
@@ -20,9 +23,15 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
+import io.github.piresrenan.orderhub.security.adapter.in.authentication.AuthenticatedUserAuthenticationToken;
+import io.github.piresrenan.orderhub.security.application.model.AuthenticatedUserPrincipal;
+import io.github.piresrenan.orderhub.security.application.model.TrustedTenantContext;
+import io.github.piresrenan.orderhub.security.application.port.in.ResolveTrustedTenantContextQuery;
+import io.github.piresrenan.orderhub.security.application.port.in.ResolveTrustedTenantContextUseCase;
 import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
 
 /**
@@ -50,6 +59,9 @@ class CreateOrderDatabaseFailureIntegrationTest {
     @Autowired
     private PostgreSQLContainer postgresContainer;
 
+    @MockitoBean
+    private ResolveTrustedTenantContextUseCase resolveTrustedTenantContextUseCase;
+
     /**
      * Verifies that a PostgreSQL outage during order creation produces a stable
      * privacy-safe internal error instead of leaking infrastructure details.
@@ -66,14 +78,40 @@ class CreateOrderDatabaseFailureIntegrationTest {
         // Why: PostgreSQL can become unavailable after the replica has already
         // accepted traffic, so request-time database failure is a real production
         // path rather than a bootstrap-only concern.
-        // Covers: HTTP -> application -> PostgreSQL repository failure -> HTTP error
-        // boundary, including response and log sanitization.
-        // Prevents: JDBC/SQL/vendor details, request identifiers or stack traces from
-        // escaping through the public API or normal outage logs.
+        // Covers: authenticated HTTP -> trusted Tenant boundary -> application ->
+        // PostgreSQL repository failure -> HTTP error boundary, including response
+        // and log sanitization. JWT and membership resolution are covered separately.
+        // Prevents: JDBC/SQL/vendor details, request or security identifiers and stack
+        // traces from escaping through the public API or normal outage logs.
 
-        var tenantId = UUID.randomUUID();
-        var customerId = UUID.randomUUID();
-        var productId = UUID.randomUUID();
+        var authenticatedUserId =
+                UUID.randomUUID();
+
+        var tenantId =
+                UUID.randomUUID();
+
+        var customerId =
+                UUID.randomUUID();
+
+        var productId =
+                UUID.randomUUID();
+
+        var authenticatedPrincipal =
+                new AuthenticatedUserPrincipal(
+                        authenticatedUserId);
+
+        var requestAuthentication =
+                new AuthenticatedUserAuthenticationToken(
+                        authenticatedPrincipal);
+
+        when(resolveTrustedTenantContextUseCase.resolve(
+                new ResolveTrustedTenantContextQuery(
+                        authenticatedPrincipal,
+                        tenantId)))
+                .thenReturn(
+                        Optional.of(
+                                new TrustedTenantContext(
+                                        tenantId)));
 
         var requestBody = """
                 {
@@ -87,45 +125,85 @@ class CreateOrderDatabaseFailureIntegrationTest {
                 }
                 """.formatted(customerId, productId);
 
-        var outageLogStart = output.getAll().length();
+        var outageLogStart =
+                output.getAll().length();
 
         postgresContainer.stop();
 
-        mockMvc.perform(post("/orders")
-                        .header("X-Tenant-Id", tenantId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
-                .andExpect(status().isInternalServerError())
-                .andExpect(content().contentTypeCompatibleWith(
-                        MediaType.APPLICATION_PROBLEM_JSON))
-                .andExpect(jsonPath("$.type")
-                        .value("urn:orderhub:problem:internal-error"))
-                .andExpect(jsonPath("$.title")
-                        .value("Internal server error"))
-                .andExpect(jsonPath("$.detail")
-                        .value("The request could not be completed."))
-                .andExpect(jsonPath("$.code")
-                        .value("INTERNAL_ERROR"))
-                .andExpect(content().string(
-                        not(containsString(tenantId.toString()))))
-                .andExpect(content().string(
-                        not(containsString(customerId.toString()))))
-                .andExpect(content().string(
-                        not(containsString(productId.toString()))))
-                .andExpect(content().string(
-                        not(containsString("jdbc:postgresql://"))))
-                .andExpect(content().string(
-                        not(containsString("PSQLException"))))
-                .andExpect(content().string(
-                        not(containsString("SQLException"))));
+        mockMvc.perform(
+                        post("/orders")
+                                .with(
+                                        authentication(
+                                                requestAuthentication))
+                                .header(
+                                        "X-Tenant-Id",
+                                        tenantId)
+                                .contentType(
+                                        MediaType.APPLICATION_JSON)
+                                .content(
+                                        requestBody))
+                .andExpect(
+                        status().isInternalServerError())
+                .andExpect(
+                        content().contentTypeCompatibleWith(
+                                MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(
+                        jsonPath("$.type")
+                                .value(
+                                        "urn:orderhub:problem:internal-error"))
+                .andExpect(
+                        jsonPath("$.title")
+                                .value(
+                                        "Internal server error"))
+                .andExpect(
+                        jsonPath("$.detail")
+                                .value(
+                                        "The request could not be completed."))
+                .andExpect(
+                        jsonPath("$.code")
+                                .value(
+                                        "INTERNAL_ERROR"))
+                .andExpect(
+                        content().string(
+                                not(containsString(
+                                        authenticatedUserId.toString()))))
+                .andExpect(
+                        content().string(
+                                not(containsString(
+                                        tenantId.toString()))))
+                .andExpect(
+                        content().string(
+                                not(containsString(
+                                        customerId.toString()))))
+                .andExpect(
+                        content().string(
+                                not(containsString(
+                                        productId.toString()))))
+                .andExpect(
+                        content().string(
+                                not(containsString(
+                                        "jdbc:postgresql://"))))
+                .andExpect(
+                        content().string(
+                                not(containsString(
+                                        "PSQLException"))))
+                .andExpect(
+                        content().string(
+                                not(containsString(
+                                        "SQLException"))));
 
-        var completeOutput = output.getAll();
+        var completeOutput =
+                output.getAll();
 
-        var outageOutput = completeOutput.substring(
-                Math.min(outageLogStart, completeOutput.length()));
+        var outageOutput =
+                completeOutput.substring(
+                        Math.min(
+                                outageLogStart,
+                                completeOutput.length()));
 
         assertThat(outageOutput)
                 .doesNotContain(
+                        authenticatedUserId.toString(),
                         tenantId.toString(),
                         customerId.toString(),
                         productId.toString(),

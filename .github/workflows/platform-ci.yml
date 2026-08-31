@@ -32,6 +32,13 @@ env:
   ORDERHUB_DB_USER: orderhub_ci
   ORDERHUB_DB_PASSWORD: synthetic-ci-password
 
+  # Synthetic trust policy used only while validating the deployable runtime.
+  # The JWK endpoint is intentionally unreachable unless a test unexpectedly
+  # attempts token verification; platform health probes require no bearer token.
+  ORDERHUB_SECURITY_JWT_ISSUER: https://issuer.orderhub.test
+  ORDERHUB_SECURITY_JWT_AUDIENCE: orderhub-api-test
+  ORDERHUB_SECURITY_JWT_JWK_SET_URI: http://127.0.0.1:1/test-only-jwks
+
 jobs:
   platform:
     name: platform-validation
@@ -278,6 +285,16 @@ jobs:
             --output yaml |
             kubectl apply --filename -
 
+          # CI owns only disposable synthetic JWT trust values.
+          kubectl create configmap orderhub-security \
+            --namespace orderhub-local \
+            --from-literal="ORDERHUB_SECURITY_JWT_ISSUER=${ORDERHUB_SECURITY_JWT_ISSUER}" \
+            --from-literal="ORDERHUB_SECURITY_JWT_AUDIENCE=${ORDERHUB_SECURITY_JWT_AUDIENCE}" \
+            --from-literal="ORDERHUB_SECURITY_JWT_JWK_SET_URI=${ORDERHUB_SECURITY_JWT_JWK_SET_URI}" \
+            --dry-run=client \
+            --output yaml |
+            kubectl apply --filename -
+
           kubectl apply \
             --dry-run=server \
             --namespace orderhub-local \
@@ -406,6 +423,16 @@ jobs:
             --from-literal="database=${ORDERHUB_DB_NAME}" \
             --from-literal="username=${ORDERHUB_DB_USER}" \
             --from-literal="password=${ORDERHUB_DB_PASSWORD}" \
+            --dry-run=client \
+            --output yaml |
+            kubectl apply --filename -
+
+          # CI owns only disposable synthetic JWT trust values.
+          kubectl create configmap orderhub-security \
+            --namespace orderhub-scale \
+            --from-literal="ORDERHUB_SECURITY_JWT_ISSUER=${ORDERHUB_SECURITY_JWT_ISSUER}" \
+            --from-literal="ORDERHUB_SECURITY_JWT_AUDIENCE=${ORDERHUB_SECURITY_JWT_AUDIENCE}" \
+            --from-literal="ORDERHUB_SECURITY_JWT_JWK_SET_URI=${ORDERHUB_SECURITY_JWT_JWK_SET_URI}" \
             --dry-run=client \
             --output yaml |
             kubectl apply --filename -

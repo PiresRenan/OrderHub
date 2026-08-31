@@ -11,24 +11,35 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.IntStream;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
 import io.github.piresrenan.orderhub.orders.domain.model.Order;
 import io.github.piresrenan.orderhub.orders.domain.model.OrderItem;
+import io.github.piresrenan.orderhub.security.adapter.in.authentication.AuthenticatedUserAuthenticationToken;
+import io.github.piresrenan.orderhub.security.application.model.AuthenticatedUserPrincipal;
+import io.github.piresrenan.orderhub.security.application.model.TrustedTenantContext;
+import io.github.piresrenan.orderhub.security.application.port.in.ResolveTrustedTenantContextQuery;
+import io.github.piresrenan.orderhub.security.application.port.in.ResolveTrustedTenantContextUseCase;
+import io.github.piresrenan.orderhub.security.support.TrustedTenantMvcTestConfiguration;
 import tools.jackson.core.exc.StreamConstraintsException;
 import tools.jackson.databind.json.JsonMapper;
 
 @WebMvcTest(OrderController.class)
+@Import(TrustedTenantMvcTestConfiguration.class)
 class OrderHttpResourceLimitsTest {
 
         private static final int EXPECTED_MAX_ITEMS = 1_000;
@@ -44,6 +55,31 @@ class OrderHttpResourceLimitsTest {
 
         @MockitoBean
         private CreateOrderUseCase createOrderUseCase;
+
+        @MockitoBean
+        private ResolveTrustedTenantContextUseCase trustedTenants;
+
+        @BeforeEach
+        void allowsRequestedTenantForResourceLimitSlice() {
+                // Why: resource-limit tests exercise Orders after the authenticated
+                // Tenant trust boundary, not JWT or membership behavior.
+                // Covers: production TrustedTenantContextArgumentResolver with a
+                // deterministic successful Tenant-resolution fixture.
+                // Prevents: MVC falling back to model-attribute construction of
+                // TrustedTenantContext before parser/resource-limit behavior runs.
+
+                when(trustedTenants.resolve(
+                                any(ResolveTrustedTenantContextQuery.class)))
+                                .thenAnswer(invocation -> {
+                                        var query = invocation.getArgument(
+                                                        0,
+                                                        ResolveTrustedTenantContextQuery.class);
+
+                                        return Optional.of(
+                                                        new TrustedTenantContext(
+                                                                        query.requestedTenantId()));
+                                });
+        }
 
         @Test
         void configuresExplicitJsonResourceLimits() {
@@ -92,7 +128,7 @@ class OrderHttpResourceLimitsTest {
                 var oversizedBody = " ".repeat((int) EXPECTED_MAX_DOCUMENT_LENGTH + 1)
                                 + validBody();
 
-                mockMvc.perform(post("/orders")
+                mockMvc.perform(authenticatedPost()
                                 .header("X-Tenant-Id", UUID.randomUUID())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(oversizedBody))
@@ -116,7 +152,7 @@ class OrderHttpResourceLimitsTest {
 
                 var body = bodyWithItems(EXPECTED_MAX_ITEMS + 1);
 
-                mockMvc.perform(post("/orders")
+                mockMvc.perform(authenticatedPost()
                                 .header("X-Tenant-Id", UUID.randomUUID())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(body))
@@ -141,7 +177,7 @@ class OrderHttpResourceLimitsTest {
 
                 var body = bodyWithItems(EXPECTED_MAX_ITEMS);
 
-                mockMvc.perform(post("/orders")
+                mockMvc.perform(authenticatedPost()
                                 .header("X-Tenant-Id", UUID.randomUUID())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(body))
@@ -179,6 +215,25 @@ class OrderHttpResourceLimitsTest {
                                 .isInstanceOf(StreamConstraintsException.class);
         }
 
+        /**
+         * Creates an Orders request positioned immediately after OrderHub's
+         * authentication boundary.
+         *
+         * <p>JWT-to-principal behavior is covered by Security integration tests.
+         * This focused resource-limit slice supplies only the minimized internal
+         * authenticated principal required by the production Tenant resolver.
+         *
+         * @return authenticated POST request for the Orders endpoint
+         */
+        private static MockHttpServletRequestBuilder authenticatedPost() {
+
+                return post("/orders")
+                                .principal(
+                                                new AuthenticatedUserAuthenticationToken(
+                                                                new AuthenticatedUserPrincipal(
+                                                                                UUID.fromString(
+                                                                                                "11111111-1111-1111-1111-111111111111"))));
+        }
         /**
          * Creates a valid application response so an accidentally accepted oversized
          * request produces a successful response instead of failing because of an

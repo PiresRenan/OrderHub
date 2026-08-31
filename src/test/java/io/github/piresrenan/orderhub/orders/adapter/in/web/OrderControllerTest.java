@@ -14,9 +14,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Stream;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -24,16 +26,25 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
 import io.github.piresrenan.orderhub.orders.domain.model.Order;
 import io.github.piresrenan.orderhub.orders.domain.model.OrderItem;
+import io.github.piresrenan.orderhub.security.adapter.in.authentication.AuthenticatedUserAuthenticationToken;
+import io.github.piresrenan.orderhub.security.application.model.AuthenticatedUserPrincipal;
+import io.github.piresrenan.orderhub.security.application.model.TrustedTenantContext;
+import io.github.piresrenan.orderhub.security.application.port.in.ResolveTrustedTenantContextQuery;
+import io.github.piresrenan.orderhub.security.application.port.in.ResolveTrustedTenantContextUseCase;
+import io.github.piresrenan.orderhub.security.support.TrustedTenantMvcTestConfiguration;
 
 @WebMvcTest(OrderController.class)
+@Import(TrustedTenantMvcTestConfiguration.class)
 class OrderControllerTest {
 
         @Autowired
@@ -41,6 +52,32 @@ class OrderControllerTest {
 
         @MockitoBean
         private CreateOrderUseCase createOrderUseCase;
+
+        @MockitoBean
+        private ResolveTrustedTenantContextUseCase trustedTenants;
+
+        @BeforeEach
+        void allowsRequestedTenantForControllerSlice() {
+                // Why: this MVC slice exercises Orders after the Security trust
+                // boundary, while the Security HTTP tests independently verify
+                // authorization success and denial.
+                // Covers: production TrustedTenantContextArgumentResolver with a
+                // deterministic allowed Tenant fixture.
+                // Prevents: falling back to MVC model-attribute construction of
+                // TrustedTenantContext.
+
+                when(trustedTenants.resolve(
+                                any(ResolveTrustedTenantContextQuery.class)))
+                                .thenAnswer(invocation -> {
+                                        var query = invocation.getArgument(
+                                                        0,
+                                                        ResolveTrustedTenantContextQuery.class);
+
+                                        return Optional.of(
+                                                        new TrustedTenantContext(
+                                                                        query.requestedTenantId()));
+                                });
+        }
 
         @Test
         void createsOrderFromValidRequest() throws Exception {
@@ -64,7 +101,7 @@ class OrderControllerTest {
                 when(createOrderUseCase.create(any(CreateOrderCommand.class)))
                                 .thenReturn(order);
 
-                mockMvc.perform(post("/orders")
+                mockMvc.perform(authenticatedPost()
                                 .header("X-Tenant-Id", tenantId)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(validBody(customerId, productId)))
@@ -92,7 +129,7 @@ class OrderControllerTest {
                 // Covers: mandatory request metadata.
                 // Prevents: creation of future unscoped or ambiguous tenant data.
 
-                mockMvc.perform(post("/orders")
+                mockMvc.perform(authenticatedPost()
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(validBody(UUID.randomUUID(), UUID.randomUUID())))
                                 .andExpect(status().isBadRequest())
@@ -110,7 +147,7 @@ class OrderControllerTest {
                 // Covers: HTTP type conversion.
                 // Prevents: malformed identity values propagating into application logic.
 
-                mockMvc.perform(post("/orders")
+                mockMvc.perform(authenticatedPost()
                                 .header("X-Tenant-Id", "not-a-uuid")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(validBody(UUID.randomUUID(), UUID.randomUUID())))
@@ -127,7 +164,7 @@ class OrderControllerTest {
                 // Covers: mandatory JSON body handling.
                 // Prevents: null access and ambiguous application failures.
 
-                mockMvc.perform(post("/orders")
+                mockMvc.perform(authenticatedPost()
                                 .header("X-Tenant-Id", UUID.randomUUID())
                                 .contentType(MediaType.APPLICATION_JSON))
                                 .andExpect(status().isBadRequest())
@@ -143,7 +180,7 @@ class OrderControllerTest {
                 // Prevents: parser internals leaking to clients or business code receiving
                 // garbage.
 
-                mockMvc.perform(post("/orders")
+                mockMvc.perform(authenticatedPost()
                                 .header("X-Tenant-Id", UUID.randomUUID())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("""
@@ -161,7 +198,7 @@ class OrderControllerTest {
                 // Covers: Content-Type enforcement.
                 // Prevents: accidental handling of unsupported representations.
 
-                mockMvc.perform(post("/orders")
+                mockMvc.perform(authenticatedPost()
                                 .header("X-Tenant-Id", UUID.randomUUID())
                                 .contentType(MediaType.TEXT_PLAIN)
                                 .content("invalid"))
@@ -182,7 +219,7 @@ class OrderControllerTest {
                 // Covers: Jakarta Bean Validation including nested collection elements.
                 // Prevents: unnecessary domain/database work and inconsistent client behavior.
 
-                mockMvc.perform(post("/orders")
+                mockMvc.perform(authenticatedPost()
                                 .header("X-Tenant-Id", UUID.randomUUID())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(requestBody))
@@ -216,7 +253,7 @@ class OrderControllerTest {
                                 }
                                 """.formatted(customerId, productId);
 
-                mockMvc.perform(post("/orders")
+                mockMvc.perform(authenticatedPost()
                                 .header("X-Tenant-Id", UUID.randomUUID())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(body))
@@ -243,7 +280,7 @@ class OrderControllerTest {
                                 }
                                 """.formatted(privateMarker);
 
-                mockMvc.perform(post("/orders")
+                mockMvc.perform(authenticatedPost()
                                 .header("X-Tenant-Id", UUID.randomUUID())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(body))
@@ -283,7 +320,7 @@ class OrderControllerTest {
 
                 stubSuccessfulOrder();
 
-                mockMvc.perform(post("/orders")
+                mockMvc.perform(authenticatedPost()
                                 .header("X-Tenant-Id", UUID.randomUUID())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(requestBody))
@@ -312,7 +349,7 @@ class OrderControllerTest {
 
                 stubSuccessfulOrder();
 
-                mockMvc.perform(post("/orders")
+                mockMvc.perform(authenticatedPost()
                                 .header("X-Tenant-Id", UUID.randomUUID())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(requestBody))
@@ -338,7 +375,7 @@ class OrderControllerTest {
                 // serialize Problem Details because the caller also rejects that media type,
                 // the evidence will be used to refine the 406 contract rather than hiding it.
 
-                mockMvc.perform(post("/orders")
+                mockMvc.perform(authenticatedPost()
                                 .header("X-Tenant-Id", UUID.randomUUID())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .accept(MediaType.APPLICATION_XML)
@@ -365,7 +402,7 @@ class OrderControllerTest {
 
                 stubSuccessfulOrder();
 
-                mockMvc.perform(post("/orders")
+                mockMvc.perform(authenticatedPost()
                                 .header("X-Tenant-Id", UUID.randomUUID())
                                 .contentType(MediaType.parseMediaType(
                                                 "application/json;charset=UTF-8"))
@@ -376,6 +413,25 @@ class OrderControllerTest {
                 verify(createOrderUseCase).create(any(CreateOrderCommand.class));
         }
 
+        /**
+         * Creates an Orders MVC request positioned immediately after the
+         * authentication boundary.
+         *
+         * <p>The Security HTTP integration tests prove JWT-to-principal mapping.
+         * This focused controller slice therefore supplies only OrderHub's
+         * minimized internal authenticated principal.
+         *
+         * @return authenticated POST request for the Orders endpoint
+         */
+        private static MockHttpServletRequestBuilder authenticatedPost() {
+
+                return post("/orders")
+                                .principal(
+                                                new AuthenticatedUserAuthenticationToken(
+                                                                new AuthenticatedUserPrincipal(
+                                                                                UUID.fromString(
+                                                                                                "11111111-1111-1111-1111-111111111111"))));
+        }
         /**
          * Supplies syntactically valid JSON whose field values cannot safely be bound
          * to

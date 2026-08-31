@@ -168,8 +168,23 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!--
+            OAuth2 Resource Server support for validating externally issued
+            JWT bearer access tokens at the HTTP authentication boundary.
+            Signature, temporal claims and cryptographic processing remain
+            delegated to Spring Security rather than application code.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security-oauth2-resource-server</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
         <!-- ==============================================================
-             5. TEST — CORE
+             5. TEST â€” CORE
              Base assertion, mocking and Spring context test infrastructure.
              ============================================================== -->
 
@@ -184,7 +199,7 @@
         </dependency>
 
         <!-- ==============================================================
-             6. TEST — SLICES
+             6. TEST â€” SLICES
              Narrow-scope tests for individual layers.
              ============================================================== -->
 
@@ -211,7 +226,7 @@
         </dependency>
 
         <!-- ==============================================================
-             7. TEST — INTEGRATION INFRASTRUCTURE
+             7. TEST â€” INTEGRATION INFRASTRUCTURE
              Disposable real dependencies for integration tests.
              ============================================================== -->
 
