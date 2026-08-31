@@ -88,7 +88,7 @@ class AuthenticatedUserJwtAuthenticationConverterTest {
                 "https://Issuer.Example.test/Provider";
 
         var exactSubject =
-                "Subject-Case_Sensitive:001";
+                " Subject-Case_Sensitive:001 ";
 
         var captured =
                 new AtomicReference<ResolveAuthenticatedUserQuery>();
@@ -171,6 +171,35 @@ class AuthenticatedUserJwtAuthenticationConverterTest {
                 converter.convert(
                         jwtWithoutSubject(
                                 ISSUER)))
+                .isInstanceOf(BadCredentialsException.class)
+                .hasMessage("Bearer authentication failed")
+                .hasMessageNotContaining(ISSUER);
+    }
+
+    @Test
+    void rejectsBlankSubjectAsGenericAuthenticationFailure() {
+        // Why: a signed JWT can carry a present but whitespace-only subject,
+        // which still cannot establish a usable external identity.
+        // Covers: structural subject validation before the application query is
+        // constructed.
+        // Prevents: ResolveAuthenticatedUserQuery IllegalArgumentException
+        // escaping Spring Security authentication handling as a server error.
+
+        ResolveAuthenticatedUserUseCase users =
+                query -> {
+                    throw new AssertionError(
+                            "Blank identity must not reach application resolution");
+                };
+
+        var converter =
+                new AuthenticatedUserJwtAuthenticationConverter(
+                        users);
+
+        assertThatThrownBy(() ->
+                converter.convert(
+                        jwt(
+                                ISSUER,
+                                "   ")))
                 .isInstanceOf(BadCredentialsException.class)
                 .hasMessage("Bearer authentication failed")
                 .hasMessageNotContaining(ISSUER);

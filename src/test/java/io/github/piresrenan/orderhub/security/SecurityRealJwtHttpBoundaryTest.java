@@ -299,6 +299,45 @@ class SecurityRealJwtHttpBoundaryTest {
     }
 
     @Test
+    void rejectsRealJwtWithBlankSubjectAsUnauthorizedBeforeIdentityResolution()
+            throws Exception {
+
+        // Why: a correctly signed token may contain a present but whitespace-only
+        // subject that still cannot identify an OrderHub User.
+        // Covers: real JWT decoding followed by structural subject rejection at
+        // the authentication adapter boundary.
+        // Prevents: application query validation escaping as a 500 response
+        // instead of the stable privacy-safe 401 authentication failure.
+
+        var now =
+                Instant.now();
+
+        var token =
+                RealJwtTestSupport.signedToken(
+                        SIGNING_KEY,
+                        ISSUER,
+                        "   ",
+                        AUDIENCE,
+                        now.plusSeconds(
+                                300),
+                        now.minusSeconds(
+                                30));
+
+        mockMvc.perform(
+                        get("/orders")
+                                .header(
+                                        HttpHeaders.AUTHORIZATION,
+                                        bearer(
+                                                token)))
+                .andExpect(
+                        status().isUnauthorized());
+
+        verifyNoInteractions(
+                externalIdentities,
+                memberships);
+    }
+
+    @Test
     void rejectsValidRealJwtWithUnknownIdentityWithoutEnumeratingClaims(
             CapturedOutput output)
             throws Exception {

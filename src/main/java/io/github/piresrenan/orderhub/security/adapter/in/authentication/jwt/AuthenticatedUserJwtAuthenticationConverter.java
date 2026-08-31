@@ -67,7 +67,10 @@ public final class AuthenticatedUserJwtAuthenticationConverter
         var subject =
                 jwt.getSubject();
 
-        if (issuer == null || subject == null) {
+        if (issuer == null
+                || issuer.isBlank()
+                || subject == null
+                || subject.isBlank()) {
             throw authenticationFailure();
         }
 
