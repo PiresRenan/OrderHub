@@ -1,6 +1,6 @@
 # ADR-0007 — Internal User Identity and Tenant Membership
 
-Status: DESIGNED
+Status: TESTED
 
 ## Context
 
