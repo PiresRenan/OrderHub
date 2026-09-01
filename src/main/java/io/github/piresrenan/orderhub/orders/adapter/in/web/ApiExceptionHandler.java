@@ -21,6 +21,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryCommitmentRejectedException;
+import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryOperationException;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderPersistenceException;
 import io.github.piresrenan.orderhub.orders.application.port.out.TransactionExecutionException;
 
@@ -61,9 +63,31 @@ public final class ApiExceptionHandler extends ResponseEntityExceptionHandler {
          * @return privacy-safe RFC 9457 response for a persistence operation that
          *         could not be completed
          */
+        /**
+         * Converts fail-closed Inventory commitment rejection into a stable
+         * conflict response without exposing Tenant, Variant, policy, stock or
+         * position state.
+         */
+        @ExceptionHandler(InventoryCommitmentRejectedException.class)
+        protected ResponseEntity<Object> handleInventoryCommitmentRejected() {
+
+                var status = HttpStatus.CONFLICT;
+
+                var problem = problem(
+                                status,
+                                "inventory-commitment-rejected",
+                                "Inventory commitment rejected",
+                                "The order could not be accepted.",
+                                "INVENTORY_COMMITMENT_REJECTED");
+
+                return ResponseEntity
+                                .status(status)
+                                .body(problem);
+        }
         @ExceptionHandler({
                         OrderPersistenceException.class,
-                        TransactionExecutionException.class
+                        TransactionExecutionException.class,
+                        InventoryOperationException.class
         })
         protected ResponseEntity<Object> handleInternalTechnicalFailure() {
 
