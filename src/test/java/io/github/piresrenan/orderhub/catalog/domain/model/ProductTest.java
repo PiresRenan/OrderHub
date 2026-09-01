@@ -249,4 +249,62 @@ class ProductTest {
         assertThat(product.categoryIds())
                 .containsExactly(originalCategory);
     }
+
+    @Test
+    void rehydratesPersistedLifecycleState() {
+
+        var productId =
+                UUID.randomUUID();
+
+        var tenantId =
+                UUID.randomUUID();
+
+        var categoryId =
+                UUID.randomUUID();
+
+        var product = Product.rehydrate(
+                productId,
+                tenantId,
+                "Professional Monitor",
+                "professional-monitor",
+                "Persisted description.",
+                List.of(categoryId),
+                ProductStatus.ARCHIVED);
+
+        assertThat(product.id())
+                .isEqualTo(productId);
+
+        assertThat(product.tenantId())
+                .isEqualTo(tenantId);
+
+        assertThat(product.name())
+                .isEqualTo("Professional Monitor");
+
+        assertThat(product.slug())
+                .isEqualTo("professional-monitor");
+
+        assertThat(product.description())
+                .isEqualTo("Persisted description.");
+
+        assertThat(product.categoryIds())
+                .containsExactly(categoryId);
+
+        assertThat(product.status())
+                .isEqualTo(ProductStatus.ARCHIVED);
+    }
+
+    @Test
+    void rejectsMissingPersistedProductStatus() {
+
+        assertThatThrownBy(() -> Product.rehydrate(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                "Professional Monitor",
+                "professional-monitor",
+                null,
+                List.of(),
+                null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Product status is required");
+    }
 }

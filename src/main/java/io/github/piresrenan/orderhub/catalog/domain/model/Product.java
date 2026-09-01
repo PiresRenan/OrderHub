@@ -36,7 +36,8 @@ public final class Product {
             String name,
             String slug,
             String description,
-            Collection<UUID> categoryIds) {
+            Collection<UUID> categoryIds,
+            ProductStatus status) {
 
         if (id == null) {
             throw new IllegalArgumentException(
@@ -58,6 +59,11 @@ public final class Product {
                     "Product name must not be blank");
         }
 
+        if (status == null) {
+            throw new IllegalArgumentException(
+                    "Product status is required");
+        }
+
         this.id = id;
         this.tenantId = tenantId;
         this.name = stripSurroundingUnicodeWhitespace(name);
@@ -65,9 +71,17 @@ public final class Product {
         this.description = description;
         this.categoryIds =
                 validateAndCopyCategoryIds(categoryIds);
-        this.status = ProductStatus.DRAFT;
+        this.status = status;
     }
 
+    /**
+     * Creates a new Product at the beginning of its commercial lifecycle.
+     *
+     * <p>
+     * New Products always start as DRAFT. Lifecycle transitions remain separate
+     * business operations and are intentionally not exposed by OH-011 yet.
+     * </p>
+     */
     public static Product create(
             UUID id,
             UUID tenantId,
@@ -82,7 +96,37 @@ public final class Product {
                 name,
                 slug,
                 description,
-                categoryIds);
+                categoryIds,
+                ProductStatus.DRAFT);
+    }
+
+    /**
+     * Reconstructs a Product from persisted state.
+     *
+     * <p>
+     * Rehydration is distinct from creation because persisted Products may
+     * legitimately already be ACTIVE or ARCHIVED. The same structural domain
+     * invariants continue to be validated while the previously persisted
+     * lifecycle state is restored exactly.
+     * </p>
+     */
+    public static Product rehydrate(
+            UUID id,
+            UUID tenantId,
+            String name,
+            String slug,
+            String description,
+            Collection<UUID> categoryIds,
+            ProductStatus status) {
+
+        return new Product(
+                id,
+                tenantId,
+                name,
+                slug,
+                description,
+                categoryIds,
+                status);
     }
 
     public UUID id() {
@@ -107,7 +151,7 @@ public final class Product {
 
     /**
      * Returns an immutable snapshot of Category assignments captured when the
-     * Product was created.
+     * Product was created or rehydrated.
      */
     public List<UUID> categoryIds() {
         return categoryIds;
