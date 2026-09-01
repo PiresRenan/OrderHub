@@ -6,24 +6,33 @@ import java.util.UUID;
 
 import io.github.piresrenan.orderhub.catalog.application.port.in.CategoryHierarchyViolationException;
 import io.github.piresrenan.orderhub.catalog.application.port.in.SaveCategoryUseCase;
+import io.github.piresrenan.orderhub.catalog.application.port.out.CategoryHierarchyMutationExecutor;
 import io.github.piresrenan.orderhub.catalog.application.port.out.CategoryRepository;
 import io.github.piresrenan.orderhub.catalog.domain.model.Category;
 
 /**
- * Validates Category ancestry before persisting a hierarchy mutation.
+ * Validates and persists Category hierarchy mutations inside one tenant-scoped
+ * atomic consistency boundary.
  */
 public final class SaveCategoryService
         implements SaveCategoryUseCase {
 
     private final CategoryRepository categoryRepository;
+    private final CategoryHierarchyMutationExecutor mutationExecutor;
 
     public SaveCategoryService(
-            CategoryRepository categoryRepository) {
+            CategoryRepository categoryRepository,
+            CategoryHierarchyMutationExecutor mutationExecutor) {
 
         this.categoryRepository =
                 Objects.requireNonNull(
                         categoryRepository,
                         "categoryRepository");
+
+        this.mutationExecutor =
+                Objects.requireNonNull(
+                        mutationExecutor,
+                        "mutationExecutor");
     }
 
     @Override
@@ -34,10 +43,16 @@ public final class SaveCategoryService
                 category,
                 "category");
 
-        validateHierarchy(category);
+        return mutationExecutor.execute(
+                category.tenantId(),
+                () -> {
 
-        return categoryRepository.save(
-                category);
+                    validateHierarchy(
+                            category);
+
+                    return categoryRepository.save(
+                            category);
+                });
     }
 
     private void validateHierarchy(
@@ -89,10 +104,12 @@ public final class SaveCategoryService
              * returned identity anyway so a broken adapter cannot silently
              * weaken the application boundary.
              */
-            if (!ancestor.tenantId().equals(
-                    candidate.tenantId())
-                    || !ancestor.id().equals(
-                            currentCategoryId)) {
+            if (
+                !ancestor.tenantId().equals(
+                        candidate.tenantId())
+                || !ancestor.id().equals(
+                        currentCategoryId)
+            ) {
 
                 throw new CategoryHierarchyViolationException();
             }

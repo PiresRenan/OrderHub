@@ -1,5 +1,7 @@
 package io.github.piresrenan.orderhub.orders.application.service;
 
+import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.ValidateOrderableVariantsCommand;
+import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.ValidateOrderableVariantsUseCase;
 import io.github.piresrenan.orderhub.inventory.application.port.in.CommitOrderInventoryCommand;
 import io.github.piresrenan.orderhub.inventory.application.port.in.CommitOrderInventoryUseCase;
 import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryAllocationOutcome;
@@ -14,8 +16,8 @@ import io.github.piresrenan.orderhub.orders.domain.model.Order;
 import io.github.piresrenan.orderhub.orders.domain.model.OrderItem;
 
 /**
- * Coordinates creation of a new Order and the durable Inventory commitment
- * required for that Order to be accepted.
+ * Coordinates Order persistence, Catalog sellability stabilization and durable
+ * Inventory commitment inside one physical transaction.
  */
 public final class CreateOrderService
         implements CreateOrderUseCase {
@@ -23,12 +25,14 @@ public final class CreateOrderService
     private final OrderRepository orderRepository;
     private final OrderIdGenerator orderIdGenerator;
     private final TransactionExecutor transactionExecutor;
+    private final ValidateOrderableVariantsUseCase catalog;
     private final CommitOrderInventoryUseCase inventory;
 
     public CreateOrderService(
             OrderRepository orderRepository,
             OrderIdGenerator orderIdGenerator,
             TransactionExecutor transactionExecutor,
+            ValidateOrderableVariantsUseCase catalog,
             CommitOrderInventoryUseCase inventory) {
 
         this.orderRepository =
@@ -39,6 +43,9 @@ public final class CreateOrderService
 
         this.transactionExecutor =
                 transactionExecutor;
+
+        this.catalog =
+                catalog;
 
         this.inventory =
                 inventory;
@@ -68,6 +75,15 @@ public final class CreateOrderService
                         command.customerId(),
                         items);
 
+        var catalogCommand =
+                new ValidateOrderableVariantsCommand(
+                        order.tenantId(),
+                        order.items()
+                                .stream()
+                                .map(
+                                        OrderItem::variantId)
+                                .toList());
+
         var inventoryCommand =
                 new CommitOrderInventoryCommand(
                         order.tenantId(),
@@ -87,6 +103,14 @@ public final class CreateOrderService
                             orderRepository.save(
                                     order);
 
+                    /*
+                     * Catalog locks are acquired before Inventory mutation.
+                     * Catalog itself normalizes Variant/Product identities into
+                     * deterministic lock order.
+                     */
+                    catalog.validate(
+                            catalogCommand);
+
                     var inventoryOutcome =
                             inventory.commit(
                                     inventoryCommand);
@@ -102,6 +126,7 @@ public final class CreateOrderService
             InventoryAllocationOutcome inventoryOutcome) {
 
         if (inventoryOutcome == null) {
+
             throw new IllegalStateException(
                     "Inventory allocation outcome is required");
         }

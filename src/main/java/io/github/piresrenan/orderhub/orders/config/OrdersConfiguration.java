@@ -10,6 +10,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import io.micrometer.core.instrument.MeterRegistry;
+import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.ValidateOrderableVariantsUseCase;
 import io.github.piresrenan.orderhub.inventory.application.port.in.CommitOrderInventoryUseCase;
 import io.github.piresrenan.orderhub.orders.adapter.out.observability.micrometer.MicrometerObservedCreateOrderUseCase;
 import io.github.piresrenan.orderhub.orders.adapter.out.observability.micrometer.MicrometerObservedTransactionExecutor;
@@ -68,13 +69,14 @@ public class OrdersConfiguration {
 
     /**
      * Exposes the create-Order use case through a low-cardinality observability
-     * decorator while keeping Micrometer out of application/domain code.
+     * decorator while preserving the Order-owned transaction boundary.
      */
     @Bean
     CreateOrderUseCase createOrderUseCase(
             OrderRepository orderRepository,
             OrderIdGenerator orderIdGenerator,
             TransactionExecutor transactionExecutor,
+            ValidateOrderableVariantsUseCase catalog,
             CommitOrderInventoryUseCase inventory,
             MeterRegistry meterRegistry) {
 
@@ -83,6 +85,7 @@ public class OrdersConfiguration {
                         orderRepository,
                         orderIdGenerator,
                         transactionExecutor,
+                        catalog,
                         inventory);
 
         return new MicrometerObservedCreateOrderUseCase(

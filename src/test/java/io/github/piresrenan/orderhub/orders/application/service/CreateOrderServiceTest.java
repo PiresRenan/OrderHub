@@ -13,6 +13,9 @@ import java.util.function.Supplier;
 
 import org.junit.jupiter.api.Test;
 
+import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.CatalogOrderabilityRejectedException;
+import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.ValidateOrderableVariantsCommand;
+import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.ValidateOrderableVariantsUseCase;
 import io.github.piresrenan.orderhub.inventory.application.port.in.CommitOrderInventoryCommand;
 import io.github.piresrenan.orderhub.inventory.application.port.in.CommitOrderInventoryUseCase;
 import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryAllocationOutcome;
@@ -26,7 +29,7 @@ import io.github.piresrenan.orderhub.orders.domain.model.Order;
 class CreateOrderServiceTest {
 
     @Test
-    void persistsOrderThenCommitsInventoryInsideSameTransaction() {
+    void persistsOrderThenValidatesCatalogThenCommitsInventoryInsideSameTransaction() {
 
         var events =
                 new ArrayList<String>();
@@ -36,6 +39,11 @@ class CreateOrderServiceTest {
 
         var repository =
                 new RecordingOrderRepository(
+                        transaction::isActive,
+                        events);
+
+        var catalog =
+                new RecordingCatalogValidator(
                         transaction::isActive,
                         events);
 
@@ -61,6 +69,7 @@ class CreateOrderServiceTest {
                         repository,
                         () -> orderId,
                         transaction,
+                        catalog,
                         inventory);
 
         var result =
@@ -74,12 +83,16 @@ class CreateOrderServiceTest {
                                                 2))));
 
         assertThat(result.order().id())
-                .isEqualTo(orderId);
+                .isEqualTo(
+                        orderId);
 
         assertThat(repository.saveCount)
                 .isEqualTo(1);
 
         assertThat(repository.saveObservedInsideTransaction)
+                .isTrue();
+
+        assertThat(catalog.validateObservedInsideTransaction)
                 .isTrue();
 
         assertThat(inventory.commitObservedInsideTransaction)
@@ -88,29 +101,39 @@ class CreateOrderServiceTest {
         assertThat(events)
                 .containsExactly(
                         "order",
+                        "catalog",
                         "inventory");
 
         assertThat(transaction.executionCount)
                 .isEqualTo(1);
 
+        assertThat(catalog.command.tenantId())
+                .isEqualTo(
+                        tenantId);
+
+        assertThat(catalog.command.variantIds())
+                .containsExactly(
+                        variantId);
+
         assertThat(inventory.command.tenantId())
-                .isEqualTo(tenantId);
+                .isEqualTo(
+                        tenantId);
 
         assertThat(inventory.command.orderId())
-                .isEqualTo(orderId);
-
-        assertThat(inventory.command.demands())
-                .containsExactly(
-                        new CommitOrderInventoryCommand.Demand(
-                                variantId,
-                                2));
+                .isEqualTo(
+                        orderId);
     }
 
     @Test
-    void forwardsRawDuplicateLinesAndLeavesAggregationToInventory() {
+    void forwardsDuplicateVariantIdentityAndLeavesCatalogDeduplicationToCatalog() {
 
         var transaction =
                 new RecordingTransactionExecutor();
+
+        var catalog =
+                new RecordingCatalogValidator(
+                        transaction::isActive,
+                        new ArrayList<>());
 
         var inventory =
                 new RecordingInventoryCommitter(
@@ -127,6 +150,7 @@ class CreateOrderServiceTest {
                                 new ArrayList<>()),
                         UUID::randomUUID,
                         transaction,
+                        catalog,
                         inventory);
 
         service.create(
@@ -140,6 +164,11 @@ class CreateOrderServiceTest {
                                 new CreateOrderCommand.Item(
                                         variantId,
                                         3))));
+
+        assertThat(catalog.command.variantIds())
+                .containsExactly(
+                        variantId,
+                        variantId);
 
         assertThat(inventory.command.demands())
                 .containsExactly(
@@ -162,7 +191,9 @@ class CreateOrderServiceTest {
 
         OrderIdGenerator generator =
                 () -> {
+
                     calls.incrementAndGet();
+
                     return generatedId;
                 };
 
@@ -176,6 +207,9 @@ class CreateOrderServiceTest {
                                 new ArrayList<>()),
                         generator,
                         transaction,
+                        new RecordingCatalogValidator(
+                                transaction::isActive,
+                                new ArrayList<>()),
                         new RecordingInventoryCommitter(
                                 transaction::isActive,
                                 new ArrayList<>()));
@@ -194,17 +228,23 @@ class CreateOrderServiceTest {
                 .hasValue(1);
 
         assertThat(result.order().id())
-                .isEqualTo(generatedId);
+                .isEqualTo(
+                        generatedId);
     }
 
     @Test
-    void doesNotOpenTransactionOrTouchPersistenceForInvalidOrder() {
+    void doesNotOpenTransactionOrTouchCollaboratorsForInvalidOrder() {
 
         var transaction =
                 new RecordingTransactionExecutor();
 
         var repository =
                 new RecordingOrderRepository(
+                        transaction::isActive,
+                        new ArrayList<>());
+
+        var catalog =
+                new RecordingCatalogValidator(
                         transaction::isActive,
                         new ArrayList<>());
 
@@ -218,6 +258,7 @@ class CreateOrderServiceTest {
                         repository,
                         UUID::randomUUID,
                         transaction,
+                        catalog,
                         inventory);
 
         assertThatThrownBy(() ->
@@ -237,12 +278,15 @@ class CreateOrderServiceTest {
         assertThat(repository.saveCount)
                 .isZero();
 
+        assertThat(catalog.validateCount)
+                .isZero();
+
         assertThat(inventory.commitCount)
                 .isZero();
     }
 
     @Test
-    void propagatesInventoryRejectionAfterOrderPersistenceInsideTransaction() {
+    void propagatesCatalogRejectionAfterOrderPersistenceAndBeforeInventory() {
 
         var transaction =
                 new RecordingTransactionExecutor();
@@ -252,6 +296,76 @@ class CreateOrderServiceTest {
 
         var repository =
                 new RecordingOrderRepository(
+                        transaction::isActive,
+                        events);
+
+        var catalog =
+                new RecordingCatalogValidator(
+                        transaction::isActive,
+                        events);
+
+        var inventory =
+                new RecordingInventoryCommitter(
+                        transaction::isActive,
+                        events);
+
+        var rejection =
+                new CatalogOrderabilityRejectedException();
+
+        catalog.failure =
+                rejection;
+
+        var service =
+                new CreateOrderService(
+                        repository,
+                        UUID::randomUUID,
+                        transaction,
+                        catalog,
+                        inventory);
+
+        assertThatThrownBy(() ->
+                service.create(
+                        new CreateOrderCommand(
+                                UUID.randomUUID(),
+                                UUID.randomUUID(),
+                                List.of(
+                                        new CreateOrderCommand.Item(
+                                                UUID.randomUUID(),
+                                                1)))))
+                .isSameAs(
+                        rejection);
+
+        assertThat(events)
+                .containsExactly(
+                        "order",
+                        "catalog");
+
+        assertThat(repository.saveCount)
+                .isEqualTo(1);
+
+        assertThat(catalog.validateCount)
+                .isEqualTo(1);
+
+        assertThat(inventory.commitCount)
+                .isZero();
+    }
+
+    @Test
+    void propagatesInventoryRejectionAfterCatalogAcceptance() {
+
+        var transaction =
+                new RecordingTransactionExecutor();
+
+        var events =
+                new ArrayList<String>();
+
+        var repository =
+                new RecordingOrderRepository(
+                        transaction::isActive,
+                        events);
+
+        var catalog =
+                new RecordingCatalogValidator(
                         transaction::isActive,
                         events);
 
@@ -271,6 +385,7 @@ class CreateOrderServiceTest {
                         repository,
                         UUID::randomUUID,
                         transaction,
+                        catalog,
                         inventory);
 
         assertThatThrownBy(() ->
@@ -288,9 +403,13 @@ class CreateOrderServiceTest {
         assertThat(events)
                 .containsExactly(
                         "order",
+                        "catalog",
                         "inventory");
 
         assertThat(repository.saveCount)
+                .isEqualTo(1);
+
+        assertThat(catalog.validateCount)
                 .isEqualTo(1);
 
         assertThat(inventory.commitCount)
@@ -311,13 +430,17 @@ class CreateOrderServiceTest {
             active = true;
 
             try {
+
                 return work.get();
+
             } finally {
+
                 active = false;
             }
         }
 
         boolean isActive() {
+
             return active;
         }
     }
@@ -366,6 +489,50 @@ class CreateOrderServiceTest {
         }
     }
 
+    private static final class RecordingCatalogValidator
+            implements ValidateOrderableVariantsUseCase {
+
+        private final BooleanSupplier transactionActive;
+        private final List<String> events;
+
+        private ValidateOrderableVariantsCommand command;
+        private int validateCount;
+        private boolean validateObservedInsideTransaction;
+        private RuntimeException failure;
+
+        RecordingCatalogValidator(
+                BooleanSupplier transactionActive,
+                List<String> events) {
+
+            this.transactionActive =
+                    transactionActive;
+
+            this.events =
+                    events;
+        }
+
+        @Override
+        public void validate(
+                ValidateOrderableVariantsCommand command) {
+
+            this.command =
+                    command;
+
+            validateCount++;
+
+            validateObservedInsideTransaction =
+                    transactionActive.getAsBoolean();
+
+            events.add(
+                    "catalog");
+
+            if (failure != null) {
+
+                throw failure;
+            }
+        }
+    }
+
     private static final class RecordingInventoryCommitter
             implements CommitOrderInventoryUseCase {
 
@@ -404,6 +571,7 @@ class CreateOrderServiceTest {
                     "inventory");
 
             if (failure != null) {
+
                 throw failure;
             }
 

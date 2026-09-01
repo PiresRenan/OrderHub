@@ -41,7 +41,9 @@ class SaveCategoryServiceTest {
 
         service =
                 new SaveCategoryService(
-                        repository);
+                        repository,
+                        (tenantId, action) ->
+                                action.get());
     }
 
     @Test

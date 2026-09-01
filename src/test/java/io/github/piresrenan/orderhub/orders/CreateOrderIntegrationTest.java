@@ -50,6 +50,14 @@ class CreateOrderIntegrationTest {
                     inventory.inventory_commitments,
                     inventory.inventory_positions,
                     inventory.tenant_policies,
+                    catalog.media,
+                    catalog.variant_base_prices,
+                    catalog.product_variant_attributes,
+                    catalog.product_categories,
+                    catalog.product_variants,
+                    catalog.categories,
+                    catalog.category_hierarchy_guards,
+                    catalog.products,
                     orders.order_items,
                     orders.orders
                 """);
@@ -74,6 +82,10 @@ class CreateOrderIntegrationTest {
         var variantId =
                 UUID.fromString(
                         "33333333-3333-3333-3333-333333333333");
+
+        seedActiveCatalogVariant(
+                tenantId,
+                variantId);
 
         jdbcTemplate.update("""
                 INSERT INTO inventory.tenant_policies (
@@ -227,5 +239,54 @@ class CreateOrderIntegrationTest {
 
         assertThat(commitmentCount)
                 .isEqualTo(1);
+    }
+    private void seedActiveCatalogVariant(
+            UUID tenantId,
+            UUID variantId) {
+
+        var productId =
+                UUID.fromString(
+                        "44444444-4444-4444-4444-444444444444");
+
+        jdbcTemplate.update("""
+                INSERT INTO catalog.products (
+                    tenant_id,
+                    id,
+                    name,
+                    slug,
+                    description,
+                    status
+                )
+                VALUES (
+                    ?,
+                    ?,
+                    'Order fixture product',
+                    'order_fixture_product',
+                    NULL,
+                    'ACTIVE'
+                )
+                """,
+                tenantId,
+                productId);
+
+        jdbcTemplate.update("""
+                INSERT INTO catalog.product_variants (
+                    tenant_id,
+                    id,
+                    product_id,
+                    sku,
+                    status
+                )
+                VALUES (
+                    ?,
+                    ?,
+                    ?,
+                    'ORDER-FIXTURE-SKU',
+                    'ACTIVE'
+                )
+                """,
+                tenantId,
+                variantId,
+                productId);
     }
 }

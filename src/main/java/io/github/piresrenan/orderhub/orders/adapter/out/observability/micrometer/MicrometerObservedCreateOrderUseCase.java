@@ -13,6 +13,7 @@ import org.springframework.transaction.TransactionTimedOutException;
 
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.CatalogOrderabilityRejectedException;
 import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryCommitmentRejectedException;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderAllocationOutcome;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
@@ -136,6 +137,12 @@ public final class MicrometerObservedCreateOrderUseCase
     private static String classifyFailure(
             RuntimeException failure) {
 
+        if (containsCause(
+                failure,
+                CatalogOrderabilityRejectedException.class::isInstance)) {
+
+            return "catalog_item_unavailable";
+        }
         if (containsCause(
                 failure,
                 InventoryCommitmentRejectedException.class::isInstance)) {

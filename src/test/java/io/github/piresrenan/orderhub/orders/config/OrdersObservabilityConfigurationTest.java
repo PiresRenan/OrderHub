@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.ValidateOrderableVariantsUseCase;
 import io.github.piresrenan.orderhub.inventory.application.port.in.CommitOrderInventoryUseCase;
 import io.github.piresrenan.orderhub.orders.adapter.out.observability.micrometer.MicrometerObservedCreateOrderUseCase;
 import io.github.piresrenan.orderhub.orders.adapter.out.observability.micrometer.MicrometerObservedTransactionExecutor;
@@ -48,6 +49,8 @@ class OrdersObservabilityConfigurationTest {
                                 OrderRepository.class),
                         orderIdGenerator,
                         transactionExecutor,
+                        mock(
+                                ValidateOrderableVariantsUseCase.class),
                         mock(
                                 CommitOrderInventoryUseCase.class),
                         registry);

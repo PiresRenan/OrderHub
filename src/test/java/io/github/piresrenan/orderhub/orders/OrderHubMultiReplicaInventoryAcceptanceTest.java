@@ -20,6 +20,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
+import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryCommitmentRejectedException;
+
 /**
  * OH-011 acceptance #12.
  *
@@ -41,6 +43,10 @@ class OrderHubMultiReplicaInventoryAcceptanceTest {
     private static final UUID TENANT_ID =
             UUID.fromString(
                     "10000000-0000-0000-0000-000000000001");
+
+    private static final UUID PRODUCT_ID =
+            UUID.fromString(
+                    "20000000-0000-0000-0000-000000000001");
 
     private static final UUID VARIANT_ID =
             UUID.fromString(
@@ -225,6 +231,15 @@ class OrderHubMultiReplicaInventoryAcceptanceTest {
                             .count())
                     .isEqualTo(1);
 
+            assertThat(results)
+                    .filteredOn(result ->
+                            result.startsWith(
+                                    "FAILURE:"))
+                    .containsExactly(
+                            "FAILURE:"
+                                    + InventoryCommitmentRejectedException.class
+                                            .getName());
+
             assertDurableSingleCommit(
                     jdbcTemplate);
         } finally {
@@ -358,6 +373,14 @@ class OrderHubMultiReplicaInventoryAcceptanceTest {
                     inventory.inventory_commitments,
                     inventory.inventory_positions,
                     inventory.tenant_policies,
+                    catalog.media,
+                    catalog.variant_base_prices,
+                    catalog.product_variant_attributes,
+                    catalog.product_categories,
+                    catalog.product_variants,
+                    catalog.categories,
+                    catalog.category_hierarchy_guards,
+                    catalog.products,
                     orders.order_items,
                     orders.orders
                 """);
@@ -365,6 +388,47 @@ class OrderHubMultiReplicaInventoryAcceptanceTest {
 
     private static void seedLastUnit(
             JdbcTemplate jdbcTemplate) {
+
+        jdbcTemplate.update("""
+                INSERT INTO catalog.products (
+                    tenant_id,
+                    id,
+                    name,
+                    slug,
+                    description,
+                    status
+                )
+                VALUES (
+                    ?,
+                    ?,
+                    'Multi replica fixture product',
+                    'multi_replica_fixture_product',
+                    NULL,
+                    'ACTIVE'
+                )
+                """,
+                TENANT_ID,
+                PRODUCT_ID);
+
+        jdbcTemplate.update("""
+                INSERT INTO catalog.product_variants (
+                    tenant_id,
+                    id,
+                    product_id,
+                    sku,
+                    status
+                )
+                VALUES (
+                    ?,
+                    ?,
+                    ?,
+                    'MULTI-REPLICA-VARIANT',
+                    'ACTIVE'
+                )
+                """,
+                TENANT_ID,
+                VARIANT_ID,
+                PRODUCT_ID);
 
         jdbcTemplate.update("""
                 INSERT INTO inventory.tenant_policies (

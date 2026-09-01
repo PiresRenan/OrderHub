@@ -64,6 +64,8 @@ class CreateOrderAllocationOutcomeTest {
                         new EchoOrderRepository(),
                         () -> orderId,
                         new DirectTransactionExecutor(),
+                        command -> {
+                        },
                         new FixedInventoryCommitter(
                                 inventoryOutcome));
 

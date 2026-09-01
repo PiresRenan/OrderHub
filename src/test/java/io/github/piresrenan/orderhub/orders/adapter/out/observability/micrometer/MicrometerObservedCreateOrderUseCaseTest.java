@@ -15,6 +15,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.transaction.TransactionTimedOutException;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.CatalogOrderabilityRejectedException;
 import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryCommitmentRejectedException;
 import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryOperationException;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderAllocationOutcome;
@@ -117,6 +118,39 @@ class MicrometerObservedCreateOrderUseCaseTest {
                 registry);
     }
 
+    @Test
+    void recordsCatalogItemUnavailableWithoutChangingTheOriginalFailure() {
+
+        var registry =
+                new SimpleMeterRegistry();
+
+        var failure =
+                new CatalogOrderabilityRejectedException();
+
+        CreateOrderUseCase delegate =
+                command -> {
+                    throw failure;
+                };
+
+        var observed =
+                new MicrometerObservedCreateOrderUseCase(
+                        delegate,
+                        registry);
+
+        assertThatThrownBy(() ->
+                observed.create(
+                        command()))
+                .isSameAs(failure);
+
+        assertCounter(
+                registry,
+                FAILURE_METRIC,
+                "reason",
+                "catalog_item_unavailable");
+
+        assertNoBusinessIdentityTags(
+                registry);
+    }
     @Test
     void recordsPostgreSqlStatementTimeoutAsLockTimeout() {
 

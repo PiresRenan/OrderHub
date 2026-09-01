@@ -42,6 +42,10 @@ class CreateOrderInventoryConcurrencyAcceptanceTest {
             UUID.fromString(
                     "10000000-0000-0000-0000-000000000001");
 
+    private static final UUID PRODUCT_ID =
+            UUID.fromString(
+                    "20000000-0000-0000-0000-000000000001");
+
     private static final UUID VARIANT_A =
             UUID.fromString(
                     "30000000-0000-0000-0000-000000000001");
@@ -81,9 +85,19 @@ class CreateOrderInventoryConcurrencyAcceptanceTest {
                     inventory.inventory_commitments,
                     inventory.inventory_positions,
                     inventory.tenant_policies,
+                    catalog.media,
+                    catalog.variant_base_prices,
+                    catalog.product_variant_attributes,
+                    catalog.product_categories,
+                    catalog.product_variants,
+                    catalog.categories,
+                    catalog.category_hierarchy_guards,
+                    catalog.products,
                     orders.order_items,
                     orders.orders
                 """);
+
+        seedActiveCatalog();
     }
 
     @AfterEach
@@ -728,6 +742,58 @@ class CreateOrderInventoryConcurrencyAcceptanceTest {
     // ---------------------------------------------------------------------
     // Database fixtures
     // ---------------------------------------------------------------------
+
+    private void seedActiveCatalog() {
+
+        jdbcTemplate.update("""
+                INSERT INTO catalog.products (
+                    tenant_id,
+                    id,
+                    name,
+                    slug,
+                    description,
+                    status
+                )
+                VALUES (
+                    ?,
+                    ?,
+                    'Inventory concurrency fixture product',
+                    'inventory_concurrency_fixture_product',
+                    NULL,
+                    'ACTIVE'
+                )
+                """,
+                TENANT_ID,
+                PRODUCT_ID);
+
+        insertActiveCatalogVariant(
+                VARIANT_A,
+                "CONCURRENCY-VARIANT-A");
+
+        insertActiveCatalogVariant(
+                VARIANT_B,
+                "CONCURRENCY-VARIANT-B");
+    }
+
+    private void insertActiveCatalogVariant(
+            UUID variantId,
+            String sku) {
+
+        jdbcTemplate.update("""
+                INSERT INTO catalog.product_variants (
+                    tenant_id,
+                    id,
+                    product_id,
+                    sku,
+                    status
+                )
+                VALUES (?, ?, ?, ?, 'ACTIVE')
+                """,
+                TENANT_ID,
+                variantId,
+                PRODUCT_ID,
+                sku);
+    }
 
     private void insertPolicy(
             String policy) {

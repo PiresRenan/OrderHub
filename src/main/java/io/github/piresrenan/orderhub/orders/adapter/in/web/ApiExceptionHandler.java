@@ -21,6 +21,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.CatalogOrderabilityRejectedException;
 import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryCommitmentRejectedException;
 import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryOperationException;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderPersistenceException;
@@ -68,6 +69,27 @@ public final class ApiExceptionHandler extends ResponseEntityExceptionHandler {
          * conflict response without exposing Tenant, Variant, policy, stock or
          * position state.
          */
+        /**
+         * Converts Catalog commercial-orderability rejection into a generic
+         * conflict response without exposing whether a Product/Variant exists,
+         * belongs to another Tenant or has a non-ACTIVE lifecycle state.
+         */
+        @ExceptionHandler(CatalogOrderabilityRejectedException.class)
+        protected ResponseEntity<Object> handleCatalogOrderabilityRejected() {
+
+                var status = HttpStatus.CONFLICT;
+
+                var problem = problem(
+                                status,
+                                "order-not-accepted",
+                                "Order could not be accepted",
+                                "The order could not be accepted.",
+                                "ORDER_NOT_ACCEPTED");
+
+                return ResponseEntity
+                                .status(status)
+                                .body(problem);
+        }
         @ExceptionHandler(InventoryCommitmentRejectedException.class)
         protected ResponseEntity<Object> handleInventoryCommitmentRejected() {
 

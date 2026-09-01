@@ -113,6 +113,44 @@ Reference:
 
 - https://docs.spring.io/spring-framework/reference/data-access/transaction/programmatic.html
 
+## PR #23 correctness review — 2026-09-01
+
+Automated review of PR #23 against commit
+`870ad9b822da9a522c640a260e767e824ec5fa51` identified two correctness
+gaps that invalidate final OH-011 acceptance until corrected:
+
+- Order placement currently commits Inventory without proving that the
+  referenced Catalog ProductVariant is still eligible for new business;
+- Category hierarchy validation and persistence are currently separate
+  unlocked operations, allowing conflicting concurrent reparenting to
+  validate against stale hierarchy state.
+
+A review of the same Catalog lifecycle boundary also makes the parent
+Product lifecycle relevant to Order acceptance: a Product in `DRAFT` or
+`ARCHIVED` state is not commercially eligible merely because one child
+ProductVariant remains `ACTIVE`.
+
+These findings are release-blocking for OH-011. Required remote checks
+passing on the reviewed commit prove the tested implementation behaved as
+written; they do not override newly discovered missing invariants.
+
+PostgreSQL documents that application-level consistency checks under
+`READ COMMITTED` require explicit locking when the checked row must remain
+valid against concurrent updates. `SELECT ... FOR SHARE` prevents
+concurrent `UPDATE` and `DELETE` of the selected rows until transaction end.
+
+References:
+
+- https://www.postgresql.org/docs/18/applevel-consistency.html
+- https://www.postgresql.org/docs/18/explicit-locking.html
+- https://www.postgresql.org/docs/18/sql-select.html
+- https://www.postgresql.org/docs/18/runtime-config-client.html
+- https://docs.spring.io/spring-framework/reference/data-access/transaction/programmatic.html
+- https://docs.spring.io/spring-modulith/docs/current/api/org/springframework/modulith/core/NamedInterface.html
+- https://shopify.dev/docs/api/admin-graphql/2026-01/enums/ProductStatus
+- https://docs.commercetools.com/api/projects/carts
+- https://www.rfc-editor.org/rfc/rfc9110.html#section-15.5.10
+
 ## Decision
 
 Introduce two separate Spring Modulith root modules:
@@ -209,6 +247,89 @@ The initial ProductVariant lifecycle is:
 Only an `ACTIVE` ProductVariant is considered sellable for Product activation
 and new Order placement. `INACTIVE` is deliberately distinct from `ARCHIVED`
 so temporary commercial suspension does not imply permanent retirement.
+
+### Order-placement sellability invariant
+
+A new Order may reference a Variant only while all of the following are true
+for the same Tenant:
+
+- the ProductVariant exists;
+- the ProductVariant is `ACTIVE`;
+- its owning Product exists;
+- its owning Product is `ACTIVE`;
+- the Variant still belongs to that Product.
+
+Missing, cross-Tenant or non-active Catalog identity fails closed using one
+stable non-enumerating application result.
+
+Order creation consumes this rule only through a public framework-neutral
+Catalog application contract. Orders must not import Catalog domain models,
+persistence ports, JDBC adapters or tables.
+
+The Catalog eligibility check executes inside the Order-owned physical
+transaction before any Inventory position mutation. The PostgreSQL Catalog
+adapter acquires `FOR SHARE` row locks for the relevant Product and
+ProductVariant records so a concurrent lifecycle update cannot invalidate
+the accepted eligibility observation before that Order transaction ends.
+
+### Deterministic Catalog locking protocol
+
+The Order-placement check deliberately avoids relying on one broad joined
+read as its sole correctness boundary under `READ COMMITTED`.
+
+The Catalog application service follows this exact lock protocol:
+
+1. reject null/invalid input before persistence access;
+2. deduplicate requested Variant UUIDs;
+3. sort Variant UUIDs using one deterministic JVM-wide ordering rule;
+4. for each Variant, execute a simple tenant-scoped PostgreSQL query equivalent
+   to `SELECT product_id ... WHERE tenant_id = ? AND id = ? AND status =
+   'ACTIVE' FOR SHARE`;
+5. treat zero rows as one generic Catalog orderability rejection;
+6. obtain the Product identity only from the successfully locked Variant row;
+7. deduplicate and deterministically sort those Product UUIDs;
+8. for each Product, execute a simple tenant-scoped PostgreSQL query equivalent
+   to `SELECT id ... WHERE tenant_id = ? AND id = ? AND status = 'ACTIVE'
+   FOR SHARE`;
+9. treat zero rows as the same generic Catalog orderability rejection;
+10. only after every Catalog identity is locked and eligible may Inventory
+    mutation begin.
+
+The locked Variant row stabilizes its status and Product relationship for the
+remainder of the Order transaction. The subsequently locked Product row
+stabilizes Product commercial eligibility for the same interval.
+
+Under PostgreSQL `READ COMMITTED`, a locking statement that encounters a
+concurrently updated target waits for that transaction and then applies its
+predicate to the updated row version. Consequently an Order must not accept
+an obsolete ACTIVE observation after a concurrent lifecycle change commits.
+
+Catalog/Inventory workflows use one global acquisition order:
+
+```text
+Catalog Variant rows — deterministic UUID order
+Catalog Product rows — deterministic UUID order
+Inventory Position rows — deterministic UUID order
+```
+
+Any future transaction that needs more than one of those resource classes must
+either preserve that order or introduce a new ADR proving an alternative.
+
+The locks are PostgreSQL transaction-scoped locks and therefore coordinate
+independent OrderHub replicas. JVM monitors, process-local locks and
+best-effort cache locks remain invalid correctness mechanisms.
+
+The existing bounded Order transaction timeout also bounds these Catalog lock
+waits. The current 5-second value remains a provisional safety baseline rather
+than an SLA, capacity claim or automatic-retry trigger.
+
+Orders consumes Catalog only through a public framework-neutral named interface.
+The initial contract is a narrow orderability use case; Catalog domain models,
+persistence ports, JDBC adapters and SQL remain internal.
+
+Orders is therefore allowed to consume only the explicitly exposed
+`catalog::api` and `inventory::api` named interfaces for this workflow.
+
 ### ProductVariant identifier invariants
 
 GTIN and MPN remain optional commercial identifiers. Their absence is valid
@@ -273,6 +394,63 @@ Parent relationships and Product assignments must never cross Tenant scope.
 Cycles are invalid and must be rejected by the application boundary even though
 a simple relational foreign key alone cannot prevent every arbitrary-depth
 cycle.
+
+### Category hierarchy concurrency
+
+Hierarchy validation and hierarchy persistence form one atomic consistency
+operation. A read-validate-write sequence running without coordination is
+insufficient under concurrent reparenting.
+
+All Category hierarchy mutations belonging to the same Tenant are serialized
+through one PostgreSQL transaction-scoped Catalog guard before ancestry
+validation begins. The guard remains held through Category persistence and is
+released by transaction completion.
+
+V10 introduces a Catalog-owned guard table conceptually equivalent to:
+
+```text
+catalog.category_hierarchy_guards
+  tenant_id UUID PRIMARY KEY
+```
+
+The guard intentionally contains no cross-module foreign key. Its identity is
+the exact Tenant UUID supplied through the already trusted module boundary.
+
+Guard acquisition is deterministic and transaction-bound:
+
+1. start the Category hierarchy transaction;
+2. provision the Tenant guard row with `INSERT ... ON CONFLICT DO NOTHING`;
+3. acquire that exact row using `SELECT ... WHERE tenant_id = ? FOR UPDATE`;
+4. only after acquiring the guard, traverse and validate the current ancestry;
+5. persist the Category mutation;
+6. commit or roll back, releasing the guard.
+
+Concurrent first use is part of the correctness model: competing inserts for
+the same Tenant must converge on the same durable guard row before hierarchy
+validation proceeds.
+
+The guard is not a JVM monitor, distributed cache lock, hash-derived advisory
+lock or global table lock. Different Tenants therefore use different rows and
+remain independently mutable.
+
+The application service retains ownership of ancestry validation. A
+framework-neutral Category hierarchy mutation executor owns only the atomic
+`guard + validate + save` execution contract, while its PostgreSQL/Spring
+adapter owns transaction demarcation and guard acquisition.
+
+Category hierarchy transaction waiting is finite and externally configurable.
+The initial configuration baseline is
+`orderhub.catalog.category-hierarchy.transaction.timeout=5s`.
+As with the Order transaction timeout, this value is a provisional safety
+bound and not a performance SLA.
+
+A deliberate held-guard acceptance test must prove bounded termination rather
+than assuming transaction-manager timeout propagation.
+
+For concurrent root mutations A->B and B->A within the same Tenant, one
+transaction obtains the guard first. The second validates only after the first
+commits and must then observe and reject the would-be cycle. Persisting A<->B
+is never an acceptable outcome.
 
 Catalog-owned composite references may use database foreign keys because all
 participating tables belong to the same module.
@@ -634,8 +812,10 @@ Baseline operation order:
 ```text
 BEGIN
   construct and persist Order
+  collect distinct ordered Variant identities
+  validate and lock Catalog Product/Variant sellability
   aggregate duplicate Variant lines
-  sort Variant mutations deterministically
+  sort Inventory mutations deterministically
   commit Inventory positions
   persist InventoryCommitments
 COMMIT
@@ -647,6 +827,8 @@ Reducing lock holding time is preferred provided rollback tests prove the whole
 unit remains atomic.
 
 If Order persistence fails, Inventory is never mutated.
+If Catalog rejects Product/Variant sellability after Order insertion, the Order
+insertion rolls back and Inventory remains unchanged.
 If Inventory mutation or commitment persistence fails after Order insertion, the
 Order insertion rolls back.
 
@@ -739,12 +921,23 @@ Insufficient Inventory under `DENY` is represented as a stable privacy-safe
 `409 Conflict` response because the command is structurally valid but conflicts
 with current business state.
 
+Catalog orderability rejection uses the same HTTP status class but a distinct
+stable business problem type. Missing Variant, cross-Tenant Variant,
+non-`ACTIVE` Variant, missing owning Product and non-`ACTIVE` owning Product
+must intentionally collapse into one non-enumerating `409 Conflict` contract.
+
+The HTTP body must not disclose whether a supplied Variant exists, which Tenant
+owns it, its lifecycle state, its Product identity or the Product lifecycle
+state. SQL/JDBC details remain forbidden.
+
 ## Database ownership and migrations
 
-Accepted Flyway V1-V8 migrations remain immutable.
+Flyway V1-V9 are immutable for the remainder of OH-011.
 
-Catalog commercial completion continues through forward migration V9.
-V6-V8 are accepted history and are not edited.
+The PR-review correction continues through forward migration V10.
+V10 introduces the Catalog-owned tenant-scoped Category hierarchy mutation
+guard required to serialize ancestry validation and persistence.
+No cross-module foreign key is introduced by that guard.
 
 Dedicated schemas:
 
@@ -783,6 +976,17 @@ unsafe authenticated-by-membership administration API.
 OH-011 adds only low-cardinality operational dimensions such as allocation
 outcome/failure category and transaction/lock timing.
 
+Catalog orderability rejection is a business-state failure and must never be
+misclassified as `technical_failure`. The create-Order failure metric therefore
+adds one bounded generic reason:
+
+```text
+catalog_item_unavailable
+```
+
+The value intentionally does not distinguish missing identity, Tenant mismatch,
+Variant lifecycle or Product lifecycle.
+
 Tenant IDs, Product IDs, Variant IDs, SKUs and external identifiers must not
 become unbounded metric labels.
 
@@ -792,6 +996,45 @@ investigation.
 Logs and errors must not expose cross-tenant data, SQL/JDBC details, full catalog
 payloads or unnecessary commercial identifiers.
 
+## OH-011 pre-PR specialist assurance gate
+
+The discovery of correctness gaps during PR review invalidated the previous
+assumption that passing the existing functional and CI suites was sufficient
+evidence for OH-011.
+
+Before the corrected implementation may be pushed for final review, the complete
+diff must pass all of the following independent review lenses:
+
+1. **Domain / commerce** — lifecycle state machines, parent-child eligibility,
+   missing-state behavior and historical identity preservation.
+2. **PostgreSQL / concurrency** — TOCTOU, lost update, write skew, lock ordering,
+   deadlocks, finite waits, first-use races and independent connections.
+3. **Transaction / reliability** — every durable failure point proves rollback
+   and zero unintended business effects.
+4. **Architecture / Modulith** — module discovery, acyclic dependencies, named
+   interfaces and absence of imports into another module's internals.
+5. **Security / multi-tenancy / privacy** — Tenant isolation, non-enumeration,
+   safe logs, safe HTTP errors and absence of business IDs in metric labels.
+6. **API semantics** — stable status codes, Problem Details and business versus
+   technical failure classification.
+7. **Observability / SRE** — bounded metric cardinality, correct failure taxonomy,
+   actionable transaction/lock evidence and no identifier leakage.
+8. **Schema / DBA** — forward-only migration, V1-V9 immutability, constraints,
+   clean V1-V10 bootstrap and concurrency behavior on real PostgreSQL.
+9. **Adversarial QA** — negative paths and deterministic concurrency barriers;
+   timing luck is not accepted as race-condition evidence.
+10. **Runtime / multi-replica** — correctness is independent of JVM-local state
+    and remains valid across at least two independent application instances
+    where the invariant crosses process boundaries.
+11. **Regression** — complete `clean verify`, repository whitespace and platform
+    runtime validation remain green.
+12. **Independent final review** — the final diff is reviewed again against this
+    ADR and its executable acceptance matrix before ADR promotion or merge.
+
+A green result in one lens cannot waive a failure in another.
+
+Passing CI demonstrates only the properties covered by CI. It is not evidence
+that an uncovered business or concurrency invariant is correct.
 ## Rejected alternatives
 
 ### One flat Product table with quantity and price
@@ -842,11 +1085,42 @@ evidence:
 - [ ] Catalog is recognized as an independent Spring Modulith module.
 - [ ] Product and ProductVariant invariants are tested without Spring.
 - [ ] Category hierarchy and multi-category assignment are tenant-safe.
+- [ ] concurrent inverse Category reparenting cannot persist a cycle.
+- [ ] same-Tenant Category hierarchy mutations serialize across independent
+      database connections while different Tenants retain independent guards.
+- [ ] concurrent first-use guard creation converges on one Tenant guard row.
+- [ ] Category ancestry validation begins only after its Tenant guard is held.
+- [ ] deliberate guard contention terminates within the configured finite
+      transaction timeout.
+- [ ] a Category guard for Tenant A does not unnecessarily block Tenant B.
 - [ ] same-tenant SKU uniqueness is deterministic.
 - [ ] standardized identifiers are optional and cannot be fabricated by default.
 - [ ] money uses ISO 4217 currency plus exact integer minor-unit storage.
 - [ ] media metadata cannot create an implicit arbitrary-URL server-fetch path.
 - [ ] Order-line terminology is migrated from Product identity to Variant identity.
+- [ ] Order placement rejects missing or non-active ProductVariant identity.
+- [ ] Order placement rejects a Variant whose owning Product is not `ACTIVE`.
+- [ ] Catalog sellability is checked through an explicit public `catalog::api`
+      named interface and Orders imports no Catalog internals.
+- [ ] requested Variants are deduplicated and locked in deterministic UUID order.
+- [ ] each Variant eligibility lookup is tenant-scoped, requires `ACTIVE`, uses
+      `FOR SHARE` and obtains Product identity from the locked row.
+- [ ] owning Products are deduplicated and locked in deterministic UUID order.
+- [ ] each Product eligibility lookup is tenant-scoped, requires `ACTIVE` and
+      uses `FOR SHARE`.
+- [ ] Catalog Product/Variant eligibility remains stable against concurrent
+      lifecycle mutation until the Order transaction completes.
+- [ ] a lifecycle mutation committed before Catalog obtains its lock causes the
+      waiting Order to observe current state and reject.
+- [ ] a lifecycle mutation started after Catalog has obtained its lock waits until
+      the accepted Order transaction completes.
+- [ ] inverse multi-Variant request ordering cannot create a Catalog lock-order
+      cycle.
+- [ ] Catalog rejection leaves zero durable Order or Inventory effects.
+- [ ] Catalog rejection maps to one privacy-safe `409 Conflict` family without
+      identity or lifecycle enumeration.
+- [ ] Catalog rejection increments only bounded
+      `failure{reason=catalog_item_unavailable}` observability.
 
 ### Inventory
 
@@ -874,20 +1148,31 @@ evidence:
 
 ### Persistence and architecture
 
-- [ ] V1-V5 remain byte-for-byte unchanged.
-- [ ] V6+ migrations build Catalog/Inventory from an empty real PostgreSQL
+- [ ] V1-V9 remain byte-for-byte unchanged by the review correction.
+- [ ] V10 creates the tenant-scoped Catalog Category hierarchy mutation guard.
+- [ ] V1-V10 migrations build Catalog/Inventory from an empty real PostgreSQL
       database.
 - [ ] PostgreSQL constraints reject impossible state when application validation
       is bypassed.
 - [ ] no cross-module persistence implementation imports/FKs are introduced.
-- [ ] Spring Modulith verification remains green.
+- [ ] Catalog and Inventory are explicitly detected as independent application
+      modules.
+- [ ] Catalog exposes only the intended orderability contract through
+      `catalog::api` for the Orders dependency introduced here.
+- [ ] Inventory remains independent of Catalog.
+- [ ] Spring Modulith verification remains green and no module cycle exists.
 
 ### Regression / repository gates
 
 - [ ] existing Orders, Tenants, Users and Security behavior remains green.
+- [ ] all twelve OH-011 pre-PR specialist review lenses are explicitly green.
 - [ ] `git diff --check` passes.
 - [ ] `.\mvnw.cmd clean verify` passes.
-- [ ] `branch-policy`, `ci-build` and `platform-validation` pass on the remote PR.
+- [ ] local reproduction of required repository workflows passes.
+- [ ] independent review of the final corrected diff reports no unresolved
+      correctness finding.
+- [ ] `branch-policy`, `ci-build` and `platform-validation` pass on the final
+      remote PR HEAD.
 
 Only after the complete verification evidence exists may this ADR be promoted to
 `TESTED`.
