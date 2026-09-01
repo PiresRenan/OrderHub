@@ -8,25 +8,17 @@ import java.util.UUID;
 
 /**
  * Tenant-owned merchandising concept in the Catalog.
- *
- * <p>
- * Product owns commercial presentation and classification. Concrete sellable
- * identities remain ProductVariant instances and reference Product by id.
- * </p>
- *
- * <p>
- * Products are created as DRAFT. The future activation use case will coordinate
- * Product with its related Variants and any additional commercial requirements
- * before allowing it to become ACTIVE.
- * </p>
  */
 public final class Product {
+
+    private static final int MAX_BRAND_CODE_POINTS = 120;
 
     private final UUID id;
     private final UUID tenantId;
     private final String name;
     private final CatalogSlug slug;
     private final String description;
+    private final String brand;
     private final List<UUID> categoryIds;
     private final ProductStatus status;
 
@@ -36,6 +28,7 @@ public final class Product {
             String name,
             String slug,
             String description,
+            String brand,
             Collection<UUID> categoryIds,
             ProductStatus status) {
 
@@ -69,19 +62,11 @@ public final class Product {
         this.name = stripSurroundingUnicodeWhitespace(name);
         this.slug = CatalogSlug.of(slug);
         this.description = description;
-        this.categoryIds =
-                validateAndCopyCategoryIds(categoryIds);
+        this.brand = normalizeBrand(brand);
+        this.categoryIds = validateAndCopyCategoryIds(categoryIds);
         this.status = status;
     }
 
-    /**
-     * Creates a new Product at the beginning of its commercial lifecycle.
-     *
-     * <p>
-     * New Products always start as DRAFT. Lifecycle transitions remain separate
-     * business operations and are intentionally not exposed by OH-011 yet.
-     * </p>
-     */
     public static Product create(
             UUID id,
             UUID tenantId,
@@ -90,26 +75,36 @@ public final class Product {
             String description,
             Collection<UUID> categoryIds) {
 
+        return create(
+                id,
+                tenantId,
+                name,
+                slug,
+                description,
+                null,
+                categoryIds);
+    }
+
+    public static Product create(
+            UUID id,
+            UUID tenantId,
+            String name,
+            String slug,
+            String description,
+            String brand,
+            Collection<UUID> categoryIds) {
+
         return new Product(
                 id,
                 tenantId,
                 name,
                 slug,
                 description,
+                brand,
                 categoryIds,
                 ProductStatus.DRAFT);
     }
 
-    /**
-     * Reconstructs a Product from persisted state.
-     *
-     * <p>
-     * Rehydration is distinct from creation because persisted Products may
-     * legitimately already be ACTIVE or ARCHIVED. The same structural domain
-     * invariants continue to be validated while the previously persisted
-     * lifecycle state is restored exactly.
-     * </p>
-     */
     public static Product rehydrate(
             UUID id,
             UUID tenantId,
@@ -119,46 +114,107 @@ public final class Product {
             Collection<UUID> categoryIds,
             ProductStatus status) {
 
+        return rehydrate(
+                id,
+                tenantId,
+                name,
+                slug,
+                description,
+                null,
+                categoryIds,
+                status);
+    }
+
+    public static Product rehydrate(
+            UUID id,
+            UUID tenantId,
+            String name,
+            String slug,
+            String description,
+            String brand,
+            Collection<UUID> categoryIds,
+            ProductStatus status) {
+
         return new Product(
                 id,
                 tenantId,
                 name,
                 slug,
                 description,
+                brand,
                 categoryIds,
                 status);
     }
 
-    public UUID id() {
-        return id;
+    public Product activate(
+            Collection<ProductVariant> variants) {
+
+        if (status == ProductStatus.ARCHIVED) {
+            throw new IllegalStateException(
+                    "Archived product cannot be activated");
+        }
+
+        if (variants == null) {
+            throw new IllegalArgumentException(
+                    "Product variants are required");
+        }
+
+        var hasEligibleVariant = false;
+
+        for (var variant : variants) {
+
+            if (
+                    variant != null
+                    && tenantId.equals(variant.tenantId())
+                    && id.equals(variant.productId())
+                    && variant.isSellable()) {
+
+                hasEligibleVariant = true;
+                break;
+            }
+        }
+
+        if (!hasEligibleVariant) {
+            throw new IllegalStateException(
+                    "Product activation requires at least one active variant");
+        }
+
+        return new Product(
+                id,
+                tenantId,
+                name,
+                slug.value(),
+                description,
+                brand,
+                categoryIds,
+                ProductStatus.ACTIVE);
     }
 
-    public UUID tenantId() {
-        return tenantId;
-    }
+    private static String normalizeBrand(
+            String brand) {
 
-    public String name() {
-        return name;
-    }
+        if (brand == null) {
+            return null;
+        }
 
-    public String slug() {
-        return slug.value();
-    }
+        if (isUnicodeBlank(brand)) {
+            throw new IllegalArgumentException(
+                    "Product brand must not be blank");
+        }
 
-    public String description() {
-        return description;
-    }
+        if (containsIsoControlCharacter(brand)) {
+            throw new IllegalArgumentException(
+                    "Product brand must not contain control characters");
+        }
 
-    /**
-     * Returns an immutable snapshot of Category assignments captured when the
-     * Product was created or rehydrated.
-     */
-    public List<UUID> categoryIds() {
-        return categoryIds;
-    }
+        var normalized = stripSurroundingUnicodeWhitespace(brand);
 
-    public ProductStatus status() {
-        return status;
+        if (normalized.codePointCount(0, normalized.length()) > MAX_BRAND_CODE_POINTS) {
+            throw new IllegalArgumentException(
+                    "Product brand must not exceed 120 characters");
+        }
+
+        return normalized;
     }
 
     private static List<UUID> validateAndCopyCategoryIds(
@@ -190,8 +246,7 @@ public final class Product {
             validatedCategoryIds.add(categoryId);
         }
 
-        return List.copyOf(
-                validatedCategoryIds);
+        return List.copyOf(validatedCategoryIds);
     }
 
     private static boolean isUnicodeBlank(
@@ -204,39 +259,30 @@ public final class Product {
     private static String stripSurroundingUnicodeWhitespace(
             String value) {
 
-        var start =
-                0;
-
-        var end =
-                value.length();
+        var start = 0;
+        var end = value.length();
 
         while (start < end) {
-            var codePoint =
-                    value.codePointAt(start);
+            var codePoint = value.codePointAt(start);
 
             if (!isUnicodeWhitespace(codePoint)) {
                 break;
             }
 
-            start +=
-                    Character.charCount(codePoint);
+            start += Character.charCount(codePoint);
         }
 
         while (end > start) {
-            var codePoint =
-                    value.codePointBefore(end);
+            var codePoint = value.codePointBefore(end);
 
             if (!isUnicodeWhitespace(codePoint)) {
                 break;
             }
 
-            end -=
-                    Character.charCount(codePoint);
+            end -= Character.charCount(codePoint);
         }
 
-        return value.substring(
-                start,
-                end);
+        return value.substring(start, end);
     }
 
     private static boolean isUnicodeWhitespace(
@@ -244,5 +290,44 @@ public final class Product {
 
         return Character.isWhitespace(codePoint)
                 || Character.isSpaceChar(codePoint);
+    }
+
+    private static boolean containsIsoControlCharacter(
+            String value) {
+
+        return value.codePoints()
+                .anyMatch(Character::isISOControl);
+    }
+
+    public UUID id() {
+        return id;
+    }
+
+    public UUID tenantId() {
+        return tenantId;
+    }
+
+    public String name() {
+        return name;
+    }
+
+    public String slug() {
+        return slug.value();
+    }
+
+    public String description() {
+        return description;
+    }
+
+    public String brand() {
+        return brand;
+    }
+
+    public List<UUID> categoryIds() {
+        return categoryIds;
+    }
+
+    public ProductStatus status() {
+        return status;
     }
 }

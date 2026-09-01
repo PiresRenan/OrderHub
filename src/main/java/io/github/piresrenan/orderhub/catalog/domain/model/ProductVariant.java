@@ -1,79 +1,183 @@
 package io.github.piresrenan.orderhub.catalog.domain.model;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
 import java.util.UUID;
 
 /**
- * Represents one concrete sellable variant inside a tenant-owned Product.
- *
- * <p>
- * ProductVariant is the commercial identity that Orders and Inventory
- * reference.
- * The parent Product represents the merchandising concept, while the Variant
- * represents the independently sellable unit identified operationally by its
- * SKU.
- * </p>
- *
- * <p>
- * The SKU is treated as an externally meaningful machine-readable identifier.
- * Valid SKU values are therefore preserved exactly rather than being silently
- * trimmed, uppercased, lowercased or otherwise canonicalized.
- * </p>
+ * Concrete tenant-owned commercial identity referenced by Orders and Inventory.
  */
 public final class ProductVariant {
 
     private static final int MAX_SKU_CODE_POINTS = 64;
+    private static final int MAX_DISPLAY_NAME_CODE_POINTS = 160;
+    private static final int MAX_MPN_CODE_POINTS = 70;
 
     private final UUID id;
     private final UUID tenantId;
     private final UUID productId;
     private final String sku;
+    private final String displayName;
+    private final String gtin;
+    private final String mpn;
+    private final List<ProductVariantAttribute> attributes;
+    private final ProductVariantStatus status;
 
     private ProductVariant(
             UUID id,
             UUID tenantId,
             UUID productId,
-            String sku) {
+            String sku,
+            String displayName,
+            String gtin,
+            String mpn,
+            Collection<ProductVariantAttribute> attributes,
+            ProductVariantStatus status) {
 
-        validateIdentity(
-                id,
-                tenantId,
-                productId);
-
+        validateIdentity(id, tenantId, productId);
         validateSku(sku);
+
+        if (status == null) {
+            throw new IllegalArgumentException(
+                    "Product variant status is required");
+        }
 
         this.id = id;
         this.tenantId = tenantId;
         this.productId = productId;
         this.sku = sku;
+        this.displayName = normalizeDisplayName(displayName);
+        this.gtin = validateAndReturnGtin(gtin);
+        this.mpn = validateAndReturnMpn(mpn);
+        this.attributes = validateAndCopyAttributes(attributes);
+        this.status = status;
     }
 
-    /**
-     * Creates a validated sellable ProductVariant.
-     *
-     * @param id        variant identity
-     * @param tenantId  owning Tenant identity
-     * @param productId parent Product identity
-     * @param sku       commercial stock-keeping identifier
-     * @return validated ProductVariant
-     * @throws IllegalArgumentException when any required invariant is violated
-     */
     public static ProductVariant create(
             UUID id,
             UUID tenantId,
             UUID productId,
             String sku) {
 
+        return create(
+                id,
+                tenantId,
+                productId,
+                sku,
+                null,
+                null,
+                null,
+                List.of());
+    }
+
+    public static ProductVariant create(
+            UUID id,
+            UUID tenantId,
+            UUID productId,
+            String sku,
+            String displayName,
+            String gtin,
+            String mpn,
+            Collection<ProductVariantAttribute> attributes) {
+
         return new ProductVariant(
                 id,
                 tenantId,
                 productId,
-                sku);
+                sku,
+                displayName,
+                gtin,
+                mpn,
+                attributes,
+                ProductVariantStatus.DRAFT);
     }
 
-    /**
-     * Validates identities required before a Variant can participate in Catalog,
-     * Inventory, pricing or Orders.
-     */
+    public static ProductVariant rehydrate(
+            UUID id,
+            UUID tenantId,
+            UUID productId,
+            String sku,
+            String displayName,
+            String gtin,
+            String mpn,
+            Collection<ProductVariantAttribute> attributes,
+            ProductVariantStatus status) {
+
+        return new ProductVariant(
+                id,
+                tenantId,
+                productId,
+                sku,
+                displayName,
+                gtin,
+                mpn,
+                attributes,
+                status);
+    }
+
+    public ProductVariant activate() {
+
+        if (status == ProductVariantStatus.ARCHIVED) {
+            throw new IllegalStateException(
+                    "Archived product variant cannot be activated");
+        }
+
+        if (status == ProductVariantStatus.ACTIVE) {
+            return this;
+        }
+
+        return copyWithStatus(ProductVariantStatus.ACTIVE);
+    }
+
+    public ProductVariant deactivate() {
+
+        if (status == ProductVariantStatus.ARCHIVED) {
+            throw new IllegalStateException(
+                    "Archived product variant cannot be deactivated");
+        }
+
+        if (status == ProductVariantStatus.INACTIVE) {
+            return this;
+        }
+
+        if (status != ProductVariantStatus.ACTIVE) {
+            throw new IllegalStateException(
+                    "Only active product variant can be deactivated");
+        }
+
+        return copyWithStatus(ProductVariantStatus.INACTIVE);
+    }
+
+    public ProductVariant archive() {
+
+        if (status == ProductVariantStatus.ARCHIVED) {
+            return this;
+        }
+
+        return copyWithStatus(ProductVariantStatus.ARCHIVED);
+    }
+
+    public boolean isSellable() {
+        return status == ProductVariantStatus.ACTIVE;
+    }
+
+    private ProductVariant copyWithStatus(
+            ProductVariantStatus newStatus) {
+
+        return new ProductVariant(
+                id,
+                tenantId,
+                productId,
+                sku,
+                displayName,
+                gtin,
+                mpn,
+                attributes,
+                newStatus);
+    }
+
     private static void validateIdentity(
             UUID id,
             UUID tenantId,
@@ -95,31 +199,8 @@ public final class ProductVariant {
         }
     }
 
-    /**
-     * Validates the operational SKU contract.
-     *
-     * <p>
-     * SKU validation intentionally avoids an arbitrary syntax whitelist. Existing
-     * commerce and ERP ecosystems use business-defined identifiers containing
-     * characters such as spaces, hyphens, underscores, slashes, periods and
-     * colons. Restricting the syntax without a concrete integration requirement
-     * would unnecessarily reduce interoperability.
-     * </p>
-     *
-     * <p>
-     * Instead, the invariant protects properties required for reliable storage
-     * and interchange:
-     * </p>
-     *
-     * <ul>
-     * <li>the SKU must exist and contain visible/non-spacing content;</li>
-     * <li>leading and trailing Unicode whitespace is forbidden;</li>
-     * <li>ISO control characters are forbidden;</li>
-     * <li>the maximum logical length is 64 Unicode code points;</li>
-     * <li>otherwise the supplied representation is preserved exactly.</li>
-     * </ul>
-     */
-    private static void validateSku(String sku) {
+    private static void validateSku(
+            String sku) {
 
         if (sku == null) {
             throw new IllegalArgumentException(
@@ -147,80 +228,235 @@ public final class ProductVariant {
         }
     }
 
-    /**
-     * Determines whether the complete value consists only of Unicode whitespace or
-     * Unicode space characters.
-     *
-     * <p>
-     * Character.isWhitespace alone deliberately excludes some Unicode spacing
-     * characters, including non-breaking spaces. Character.isSpaceChar covers
-     * those Unicode separator categories, so both predicates are required for the
-     * Catalog identifier boundary.
-     * </p>
-     */
-    private static boolean isUnicodeBlank(String value) {
+    private static String normalizeDisplayName(
+            String displayName) {
+
+        if (displayName == null) {
+            return null;
+        }
+
+        if (isUnicodeBlank(displayName)) {
+            throw new IllegalArgumentException(
+                    "Product variant display name must not be blank");
+        }
+
+        if (containsIsoControlCharacter(displayName)) {
+            throw new IllegalArgumentException(
+                    "Product variant display name must not contain control characters");
+        }
+
+        var normalized = stripSurroundingUnicodeWhitespace(displayName);
+
+        if (normalized.codePointCount(0, normalized.length()) > MAX_DISPLAY_NAME_CODE_POINTS) {
+            throw new IllegalArgumentException(
+                    "Product variant display name must not exceed 160 characters");
+        }
+
+        return normalized;
+    }
+
+    private static String validateAndReturnGtin(
+            String gtin) {
+
+        if (gtin == null) {
+            return null;
+        }
+
+        var length = gtin.length();
+
+        if (
+                length != 8
+                && length != 12
+                && length != 13
+                && length != 14) {
+
+            throw new IllegalArgumentException(
+                    "Product variant GTIN must contain 8, 12, 13 or 14 digits");
+        }
+
+        var digitsOnly = gtin.chars()
+                .allMatch(character -> character >= 48 && character <= 57);
+
+        if (!digitsOnly) {
+            throw new IllegalArgumentException(
+                    "Product variant GTIN must contain only decimal digits");
+        }
+
+        var sum = 0;
+        var positionFromRight = 0;
+
+        for (var index = gtin.length() - 2; index >= 0; index--) {
+
+            var digit = gtin.charAt(index) - 48;
+            var weight = positionFromRight % 2 == 0 ? 3 : 1;
+
+            sum += digit * weight;
+            positionFromRight++;
+        }
+
+        var expectedCheckDigit = (10 - (sum % 10)) % 10;
+        var actualCheckDigit = gtin.charAt(gtin.length() - 1) - 48;
+
+        if (expectedCheckDigit != actualCheckDigit) {
+            throw new IllegalArgumentException(
+                    "Product variant GTIN has an invalid GS1 check digit");
+        }
+
+        return gtin;
+    }
+
+    private static String validateAndReturnMpn(
+            String mpn) {
+
+        if (mpn == null) {
+            return null;
+        }
+
+        if (isUnicodeBlank(mpn)) {
+            throw new IllegalArgumentException(
+                    "Product variant MPN must not be blank");
+        }
+
+        if (hasSurroundingUnicodeWhitespace(mpn)) {
+            throw new IllegalArgumentException(
+                    "Product variant MPN must not contain surrounding whitespace");
+        }
+
+        if (containsIsoControlCharacter(mpn)) {
+            throw new IllegalArgumentException(
+                    "Product variant MPN must not contain control characters");
+        }
+
+        if (mpn.codePointCount(0, mpn.length()) > MAX_MPN_CODE_POINTS) {
+            throw new IllegalArgumentException(
+                    "Product variant MPN must not exceed 70 characters");
+        }
+
+        return mpn;
+    }
+
+    private static List<ProductVariantAttribute> validateAndCopyAttributes(
+            Collection<ProductVariantAttribute> attributes) {
+
+        if (attributes == null) {
+            throw new IllegalArgumentException(
+                    "Product variant attributes are required");
+        }
+
+        var result =
+                new ArrayList<ProductVariantAttribute>(attributes.size());
+
+        var keys =
+                new HashSet<String>();
+
+        for (var attribute : attributes) {
+
+            if (attribute == null) {
+                throw new IllegalArgumentException(
+                        "Product variant attributes must not contain null values");
+            }
+
+            if (!keys.add(attribute.key())) {
+                throw new IllegalArgumentException(
+                        "Product variant attribute keys must be unique");
+            }
+
+            result.add(attribute);
+        }
+
+        return List.copyOf(result);
+    }
+
+    private static boolean isUnicodeBlank(
+            String value) {
 
         return value.codePoints()
                 .allMatch(ProductVariant::isUnicodeWhitespace);
     }
 
-    /**
-     * Detects leading or trailing Unicode whitespace without mutating the supplied
-     * SKU.
-     */
-    private static boolean hasSurroundingUnicodeWhitespace(String value) {
+    private static boolean hasSurroundingUnicodeWhitespace(
+            String value) {
 
-        var firstCodePoint = value.codePointAt(0);
-
-        var lastCodePoint = value.codePointBefore(value.length());
-
-        return isUnicodeWhitespace(firstCodePoint)
-                || isUnicodeWhitespace(lastCodePoint);
+        return isUnicodeWhitespace(value.codePointAt(0))
+                || isUnicodeWhitespace(value.codePointBefore(value.length()));
     }
 
-    /**
-     * Provides the whitespace definition used consistently by SKU validation.
-     */
-    private static boolean isUnicodeWhitespace(int codePoint) {
+    private static String stripSurroundingUnicodeWhitespace(
+            String value) {
+
+        var start = 0;
+        var end = value.length();
+
+        while (start < end) {
+            var codePoint = value.codePointAt(start);
+
+            if (!isUnicodeWhitespace(codePoint)) {
+                break;
+            }
+
+            start += Character.charCount(codePoint);
+        }
+
+        while (end > start) {
+            var codePoint = value.codePointBefore(end);
+
+            if (!isUnicodeWhitespace(codePoint)) {
+                break;
+            }
+
+            end -= Character.charCount(codePoint);
+        }
+
+        return value.substring(start, end);
+    }
+
+    private static boolean isUnicodeWhitespace(
+            int codePoint) {
 
         return Character.isWhitespace(codePoint)
                 || Character.isSpaceChar(codePoint);
     }
 
-    /**
-     * Detects ISO control code points anywhere inside the SKU.
-     */
-    private static boolean containsIsoControlCharacter(String value) {
+    private static boolean containsIsoControlCharacter(
+            String value) {
 
         return value.codePoints()
                 .anyMatch(Character::isISOControl);
     }
 
-    /**
-     * Returns this sellable Variant's identity.
-     */
     public UUID id() {
         return id;
     }
 
-    /**
-     * Returns the Tenant that owns this Variant.
-     */
     public UUID tenantId() {
         return tenantId;
     }
 
-    /**
-     * Returns the parent Product identity.
-     */
     public UUID productId() {
         return productId;
     }
 
-    /**
-     * Returns the commercial SKU exactly as supplied after validation.
-     */
     public String sku() {
         return sku;
+    }
+
+    public String displayName() {
+        return displayName;
+    }
+
+    public String gtin() {
+        return gtin;
+    }
+
+    public String mpn() {
+        return mpn;
+    }
+
+    public List<ProductVariantAttribute> attributes() {
+        return attributes;
+    }
+
+    public ProductVariantStatus status() {
+        return status;
     }
 }

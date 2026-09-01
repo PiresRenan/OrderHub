@@ -17,7 +17,7 @@ import io.github.piresrenan.orderhub.catalog.domain.model.Category;
 public final class PostgreSqlCategoryRepository
         implements CategoryRepository {
 
-    private static final String INSERT_CATEGORY_SQL = """
+    private static final String SAVE_CATEGORY_SQL = """
             INSERT INTO catalog.categories (
                 tenant_id,
                 id,
@@ -27,6 +27,12 @@ public final class PostgreSqlCategoryRepository
                 description
             )
             VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT (tenant_id, id)
+            DO UPDATE SET
+                parent_category_id = EXCLUDED.parent_category_id,
+                name = EXCLUDED.name,
+                slug = EXCLUDED.slug,
+                description = EXCLUDED.description
             """;
 
     private static final String FIND_CATEGORY_SQL = """
@@ -57,9 +63,13 @@ public final class PostgreSqlCategoryRepository
     public Category save(
             Category category) {
 
+        Objects.requireNonNull(
+                category,
+                "category");
+
         try {
             jdbcTemplate.update(
-                    INSERT_CATEGORY_SQL,
+                    SAVE_CATEGORY_SQL,
                     category.tenantId(),
                     category.id(),
                     category.parentCategoryId(),

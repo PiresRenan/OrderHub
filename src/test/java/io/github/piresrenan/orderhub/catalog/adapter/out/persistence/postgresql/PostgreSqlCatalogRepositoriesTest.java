@@ -124,6 +124,9 @@ class PostgreSqlCatalogRepositoriesTest {
 
         jdbcTemplate.update("""
                 TRUNCATE TABLE
+                    catalog.media,
+                    catalog.variant_base_prices,
+                    catalog.product_variant_attributes,
                     catalog.product_categories,
                     catalog.product_variants,
                     catalog.categories,
@@ -137,7 +140,8 @@ class PostgreSqlCatalogRepositoriesTest {
 
         productVariantRepository =
                 new PostgreSqlProductVariantRepository(
-                        jdbcTemplate);
+                        jdbcTemplate,
+                        transactionOperations);
 
         categoryRepository =
                 new PostgreSqlCategoryRepository(

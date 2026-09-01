@@ -16,32 +16,34 @@ import io.github.piresrenan.orderhub.catalog.domain.model.ProductStatus;
 
 /**
  * PostgreSQL adapter for complete Product persistence and rehydration.
- *
- * <p>
- * A Product persistence operation consists of the Product root row plus all of
- * its Category assignments. Those writes therefore execute inside one externally
- * configured transaction boundary.
- * </p>
- *
- * <p>
- * Reads use one joined SQL statement so Product state and Category assignments
- * are reconstructed from one PostgreSQL statement snapshot rather than from
- * multiple independent reads.
- * </p>
  */
 public final class PostgreSqlProductRepository
         implements ProductRepository {
 
-    private static final String INSERT_PRODUCT_SQL = """
+    private static final String UPSERT_PRODUCT_SQL = """
             INSERT INTO catalog.products (
                 tenant_id,
                 id,
                 name,
                 slug,
                 description,
+                brand,
                 status
             )
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (tenant_id, id)
+            DO UPDATE SET
+                name = EXCLUDED.name,
+                slug = EXCLUDED.slug,
+                description = EXCLUDED.description,
+                brand = EXCLUDED.brand,
+                status = EXCLUDED.status
+            """;
+
+    private static final String DELETE_PRODUCT_CATEGORIES_SQL = """
+            DELETE FROM catalog.product_categories
+            WHERE tenant_id = ?
+              AND product_id = ?
             """;
 
     private static final String INSERT_PRODUCT_CATEGORY_SQL = """
@@ -60,6 +62,7 @@ public final class PostgreSqlProductRepository
                 p.name,
                 p.slug,
                 p.description,
+                p.brand,
                 p.status,
                 pc.category_id
             FROM catalog.products p
@@ -90,7 +93,7 @@ public final class PostgreSqlProductRepository
     }
 
     /**
-     * Persists Product root and Category assignments atomically.
+     * Persists the current Product root and Category assignment snapshot atomically.
      */
     @Override
     public Product save(
@@ -101,13 +104,19 @@ public final class PostgreSqlProductRepository
                     transactionStatus -> {
 
                         jdbcTemplate.update(
-                                INSERT_PRODUCT_SQL,
+                                UPSERT_PRODUCT_SQL,
                                 product.tenantId(),
                                 product.id(),
                                 product.name(),
                                 product.slug(),
                                 product.description(),
+                                product.brand(),
                                 product.status().name());
+
+                        jdbcTemplate.update(
+                                DELETE_PRODUCT_CATEGORIES_SQL,
+                                product.tenantId(),
+                                product.id());
 
                         for (var categoryId : product.categoryIds()) {
                             jdbcTemplate.update(
@@ -125,9 +134,6 @@ public final class PostgreSqlProductRepository
         }
     }
 
-    /**
-     * Reconstructs one Product strictly inside the supplied Tenant.
-     */
     @Override
     public Optional<Product> findById(
             UUID tenantId,
@@ -151,6 +157,8 @@ public final class PostgreSqlProductRepository
                                                     "slug"),
                                             resultSet.getString(
                                                     "description"),
+                                            resultSet.getString(
+                                                    "brand"),
                                             ProductStatus.valueOf(
                                                     resultSet.getString(
                                                             "status")),
@@ -180,6 +188,7 @@ public final class PostgreSqlProductRepository
                             root.name(),
                             root.slug(),
                             root.description(),
+                            root.brand(),
                             categoryIds,
                             root.status()));
         } catch (DataAccessException exception) {
@@ -194,6 +203,7 @@ public final class PostgreSqlProductRepository
             String name,
             String slug,
             String description,
+            String brand,
             ProductStatus status,
             UUID categoryId) {
     }
