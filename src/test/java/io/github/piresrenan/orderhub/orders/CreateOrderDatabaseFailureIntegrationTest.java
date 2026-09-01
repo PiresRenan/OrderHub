@@ -93,7 +93,7 @@ class CreateOrderDatabaseFailureIntegrationTest {
         var customerId =
                 UUID.randomUUID();
 
-        var productId =
+        var variantId =
                 UUID.randomUUID();
 
         var authenticatedPrincipal =
@@ -118,12 +118,12 @@ class CreateOrderDatabaseFailureIntegrationTest {
                   "customerId": "%s",
                   "items": [
                     {
-                      "productId": "%s",
+                      "variantId": "%s",
                       "quantity": 2
                     }
                   ]
                 }
-                """.formatted(customerId, productId);
+                """.formatted(customerId, variantId);
 
         var outageLogStart =
                 output.getAll().length();
@@ -178,7 +178,7 @@ class CreateOrderDatabaseFailureIntegrationTest {
                 .andExpect(
                         content().string(
                                 not(containsString(
-                                        productId.toString()))))
+                                        variantId.toString()))))
                 .andExpect(
                         content().string(
                                 not(containsString(
@@ -206,7 +206,7 @@ class CreateOrderDatabaseFailureIntegrationTest {
                         authenticatedUserId.toString(),
                         tenantId.toString(),
                         customerId.toString(),
-                        productId.toString(),
+                        variantId.toString(),
                         "CannotGetJdbcConnectionException",
                         "DataAccessResourceFailureException",
                         "SQLTransientConnectionException",

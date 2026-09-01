@@ -96,8 +96,8 @@ class PostgreSqlOrderRepositoryTest {
         var tenantId = UUID.randomUUID();
         var orderId = UUID.randomUUID();
         var customerId = UUID.randomUUID();
-        var firstProductId = UUID.randomUUID();
-        var secondProductId = UUID.randomUUID();
+        var firstVariantId = UUID.randomUUID();
+        var secondVariantId = UUID.randomUUID();
 
         var order = Order.create(
                 orderId,
@@ -105,10 +105,10 @@ class PostgreSqlOrderRepositoryTest {
                 customerId,
                 List.of(
                         new OrderItem(
-                                firstProductId,
+                                firstVariantId,
                                 2),
                         new OrderItem(
-                                secondProductId,
+                                secondVariantId,
                                 4)));
 
         var writer = new PostgreSqlOrderRepository(jdbcTemplate);
@@ -141,10 +141,10 @@ class PostgreSqlOrderRepositoryTest {
                 .isEqualTo(OrderStatus.CREATED);
 
         assertThat(rehydrated.items())
-                .extracting(OrderItem::productId)
+                .extracting(OrderItem::variantId)
                 .containsExactly(
-                        firstProductId,
-                        secondProductId);
+                        firstVariantId,
+                        secondVariantId);
 
         assertThat(rehydrated.items())
                 .extracting(OrderItem::quantity)
@@ -209,8 +209,8 @@ class PostgreSqlOrderRepositoryTest {
         var orderId = UUID.randomUUID();
         var customerId = UUID.randomUUID();
 
-        var firstProductId = UUID.randomUUID();
-        var secondProductId = UUID.randomUUID();
+        var firstVariantId = UUID.randomUUID();
+        var secondVariantId = UUID.randomUUID();
         var thirdProductId = UUID.randomUUID();
 
         jdbcTemplate.update("""
@@ -233,7 +233,7 @@ class PostgreSqlOrderRepositoryTest {
                     tenant_id,
                     order_id,
                     line_number,
-                    product_id,
+                    variant_id,
                     quantity
                 )
                 VALUES (?, ?, ?, ?, ?)
@@ -249,7 +249,7 @@ class PostgreSqlOrderRepositoryTest {
                     tenant_id,
                     order_id,
                     line_number,
-                    product_id,
+                    variant_id,
                     quantity
                 )
                 VALUES (?, ?, ?, ?, ?)
@@ -257,7 +257,7 @@ class PostgreSqlOrderRepositoryTest {
                 tenantId,
                 orderId,
                 0,
-                firstProductId,
+                firstVariantId,
                 1);
 
         jdbcTemplate.update("""
@@ -265,7 +265,7 @@ class PostgreSqlOrderRepositoryTest {
                     tenant_id,
                     order_id,
                     line_number,
-                    product_id,
+                    variant_id,
                     quantity
                 )
                 VALUES (?, ?, ?, ?, ?)
@@ -273,7 +273,7 @@ class PostgreSqlOrderRepositoryTest {
                 tenantId,
                 orderId,
                 1,
-                secondProductId,
+                secondVariantId,
                 2);
 
         var repository = new PostgreSqlOrderRepository(jdbcTemplate);
@@ -284,10 +284,10 @@ class PostgreSqlOrderRepositoryTest {
                 .orElseThrow();
 
         assertThat(order.items())
-                .extracting(OrderItem::productId)
+                .extracting(OrderItem::variantId)
                 .containsExactly(
-                        firstProductId,
-                        secondProductId,
+                        firstVariantId,
+                        secondVariantId,
                         thirdProductId);
 
         assertThat(order.items())

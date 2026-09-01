@@ -109,7 +109,7 @@ class SecurityRealJwtOrdersHttpEndToEndTest {
         var customerId =
                 UUID.randomUUID();
 
-        var productId =
+        var variantId =
                 UUID.randomUUID();
 
         allowIdentity(
@@ -134,7 +134,7 @@ class SecurityRealJwtOrdersHttpEndToEndTest {
                             command.items()
                                     .stream()
                                     .map(item -> new OrderItem(
-                                            item.productId(),
+                                            item.variantId(),
                                             item.quantity()))
                                     .toList());
                 });
@@ -153,7 +153,7 @@ class SecurityRealJwtOrdersHttpEndToEndTest {
                                 .content(
                                         validBody(
                                                 customerId,
-                                                productId)))
+                                                variantId)))
                 .andExpect(
                         status().isCreated())
                 .andExpect(
@@ -385,7 +385,7 @@ class SecurityRealJwtOrdersHttpEndToEndTest {
         var customerId =
                 UUID.randomUUID();
 
-        var productId =
+        var variantId =
                 UUID.randomUUID();
 
         var token =
@@ -405,7 +405,7 @@ class SecurityRealJwtOrdersHttpEndToEndTest {
                                 .content(
                                         validBody(
                                                 customerId,
-                                                productId)))
+                                                variantId)))
                 .andExpect(
                         status().isCreated());
 
@@ -423,7 +423,7 @@ class SecurityRealJwtOrdersHttpEndToEndTest {
                                 .content(
                                         validBody(
                                                 customerId,
-                                                productId)))
+                                                variantId)))
                 .andExpect(
                         status().isForbidden());
 
@@ -514,19 +514,19 @@ class SecurityRealJwtOrdersHttpEndToEndTest {
 
     private static String validBody(
             UUID customerId,
-            UUID productId) {
+            UUID variantId) {
 
         return """
                 {
                   "customerId": "%s",
                   "items": [{
-                    "productId": "%s",
+                    "variantId": "%s",
                     "quantity": 2
                   }]
                 }
                 """.formatted(
                 customerId,
-                productId);
+                variantId);
     }
 
     private static RSAKey generateRsaKey(

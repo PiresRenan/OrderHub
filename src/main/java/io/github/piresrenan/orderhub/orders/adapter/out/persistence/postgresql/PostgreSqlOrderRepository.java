@@ -19,8 +19,8 @@ import io.github.piresrenan.orderhub.orders.domain.model.OrderStatus;
  *
  * <p>
  * This adapter owns relational mapping only. Transaction demarcation belongs
- * to the calling application use case so one transaction can later include
- * Orders and other participating modules.
+ * to the calling application use case so one transaction can include multiple
+ * participating persistence adapters.
  * </p>
  */
 public final class PostgreSqlOrderRepository
@@ -41,7 +41,7 @@ public final class PostgreSqlOrderRepository
                 tenant_id,
                 order_id,
                 line_number,
-                product_id,
+                variant_id,
                 quantity
             )
             VALUES (?, ?, ?, ?, ?)
@@ -60,7 +60,7 @@ public final class PostgreSqlOrderRepository
 
     private static final String FIND_ITEMS_SQL = """
             SELECT
-                product_id,
+                variant_id,
                 quantity
             FROM orders.order_items
             WHERE tenant_id = ?
@@ -160,7 +160,7 @@ public final class PostgreSqlOrderRepository
                     order.tenantId(),
                     order.id(),
                     lineNumber,
-                    item.productId(),
+                    item.variantId(),
                     item.quantity());
         }
     }
@@ -202,7 +202,7 @@ public final class PostgreSqlOrderRepository
                 (resultSet, rowNumber) ->
                         new OrderItem(
                                 resultSet.getObject(
-                                        "product_id",
+                                        "variant_id",
                                         UUID.class),
                                 resultSet.getInt(
                                         "quantity")),

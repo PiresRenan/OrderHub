@@ -48,15 +48,10 @@ public final class CreateOrderService
                         .stream()
                         .map(item ->
                                 new OrderItem(
-                                        item.productId(),
+                                        item.variantId(),
                                         item.quantity()))
                         .toList();
 
-        /*
-         * Construction and invariant validation deliberately occur before the
-         * transaction starts. Invalid input therefore consumes no database
-         * transaction.
-         */
         var order =
                 Order.create(
                         orderIdGenerator.generate(),

@@ -273,7 +273,7 @@ class OrderHttpResourceLimitsTest {
                 var items = IntStream.range(0, itemCount)
                                 .mapToObj(index -> """
                                                 {
-                                                  "productId": "33333333-3333-3333-3333-333333333333",
+                                                  "variantId": "33333333-3333-3333-3333-333333333333",
                                                   "quantity": 1
                                                 }
                                                 """)
@@ -298,7 +298,7 @@ class OrderHttpResourceLimitsTest {
                                 {
                                   "customerId": "22222222-2222-2222-2222-222222222222",
                                   "items": [{
-                                    "productId": "33333333-3333-3333-3333-333333333333",
+                                    "variantId": "33333333-3333-3333-3333-333333333333",
                                     "quantity": 1
                                   }]
                                 }

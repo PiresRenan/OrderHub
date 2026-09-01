@@ -30,7 +30,7 @@ class OrderControllerTrustedTenantContextTest {
         var customerId =
                 UUID.randomUUID();
 
-        var productId =
+        var variantId =
                 UUID.randomUUID();
 
         var capturedCommand =
@@ -47,7 +47,7 @@ class OrderControllerTrustedTenantContextTest {
                             command.customerId(),
                             List.of(
                                     new OrderItem(
-                                            productId,
+                                            variantId,
                                             2)));
                 };
 
@@ -61,7 +61,7 @@ class OrderControllerTrustedTenantContextTest {
                         customerId,
                         List.of(
                                 new CreateOrderRequest.Item(
-                                        productId,
+                                        variantId,
                                         2)));
 
         controller.create(
@@ -82,9 +82,9 @@ class OrderControllerTrustedTenantContextTest {
                     assertThat(command.items())
                             .singleElement()
                             .satisfies(item -> {
-                                assertThat(item.productId())
+                                assertThat(item.variantId())
                                         .isEqualTo(
-                                                productId);
+                                                variantId);
 
                                 assertThat(item.quantity())
                                         .isEqualTo(

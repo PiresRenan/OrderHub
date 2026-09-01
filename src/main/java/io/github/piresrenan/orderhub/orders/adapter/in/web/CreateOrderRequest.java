@@ -18,8 +18,8 @@ public record CreateOrderRequest(
 
     public record Item(
 
-            @NotNull(message = "productId is required")
-            UUID productId,
+            @NotNull(message = "variantId is required")
+            UUID variantId,
 
             @NotNull(message = "quantity is required")
             @Positive(message = "quantity must be greater than zero")

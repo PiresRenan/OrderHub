@@ -78,7 +78,7 @@ class CreateOrderIntegrationTest {
                 UUID.fromString(
                         "22222222-2222-2222-2222-222222222222");
 
-        var productId =
+        var variantId =
                 UUID.fromString(
                         "33333333-3333-3333-3333-333333333333");
 
@@ -114,7 +114,7 @@ class CreateOrderIntegrationTest {
                                           "customerId":
                                             "22222222-2222-2222-2222-222222222222",
                                           "items": [{
-                                            "productId":
+                                            "variantId":
                                               "33333333-3333-3333-3333-333333333333",
                                             "quantity": 2
                                           }]
@@ -159,13 +159,13 @@ class CreateOrderIntegrationTest {
                          AND root.id = item.order_id
                         WHERE root.tenant_id = ?
                           AND root.customer_id = ?
-                          AND item.product_id = ?
+                          AND item.variant_id = ?
                           AND item.quantity = ?
                         """,
                         Long.class,
                         tenantId,
                         customerId,
-                        productId,
+                        variantId,
                         2);
 
         assertThat(persistedOrderCount)

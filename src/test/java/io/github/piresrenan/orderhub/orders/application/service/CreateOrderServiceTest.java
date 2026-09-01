@@ -34,7 +34,7 @@ class CreateOrderServiceTest {
         var customerId =
                 UUID.randomUUID();
 
-        var productId =
+        var variantId =
                 UUID.randomUUID();
 
         var transactionExecutor =
@@ -59,7 +59,7 @@ class CreateOrderServiceTest {
                         customerId,
                         List.of(
                                 new CreateOrderCommand.Item(
-                                        productId,
+                                        variantId,
                                         2)));
 
         var order =
@@ -81,8 +81,8 @@ class CreateOrderServiceTest {
         assertThat(
                 order.items()
                         .getFirst()
-                        .productId())
-                .isEqualTo(productId);
+                        .variantId())
+                .isEqualTo(variantId);
 
         assertThat(
                 order.items()
@@ -127,10 +127,10 @@ class CreateOrderServiceTest {
                         () -> generatedId,
                         transactionExecutor);
 
-        var firstProduct =
+        var firstVariant =
                 UUID.randomUUID();
 
-        var secondProduct =
+        var secondVariant =
                 UUID.randomUUID();
 
         var order =
@@ -140,18 +140,18 @@ class CreateOrderServiceTest {
                                 UUID.randomUUID(),
                                 List.of(
                                         new CreateOrderCommand.Item(
-                                                firstProduct,
+                                                firstVariant,
                                                 2),
                                         new CreateOrderCommand.Item(
-                                                secondProduct,
+                                                secondVariant,
                                                 4))));
 
         assertThat(order.items())
                 .extracting(
-                        OrderItem::productId)
+                        OrderItem::variantId)
                 .containsExactly(
-                        firstProduct,
-                        secondProduct);
+                        firstVariant,
+                        secondVariant);
 
         assertThat(order.items())
                 .extracting(

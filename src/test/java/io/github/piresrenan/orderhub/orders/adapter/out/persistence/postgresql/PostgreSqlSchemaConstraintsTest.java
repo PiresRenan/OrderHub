@@ -48,10 +48,10 @@ class PostgreSqlSchemaConstraintsTest {
     private static final UUID CUSTOMER_B = UUID.fromString(
             "55555555-5555-5555-5555-555555555555");
 
-    private static final UUID PRODUCT_A = UUID.fromString(
+    private static final UUID VARIANT_A = UUID.fromString(
             "66666666-6666-6666-6666-666666666666");
 
-    private static final UUID PRODUCT_B = UUID.fromString(
+    private static final UUID VARIANT_B = UUID.fromString(
             "77777777-7777-7777-7777-777777777777");
 
     @Container
@@ -158,7 +158,7 @@ class PostgreSqlSchemaConstraintsTest {
         insertOrder(TENANT_A, ORDER_ID, CUSTOMER_A, "CREATED");
 
         assertThatThrownBy(() ->
-                insertItem(TENANT_A, ORDER_ID, 0, PRODUCT_A, 0))
+                insertItem(TENANT_A, ORDER_ID, 0, VARIANT_A, 0))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -171,7 +171,7 @@ class PostgreSqlSchemaConstraintsTest {
         insertOrder(TENANT_A, ORDER_ID, CUSTOMER_A, "CREATED");
 
         assertThatThrownBy(() ->
-                insertItem(TENANT_A, ORDER_ID, 0, PRODUCT_A, -1))
+                insertItem(TENANT_A, ORDER_ID, 0, VARIANT_A, -1))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -184,7 +184,7 @@ class PostgreSqlSchemaConstraintsTest {
         insertOrder(TENANT_A, ORDER_ID, CUSTOMER_A, "CREATED");
 
         assertThatThrownBy(() ->
-                insertItem(TENANT_A, ORDER_ID, -1, PRODUCT_A, 1))
+                insertItem(TENANT_A, ORDER_ID, -1, VARIANT_A, 1))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -195,7 +195,7 @@ class PostgreSqlSchemaConstraintsTest {
         // Prevents: orphan child rows surviving without an owning Order.
 
         assertThatThrownBy(() ->
-                insertItem(TENANT_A, ORDER_ID, 0, PRODUCT_A, 1))
+                insertItem(TENANT_A, ORDER_ID, 0, VARIANT_A, 1))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -208,7 +208,7 @@ class PostgreSqlSchemaConstraintsTest {
         insertOrder(TENANT_A, ORDER_ID, CUSTOMER_A, "CREATED");
 
         assertThatThrownBy(() ->
-                insertItem(TENANT_B, ORDER_ID, 0, PRODUCT_A, 1))
+                insertItem(TENANT_B, ORDER_ID, 0, VARIANT_A, 1))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -219,10 +219,10 @@ class PostgreSqlSchemaConstraintsTest {
         // Prevents: ambiguous ordering during aggregate reconstruction.
 
         insertOrder(TENANT_A, ORDER_ID, CUSTOMER_A, "CREATED");
-        insertItem(TENANT_A, ORDER_ID, 0, PRODUCT_A, 1);
+        insertItem(TENANT_A, ORDER_ID, 0, VARIANT_A, 1);
 
         assertThatThrownBy(() ->
-                insertItem(TENANT_A, ORDER_ID, 0, PRODUCT_B, 1))
+                insertItem(TENANT_A, ORDER_ID, 0, VARIANT_B, 1))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -263,14 +263,14 @@ class PostgreSqlSchemaConstraintsTest {
      * @param tenantId owning tenant identifier
      * @param orderId owning Order identifier
      * @param lineNumber persisted list position
-     * @param productId synthetic product identifier
+     * @param variantId synthetic variant identifier
      * @param quantity requested positive quantity
      */
     private void insertItem(
             UUID tenantId,
             UUID orderId,
             int lineNumber,
-            UUID productId,
+            UUID variantId,
             int quantity) {
 
         jdbcTemplate.update("""
@@ -278,7 +278,7 @@ class PostgreSqlSchemaConstraintsTest {
                     tenant_id,
                     order_id,
                     line_number,
-                    product_id,
+                    variant_id,
                     quantity
                 )
                 VALUES (?, ?, ?, ?, ?)
@@ -286,7 +286,7 @@ class PostgreSqlSchemaConstraintsTest {
                 tenantId,
                 orderId,
                 lineNumber,
-                productId,
+                variantId,
                 quantity);
     }
 }
