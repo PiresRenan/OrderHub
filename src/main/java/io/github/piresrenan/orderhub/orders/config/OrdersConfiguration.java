@@ -9,7 +9,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import io.github.piresrenan.orderhub.inventory.application.port.in.CommitOrderInventoryUseCase;
+import io.github.piresrenan.orderhub.orders.adapter.out.observability.micrometer.MicrometerObservedCreateOrderUseCase;
+import io.github.piresrenan.orderhub.orders.adapter.out.observability.micrometer.MicrometerObservedTransactionExecutor;
 import io.github.piresrenan.orderhub.orders.adapter.out.persistence.postgresql.PostgreSqlOrderRepository;
 import io.github.piresrenan.orderhub.orders.adapter.out.transaction.spring.SpringTransactionExecutor;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
@@ -32,18 +35,14 @@ public class OrdersConfiguration {
     }
 
     /**
-     * Creates the infrastructure transaction boundary used by Order creation.
-     *
-     * <p>
-     * The finite timeout is externalized and propagated to Spring's JDBC
-     * transaction resources. A blocked PostgreSQL statement therefore cannot
-     * wait indefinitely for another transaction to release a row lock.
-     * </p>
+     * Creates the application-owned transaction boundary and instruments its
+     * exact execution duration without business-identity metric tags.
      */
     @Bean
     TransactionExecutor transactionExecutor(
             PlatformTransactionManager transactionManager,
-            OrderTransactionProperties properties) {
+            OrderTransactionProperties properties,
+            MeterRegistry meterRegistry) {
 
         var transactionTemplate =
                 new TransactionTemplate(
@@ -52,8 +51,13 @@ public class OrdersConfiguration {
         transactionTemplate.setTimeout(
                 properties.timeoutSeconds());
 
-        return new SpringTransactionExecutor(
-                transactionTemplate);
+        var springTransactionExecutor =
+                new SpringTransactionExecutor(
+                        transactionTemplate);
+
+        return new MicrometerObservedTransactionExecutor(
+                springTransactionExecutor,
+                meterRegistry);
     }
 
     @Bean
@@ -62,17 +66,27 @@ public class OrdersConfiguration {
         return UUID::randomUUID;
     }
 
+    /**
+     * Exposes the create-Order use case through a low-cardinality observability
+     * decorator while keeping Micrometer out of application/domain code.
+     */
     @Bean
     CreateOrderUseCase createOrderUseCase(
             OrderRepository orderRepository,
             OrderIdGenerator orderIdGenerator,
             TransactionExecutor transactionExecutor,
-            CommitOrderInventoryUseCase inventory) {
+            CommitOrderInventoryUseCase inventory,
+            MeterRegistry meterRegistry) {
 
-        return new CreateOrderService(
-                orderRepository,
-                orderIdGenerator,
-                transactionExecutor,
-                inventory);
+        var createOrderService =
+                new CreateOrderService(
+                        orderRepository,
+                        orderIdGenerator,
+                        transactionExecutor,
+                        inventory);
+
+        return new MicrometerObservedCreateOrderUseCase(
+                createOrderService,
+                meterRegistry);
     }
 }

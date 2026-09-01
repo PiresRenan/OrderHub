@@ -7,8 +7,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 
+import io.github.piresrenan.orderhub.orders.adapter.out.observability.micrometer.MicrometerObservedCreateOrderUseCase;
+import io.github.piresrenan.orderhub.orders.adapter.out.observability.micrometer.MicrometerObservedTransactionExecutor;
 import io.github.piresrenan.orderhub.orders.adapter.out.persistence.postgresql.PostgreSqlOrderRepository;
-import io.github.piresrenan.orderhub.orders.adapter.out.transaction.spring.SpringTransactionExecutor;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderIdGenerator;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderRepository;
@@ -32,10 +33,11 @@ class OrdersConfigurationTest {
     private TransactionExecutor transactionExecutor;
 
     @Test
-    void wiresOrderApplicationComponents() {
+    void wiresOrderApplicationComponentsThroughObservedBoundaries() {
 
         assertThat(createOrderUseCase)
-                .isNotNull();
+                .isInstanceOf(
+                        MicrometerObservedCreateOrderUseCase.class);
 
         assertThat(orderRepository)
                 .isInstanceOf(
@@ -46,6 +48,6 @@ class OrdersConfigurationTest {
 
         assertThat(transactionExecutor)
                 .isInstanceOf(
-                        SpringTransactionExecutor.class);
+                        MicrometerObservedTransactionExecutor.class);
     }
 }
