@@ -22,7 +22,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
+import io.github.piresrenan.orderhub.orders.adapter.out.transaction.spring.SpringTransactionExecutor;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderPersistenceException;
+import io.github.piresrenan.orderhub.orders.application.port.out.TransactionExecutor;
 import io.github.piresrenan.orderhub.orders.domain.model.Order;
 import io.github.piresrenan.orderhub.orders.domain.model.OrderItem;
 import io.github.piresrenan.orderhub.orders.domain.model.OrderStatus;
@@ -42,7 +44,7 @@ class PostgreSqlOrderRepositoryTest {
             .withPassword("synthetic-test-password");
 
     private static JdbcTemplate jdbcTemplate;
-    private static TransactionTemplate transactionTemplate;
+    private static TransactionExecutor transactionExecutor;
 
     /**
      * Creates the real PostgreSQL-backed JDBC and transaction infrastructure used
@@ -62,8 +64,11 @@ class PostgreSqlOrderRepositoryTest {
                 .migrate();
 
         jdbcTemplate = new JdbcTemplate(dataSource);
-        transactionTemplate = new TransactionTemplate(
-                new DataSourceTransactionManager(dataSource));
+        transactionExecutor =
+                new SpringTransactionExecutor(
+                        new TransactionTemplate(
+                                new DataSourceTransactionManager(
+                                        dataSource)));
     }
 
     /**
@@ -106,17 +111,13 @@ class PostgreSqlOrderRepositoryTest {
                                 secondProductId,
                                 4)));
 
-        var writer = new PostgreSqlOrderRepository(
-                jdbcTemplate,
-                transactionTemplate);
+        var writer = new PostgreSqlOrderRepository(jdbcTemplate);
 
         writer.save(order);
 
         // A separate adapter instance ensures the assertion exercises persisted
         // state rather than relying on repository-instance memory.
-        var reader = new PostgreSqlOrderRepository(
-                jdbcTemplate,
-                transactionTemplate);
+        var reader = new PostgreSqlOrderRepository(jdbcTemplate);
 
         var result = reader.findById(
                 tenantId,
@@ -172,9 +173,7 @@ class PostgreSqlOrderRepositoryTest {
                                 UUID.randomUUID(),
                                 2)));
 
-        var repository = new PostgreSqlOrderRepository(
-                jdbcTemplate,
-                transactionTemplate);
+        var repository = new PostgreSqlOrderRepository(jdbcTemplate);
 
         repository.save(order);
 
@@ -191,9 +190,7 @@ class PostgreSqlOrderRepositoryTest {
         // Covers: tenant-scoped lookup when no relational root exists.
         // Prevents: ambiguous absence semantics leaking from JDBC into the application.
 
-        var repository = new PostgreSqlOrderRepository(
-                jdbcTemplate,
-                transactionTemplate);
+        var repository = new PostgreSqlOrderRepository(jdbcTemplate);
 
         assertThat(repository.findById(
                 UUID.randomUUID(),
@@ -279,9 +276,7 @@ class PostgreSqlOrderRepositoryTest {
                 secondProductId,
                 2);
 
-        var repository = new PostgreSqlOrderRepository(
-                jdbcTemplate,
-                transactionTemplate);
+        var repository = new PostgreSqlOrderRepository(jdbcTemplate);
 
         var order = repository.findById(
                 tenantId,
@@ -304,7 +299,7 @@ class PostgreSqlOrderRepositoryTest {
     }
 
     @Test
-    void rollsBackCompleteAggregateWhenLaterItemInsertFails() {
+    void callerOwnedTransactionRollsBackCompleteAggregateWhenLaterItemInsertFails() {
         // Why: OrderRepository.save represents persistence of one complete aggregate,
         // so failure after some SQL statements have succeeded must not leave partial
         // relational state.
@@ -335,11 +330,11 @@ class PostgreSqlOrderRepositoryTest {
                 """);
 
         try {
-            var repository = new PostgreSqlOrderRepository(
-                    jdbcTemplate,
-                    transactionTemplate);
+            var repository = new PostgreSqlOrderRepository(jdbcTemplate);
 
-            assertThatThrownBy(() -> repository.save(order))
+            assertThatThrownBy(() ->
+                    transactionExecutor.execute(
+                            () -> repository.save(order)))
                     .isInstanceOf(OrderPersistenceException.class)
                     .hasCauseInstanceOf(DataIntegrityViolationException.class);
 

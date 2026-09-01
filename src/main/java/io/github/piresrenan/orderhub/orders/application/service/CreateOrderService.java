@@ -4,57 +4,69 @@ import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderComma
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderIdGenerator;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderRepository;
+import io.github.piresrenan.orderhub.orders.application.port.out.TransactionExecutor;
 import io.github.piresrenan.orderhub.orders.domain.model.Order;
 import io.github.piresrenan.orderhub.orders.domain.model.OrderItem;
 
-public final class CreateOrderService implements CreateOrderUseCase {
+/**
+ * Coordinates creation of a new Order.
+ *
+ * <p>
+ * Domain validation occurs before a transaction is opened. Once a valid
+ * aggregate exists, the application service owns the durable transaction
+ * boundary and repositories participate in that caller-owned transaction.
+ * </p>
+ */
+public final class CreateOrderService
+        implements CreateOrderUseCase {
 
     private final OrderRepository orderRepository;
     private final OrderIdGenerator orderIdGenerator;
+    private final TransactionExecutor transactionExecutor;
 
-    /**
-     * Creates the application service using only output-port abstractions.
-     *
-     * <p>
-     * Constructor injection keeps the use case independent of Spring and allows
-     * persistence and identity generation strategies to be replaced without
-     * modifying application logic.
-     * </p>
-     *
-     * @param orderRepository  persistence port used after successful domain
-     *                         creation
-     * @param orderIdGenerator identity-generation port used for new aggregates
-     */
-    public CreateOrderService(OrderRepository orderRepository, OrderIdGenerator orderIdGenerator) {
-        this.orderRepository = orderRepository;
-        this.orderIdGenerator = orderIdGenerator;
+    public CreateOrderService(
+            OrderRepository orderRepository,
+            OrderIdGenerator orderIdGenerator,
+            TransactionExecutor transactionExecutor) {
+
+        this.orderRepository =
+                orderRepository;
+
+        this.orderIdGenerator =
+                orderIdGenerator;
+
+        this.transactionExecutor =
+                transactionExecutor;
     }
 
-    /**
-     * Coordinates the creation of a new order.
-     *
-     * <p>
-     * The method translates application input items into domain objects,
-     * generates the aggregate identity, delegates invariant enforcement to the
-     * domain and persists the aggregate only after successful construction.
-     * </p>
-     *
-     * @param command application input containing tenant, customer and order items
-     * @return the successfully created and persisted order
-     * @throws IllegalArgumentException when domain invariants reject the supplied
-     *                                  command data
-     */
     @Override
-    public Order create(CreateOrderCommand command) {
-        var items = command.items().stream()
-                .map(item -> new OrderItem(item.productId(), item.quantity()))
-                .toList();
-        var order = Order.create(
-                orderIdGenerator.generate(),
-                command.tenantId(),
-                command.customerId(),
-                items);
-        return orderRepository.save(order);
-    }
+    public Order create(
+            CreateOrderCommand command) {
 
+        var items =
+                command.items()
+                        .stream()
+                        .map(item ->
+                                new OrderItem(
+                                        item.productId(),
+                                        item.quantity()))
+                        .toList();
+
+        /*
+         * Construction and invariant validation deliberately occur before the
+         * transaction starts. Invalid input therefore consumes no database
+         * transaction.
+         */
+        var order =
+                Order.create(
+                        orderIdGenerator.generate(),
+                        command.tenantId(),
+                        command.customerId(),
+                        items);
+
+        return transactionExecutor.execute(
+                () ->
+                        orderRepository.save(
+                                order));
+    }
 }

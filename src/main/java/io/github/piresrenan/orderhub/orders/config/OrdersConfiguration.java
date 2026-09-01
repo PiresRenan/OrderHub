@@ -9,68 +9,60 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import io.github.piresrenan.orderhub.orders.adapter.out.persistence.postgresql.PostgreSqlOrderRepository;
+import io.github.piresrenan.orderhub.orders.adapter.out.transaction.spring.SpringTransactionExecutor;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderIdGenerator;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderRepository;
+import io.github.piresrenan.orderhub.orders.application.port.out.TransactionExecutor;
 import io.github.piresrenan.orderhub.orders.application.service.CreateOrderService;
 
 @Configuration(proxyBeanMethods = false)
 public class OrdersConfiguration {
 
     /**
-     * Provides the durable PostgreSQL implementation of the OrderRepository port.
-     *
-     * <p>
-     * JDBC infrastructure and the transaction manager are supplied by Spring
-     * Boot. Transaction demarcation remains owned by the PostgreSQL persistence
-     * adapter through TransactionOperations rather than by the application
-     * service.
-     * </p>
-     *
-     * @param jdbcTemplate       configured JDBC operations for the application
-     *                           DataSource
-     * @param transactionManager transaction manager associated with the same
-     *                           application DataSource
-     * @return PostgreSQL-backed repository used for Order persistence
+     * Provides relational Order persistence without owning transaction
+     * demarcation.
      */
     @Bean
     OrderRepository orderRepository(
-            JdbcTemplate jdbcTemplate,
-            PlatformTransactionManager transactionManager) {
+            JdbcTemplate jdbcTemplate) {
 
         return new PostgreSqlOrderRepository(
-                jdbcTemplate,
-                new TransactionTemplate(transactionManager));
+                jdbcTemplate);
     }
 
     /**
-     * Provides the production identity-generation strategy for new orders.
-     *
-     * @return generator backed by UUID.randomUUID
+     * Adapts Spring transaction infrastructure to the framework-neutral
+     * application transaction port.
      */
     @Bean
+    TransactionExecutor transactionExecutor(
+            PlatformTransactionManager transactionManager) {
+
+        return new SpringTransactionExecutor(
+                new TransactionTemplate(
+                        transactionManager));
+    }
+
+    @Bean
     OrderIdGenerator orderIdGenerator() {
+
         return UUID::randomUUID;
     }
 
     /**
-     * Composes the order creation use case with its required output ports.
-     *
-     * <p>
-     * Keeping framework composition in configuration allows the application
-     * service itself to remain independent of Spring annotations.
-     * </p>
-     *
-     * @param orderRepository  configured order persistence port
-     * @param orderIdGenerator configured order identity-generation port
-     * @return application input port ready to process order creation commands
+     * Composes the Create Order use case with caller-owned transaction
+     * demarcation.
      */
     @Bean
     CreateOrderUseCase createOrderUseCase(
             OrderRepository orderRepository,
-            OrderIdGenerator orderIdGenerator) {
+            OrderIdGenerator orderIdGenerator,
+            TransactionExecutor transactionExecutor) {
+
         return new CreateOrderService(
                 orderRepository,
-                orderIdGenerator);
+                orderIdGenerator,
+                transactionExecutor);
     }
 }

@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderPersistenceException;
+import io.github.piresrenan.orderhub.orders.application.port.out.TransactionExecutionException;
 
 @RestControllerAdvice
 public final class ApiExceptionHandler extends ResponseEntityExceptionHandler {
@@ -60,8 +61,11 @@ public final class ApiExceptionHandler extends ResponseEntityExceptionHandler {
          * @return privacy-safe RFC 9457 response for a persistence operation that
          *         could not be completed
          */
-        @ExceptionHandler(OrderPersistenceException.class)
-        protected ResponseEntity<Object> handleOrderPersistenceFailure() {
+        @ExceptionHandler({
+                        OrderPersistenceException.class,
+                        TransactionExecutionException.class
+        })
+        protected ResponseEntity<Object> handleInternalTechnicalFailure() {
 
                 var status = HttpStatus.INTERNAL_SERVER_ERROR;
 

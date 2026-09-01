@@ -1,13 +1,12 @@
 package io.github.piresrenan.orderhub.orders.adapter.out.persistence.postgresql;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.transaction.TransactionException;
-import org.springframework.transaction.support.TransactionOperations;
 
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderPersistenceException;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderRepository;
@@ -18,11 +17,14 @@ import io.github.piresrenan.orderhub.orders.domain.model.OrderStatus;
 /**
  * Persists and reconstructs Order aggregates using explicit PostgreSQL SQL.
  *
- * <p>This adapter owns relational mapping and transaction demarcation while the
- * application and domain layers remain independent of JDBC, Spring transactions
- * and PostgreSQL-specific concerns.</p>
+ * <p>
+ * This adapter owns relational mapping only. Transaction demarcation belongs
+ * to the calling application use case so one transaction can later include
+ * Orders and other participating modules.
+ * </p>
  */
-public final class PostgreSqlOrderRepository implements OrderRepository {
+public final class PostgreSqlOrderRepository
+        implements OrderRepository {
 
     private static final String INSERT_ORDER_SQL = """
             INSERT INTO orders.orders (
@@ -67,85 +69,56 @@ public final class PostgreSqlOrderRepository implements OrderRepository {
             """;
 
     private final JdbcTemplate jdbcTemplate;
-    private final TransactionOperations transactionOperations;
 
-    /**
-     * Creates a PostgreSQL repository using externally provided JDBC and
-     * transaction infrastructure.
-     *
-     * <p>The adapter itself is deliberately free of Spring component annotations.
-     * Runtime composition remains the responsibility of the application
-     * configuration layer.</p>
-     *
-     * @param jdbcTemplate JDBC operations configured for the Orders database
-     * @param transactionOperations transaction boundary used for aggregate writes
-     */
     public PostgreSqlOrderRepository(
-            JdbcTemplate jdbcTemplate,
-            TransactionOperations transactionOperations) {
+            JdbcTemplate jdbcTemplate) {
 
-        this.jdbcTemplate = jdbcTemplate;
-        this.transactionOperations = transactionOperations;
+        this.jdbcTemplate =
+                Objects.requireNonNull(
+                        jdbcTemplate,
+                        "jdbcTemplate");
     }
 
-    /**
-     * Persists one complete Order aggregate atomically.
-     *
-     * <p>The root and every owned item are written inside the same database
-     * transaction. Any failure during item persistence therefore causes the root
-     * write and all preceding item writes to roll back together.</p>
-     *
-     * @param order valid aggregate to persist
-     * @return the same aggregate after successful persistence
-     * @throws OrderPersistenceException when the aggregate cannot be persisted
-     */
     @Override
-    public Order save(Order order) {
+    public Order save(
+            Order order) {
+
         try {
-            transactionOperations.executeWithoutResult(transactionStatus -> {
-                insertOrderRoot(order);
-                insertOrderItems(order);
-            });
+            insertOrderRoot(
+                    order);
+
+            insertOrderItems(
+                    order);
 
             return order;
-        } catch (DataAccessException | TransactionException exception) {
-            throw new OrderPersistenceException(exception);
+        } catch (DataAccessException exception) {
+            throw new OrderPersistenceException(
+                    exception);
         }
     }
 
-    /**
-     * Loads one complete Order aggregate inside the requested tenant boundary.
-     *
-     * <p>Absence of the root returns an empty Optional. When the root exists, its
-     * items are loaded in persisted line order and the domain aggregate is
-     * reconstructed through {@link Order#rehydrate(UUID, UUID, UUID, List,
-     * OrderStatus)}.</p>
-     *
-     * @param tenantId tenant boundary in which the Order must exist
-     * @param orderId aggregate identifier
-     * @return reconstructed Order when found in the requested tenant, otherwise
-     *         an empty Optional
-     * @throws OrderPersistenceException when the lookup cannot be completed
-     */
     @Override
     public Optional<Order> findById(
             UUID tenantId,
             UUID orderId) {
 
         try {
-            var root = loadOrderRoot(
-                    tenantId,
-                    orderId);
+            var root =
+                    loadOrderRoot(
+                            tenantId,
+                            orderId);
 
             if (root.isEmpty()) {
                 return Optional.empty();
             }
 
-            var persistedRoot = root.orElseThrow();
+            var persistedRoot =
+                    root.orElseThrow();
 
-            var items = loadOrderItems(
-                    tenantId,
-                    orderId);
+            var items =
+                    loadOrderItems(
+                            tenantId,
+                            orderId);
 
             return Optional.of(
                     Order.rehydrate(
@@ -155,16 +128,14 @@ public final class PostgreSqlOrderRepository implements OrderRepository {
                             items,
                             persistedRoot.status()));
         } catch (DataAccessException exception) {
-            throw new OrderPersistenceException(exception);
+            throw new OrderPersistenceException(
+                    exception);
         }
     }
 
-    /**
-     * Inserts the relational root representation of one Order.
-     *
-     * @param order aggregate whose root state must be persisted
-     */
-    private void insertOrderRoot(Order order) {
+    private void insertOrderRoot(
+            Order order) {
+
         jdbcTemplate.update(
                 INSERT_ORDER_SQL,
                 order.tenantId(),
@@ -173,18 +144,16 @@ public final class PostgreSqlOrderRepository implements OrderRepository {
                 order.status().name());
     }
 
-    /**
-     * Inserts all Order items while preserving their aggregate list position as
-     * the relational line number.
-     *
-     * @param order aggregate whose owned items must be persisted
-     */
-    private void insertOrderItems(Order order) {
+    private void insertOrderItems(
+            Order order) {
+
         for (int lineNumber = 0;
                 lineNumber < order.items().size();
                 lineNumber++) {
 
-            var item = order.items().get(lineNumber);
+            var item =
+                    order.items()
+                            .get(lineNumber);
 
             jdbcTemplate.update(
                     INSERT_ITEM_SQL,
@@ -196,72 +165,51 @@ public final class PostgreSqlOrderRepository implements OrderRepository {
         }
     }
 
-    /**
-     * Loads the relational Order root using its complete tenant-scoped identity.
-     *
-     * @param tenantId tenant boundary to search
-     * @param orderId aggregate identifier to search
-     * @return persisted root state when present, otherwise an empty Optional
-     */
     private Optional<PersistedOrderRoot> loadOrderRoot(
             UUID tenantId,
             UUID orderId) {
 
-        var roots = jdbcTemplate.query(
-                FIND_ORDER_SQL,
-                (resultSet, rowNumber) -> new PersistedOrderRoot(
-                        resultSet.getObject(
-                                "id",
-                                UUID.class),
-                        resultSet.getObject(
-                                "tenant_id",
-                                UUID.class),
-                        resultSet.getObject(
-                                "customer_id",
-                                UUID.class),
-                        OrderStatus.valueOf(
-                                resultSet.getString("status"))),
-                tenantId,
-                orderId);
+        var roots =
+                jdbcTemplate.query(
+                        FIND_ORDER_SQL,
+                        (resultSet, rowNumber) ->
+                                new PersistedOrderRoot(
+                                        resultSet.getObject(
+                                                "id",
+                                                UUID.class),
+                                        resultSet.getObject(
+                                                "tenant_id",
+                                                UUID.class),
+                                        resultSet.getObject(
+                                                "customer_id",
+                                                UUID.class),
+                                        OrderStatus.valueOf(
+                                                resultSet.getString(
+                                                        "status"))),
+                        tenantId,
+                        orderId);
 
         return roots.stream()
                 .findFirst();
     }
 
-    /**
-     * Loads all items owned by one Order in their persisted line-number order.
-     *
-     * @param tenantId owning tenant identifier
-     * @param orderId owning Order identifier
-     * @return ordered domain items reconstructed from relational rows
-     */
     private List<OrderItem> loadOrderItems(
             UUID tenantId,
             UUID orderId) {
 
         return jdbcTemplate.query(
                 FIND_ITEMS_SQL,
-                (resultSet, rowNumber) -> new OrderItem(
-                        resultSet.getObject(
-                                "product_id",
-                                UUID.class),
-                        resultSet.getInt("quantity")),
+                (resultSet, rowNumber) ->
+                        new OrderItem(
+                                resultSet.getObject(
+                                        "product_id",
+                                        UUID.class),
+                                resultSet.getInt(
+                                        "quantity")),
                 tenantId,
                 orderId);
     }
 
-    /**
-     * Carries relational root state inside the PostgreSQL adapter before domain
-     * reconstruction.
-     *
-     * <p>This representation is private so JDBC persistence structures cannot
-     * escape into the application or domain layers.</p>
-     *
-     * @param id aggregate identifier
-     * @param tenantId owning tenant identifier
-     * @param customerId persisted customer association
-     * @param status persisted lifecycle state
-     */
     private record PersistedOrderRoot(
             UUID id,
             UUID tenantId,
