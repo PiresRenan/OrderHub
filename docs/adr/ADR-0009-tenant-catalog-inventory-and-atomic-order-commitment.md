@@ -707,6 +707,12 @@ Lock/transaction waiting must be finite and externally configurable. Initial
 values are safety baselines and must not be described as proven latency/capacity
 numbers before benchmark evidence.
 
+For OH-011, `orderhub.orders.transaction.timeout=5s` is the initial production
+safety baseline. The value is deliberately provisional: it bounds
+lock/transaction waiting before load and latency evidence exists, but it is not
+an SLA, capacity claim or retry trigger. Tests may override the value with a
+shorter duration to prove bounded failure deterministically.
+
 Broad automatic retry of deadlock/lock-timeout failures is deferred until the
 Order HTTP boundary has durable business idempotency.
 

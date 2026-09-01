@@ -2,6 +2,7 @@ package io.github.piresrenan.orderhub.orders.config;
 
 import java.util.UUID;
 
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -18,6 +19,8 @@ import io.github.piresrenan.orderhub.orders.application.port.out.TransactionExec
 import io.github.piresrenan.orderhub.orders.application.service.CreateOrderService;
 
 @Configuration(proxyBeanMethods = false)
+@EnableConfigurationProperties(
+        OrderTransactionProperties.class)
 public class OrdersConfiguration {
 
     @Bean
@@ -28,13 +31,29 @@ public class OrdersConfiguration {
                 jdbcTemplate);
     }
 
+    /**
+     * Creates the infrastructure transaction boundary used by Order creation.
+     *
+     * <p>
+     * The finite timeout is externalized and propagated to Spring's JDBC
+     * transaction resources. A blocked PostgreSQL statement therefore cannot
+     * wait indefinitely for another transaction to release a row lock.
+     * </p>
+     */
     @Bean
     TransactionExecutor transactionExecutor(
-            PlatformTransactionManager transactionManager) {
+            PlatformTransactionManager transactionManager,
+            OrderTransactionProperties properties) {
+
+        var transactionTemplate =
+                new TransactionTemplate(
+                        transactionManager);
+
+        transactionTemplate.setTimeout(
+                properties.timeoutSeconds());
 
         return new SpringTransactionExecutor(
-                new TransactionTemplate(
-                        transactionManager));
+                transactionTemplate);
     }
 
     @Bean
