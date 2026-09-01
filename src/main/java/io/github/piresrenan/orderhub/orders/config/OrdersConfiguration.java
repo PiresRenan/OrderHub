@@ -2,75 +2,94 @@ package io.github.piresrenan.orderhub.orders.config;
 
 import java.util.UUID;
 
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.ValidateOrderableVariantsUseCase;
+import io.github.piresrenan.orderhub.inventory.application.port.in.CommitOrderInventoryUseCase;
+import io.github.piresrenan.orderhub.orders.adapter.out.observability.micrometer.MicrometerObservedCreateOrderUseCase;
+import io.github.piresrenan.orderhub.orders.adapter.out.observability.micrometer.MicrometerObservedTransactionExecutor;
 import io.github.piresrenan.orderhub.orders.adapter.out.persistence.postgresql.PostgreSqlOrderRepository;
+import io.github.piresrenan.orderhub.orders.adapter.out.transaction.spring.SpringTransactionExecutor;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderIdGenerator;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderRepository;
+import io.github.piresrenan.orderhub.orders.application.port.out.TransactionExecutor;
 import io.github.piresrenan.orderhub.orders.application.service.CreateOrderService;
 
 @Configuration(proxyBeanMethods = false)
+@EnableConfigurationProperties(
+        OrderTransactionProperties.class)
 public class OrdersConfiguration {
 
-    /**
-     * Provides the durable PostgreSQL implementation of the OrderRepository port.
-     *
-     * <p>
-     * JDBC infrastructure and the transaction manager are supplied by Spring
-     * Boot. Transaction demarcation remains owned by the PostgreSQL persistence
-     * adapter through TransactionOperations rather than by the application
-     * service.
-     * </p>
-     *
-     * @param jdbcTemplate       configured JDBC operations for the application
-     *                           DataSource
-     * @param transactionManager transaction manager associated with the same
-     *                           application DataSource
-     * @return PostgreSQL-backed repository used for Order persistence
-     */
     @Bean
     OrderRepository orderRepository(
-            JdbcTemplate jdbcTemplate,
-            PlatformTransactionManager transactionManager) {
+            JdbcTemplate jdbcTemplate) {
 
         return new PostgreSqlOrderRepository(
-                jdbcTemplate,
-                new TransactionTemplate(transactionManager));
+                jdbcTemplate);
     }
 
     /**
-     * Provides the production identity-generation strategy for new orders.
-     *
-     * @return generator backed by UUID.randomUUID
+     * Creates the application-owned transaction boundary and instruments its
+     * exact execution duration without business-identity metric tags.
      */
     @Bean
+    TransactionExecutor transactionExecutor(
+            PlatformTransactionManager transactionManager,
+            OrderTransactionProperties properties,
+            MeterRegistry meterRegistry) {
+
+        var transactionTemplate =
+                new TransactionTemplate(
+                        transactionManager);
+
+        transactionTemplate.setTimeout(
+                properties.timeoutSeconds());
+
+        var springTransactionExecutor =
+                new SpringTransactionExecutor(
+                        transactionTemplate);
+
+        return new MicrometerObservedTransactionExecutor(
+                springTransactionExecutor,
+                meterRegistry);
+    }
+
+    @Bean
     OrderIdGenerator orderIdGenerator() {
+
         return UUID::randomUUID;
     }
 
     /**
-     * Composes the order creation use case with its required output ports.
-     *
-     * <p>
-     * Keeping framework composition in configuration allows the application
-     * service itself to remain independent of Spring annotations.
-     * </p>
-     *
-     * @param orderRepository  configured order persistence port
-     * @param orderIdGenerator configured order identity-generation port
-     * @return application input port ready to process order creation commands
+     * Exposes the create-Order use case through a low-cardinality observability
+     * decorator while preserving the Order-owned transaction boundary.
      */
     @Bean
     CreateOrderUseCase createOrderUseCase(
             OrderRepository orderRepository,
-            OrderIdGenerator orderIdGenerator) {
-        return new CreateOrderService(
-                orderRepository,
-                orderIdGenerator);
+            OrderIdGenerator orderIdGenerator,
+            TransactionExecutor transactionExecutor,
+            ValidateOrderableVariantsUseCase catalog,
+            CommitOrderInventoryUseCase inventory,
+            MeterRegistry meterRegistry) {
+
+        var createOrderService =
+                new CreateOrderService(
+                        orderRepository,
+                        orderIdGenerator,
+                        transactionExecutor,
+                        catalog,
+                        inventory);
+
+        return new MicrometerObservedCreateOrderUseCase(
+                createOrderService,
+                meterRegistry);
     }
 }

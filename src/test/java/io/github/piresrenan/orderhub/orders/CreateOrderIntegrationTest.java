@@ -42,29 +42,30 @@ class CreateOrderIntegrationTest {
     @MockitoBean
     private ResolveTrustedTenantContextUseCase resolveTrustedTenantContextUseCase;
 
-    /**
-     * Ensures each full-stack scenario starts from an empty Orders business state
-     * while preserving the schema already created by Flyway.
-     */
     @BeforeEach
-    void cleanPersistedOrders() {
+    void cleanBusinessState() {
+
         jdbcTemplate.update("""
                 TRUNCATE TABLE
+                    inventory.inventory_commitments,
+                    inventory.inventory_positions,
+                    inventory.tenant_policies,
+                    catalog.media,
+                    catalog.variant_base_prices,
+                    catalog.product_variant_attributes,
+                    catalog.product_categories,
+                    catalog.product_variants,
+                    catalog.categories,
+                    catalog.category_hierarchy_guards,
+                    catalog.products,
                     orders.order_items,
                     orders.orders
                 """);
     }
 
     @Test
-    void createsOrderThroughCompleteApplicationStack() throws Exception {
-        // Why: a successful HTTP response is insufficient if the created aggregate is
-        // not durably stored.
-        // Covers: authenticated HTTP -> trusted Tenant boundary -> Orders controller
-        // -> use case -> domain -> PostgreSQL repository, including persisted root and
-        // owned item. JWT and membership resolution are covered by dedicated Security
-        // end-to-end tests.
-        // Prevents: false-positive integration success where the API returns 201 but
-        // persistence wiring does not actually write the aggregate.
+    void createsOrderThroughCompleteApplicationStackOnlyAfterInventoryCommitment()
+            throws Exception {
 
         var authenticatedUserId =
                 UUID.fromString(
@@ -78,9 +79,36 @@ class CreateOrderIntegrationTest {
                 UUID.fromString(
                         "22222222-2222-2222-2222-222222222222");
 
-        var productId =
+        var variantId =
                 UUID.fromString(
                         "33333333-3333-3333-3333-333333333333");
+
+        seedActiveCatalogVariant(
+                tenantId,
+                variantId);
+
+        jdbcTemplate.update("""
+                INSERT INTO inventory.tenant_policies (
+                    tenant_id,
+                    policy
+                )
+                VALUES (?, 'DENY')
+                """,
+                tenantId);
+
+        jdbcTemplate.update("""
+                INSERT INTO inventory.inventory_positions (
+                    tenant_id,
+                    variant_id,
+                    on_hand,
+                    committed,
+                    backordered,
+                    safety_stock
+                )
+                VALUES (?, ?, 10, 0, 0, 0)
+                """,
+                tenantId,
+                variantId);
 
         var authenticatedPrincipal =
                 new AuthenticatedUserPrincipal(
@@ -114,7 +142,7 @@ class CreateOrderIntegrationTest {
                                           "customerId":
                                             "22222222-2222-2222-2222-222222222222",
                                           "items": [{
-                                            "productId":
+                                            "variantId":
                                               "33333333-3333-3333-3333-333333333333",
                                             "quantity": 2
                                           }]
@@ -136,7 +164,15 @@ class CreateOrderIntegrationTest {
                 .andExpect(
                         jsonPath("$.status")
                                 .value(
-                                        "CREATED"));
+                                        "CREATED"))
+                .andExpect(
+                        jsonPath("$.allocationOutcome")
+                                .value(
+                                        "FULLY_ALLOCATED"))
+                .andExpect(
+                        jsonPath("$.items[0].variantId")
+                                .value(
+                                        variantId.toString()));
 
         var persistedOrderCount =
                 jdbcTemplate.queryForObject("""
@@ -159,21 +195,98 @@ class CreateOrderIntegrationTest {
                          AND root.id = item.order_id
                         WHERE root.tenant_id = ?
                           AND root.customer_id = ?
-                          AND item.product_id = ?
-                          AND item.quantity = ?
+                          AND item.variant_id = ?
+                          AND item.quantity = 2
                         """,
                         Long.class,
                         tenantId,
                         customerId,
-                        productId,
-                        2);
+                        variantId);
+
+        var committed =
+                jdbcTemplate.queryForObject("""
+                        SELECT committed
+                        FROM inventory.inventory_positions
+                        WHERE tenant_id = ?
+                          AND variant_id = ?
+                        """,
+                        Long.class,
+                        tenantId,
+                        variantId);
+
+        var commitmentCount =
+                jdbcTemplate.queryForObject("""
+                        SELECT COUNT(*)
+                        FROM inventory.inventory_commitments
+                        WHERE tenant_id = ?
+                          AND variant_id = ?
+                          AND requested_quantity = 2
+                          AND allocated_quantity = 2
+                          AND backordered_quantity = 0
+                        """,
+                        Long.class,
+                        tenantId,
+                        variantId);
 
         assertThat(persistedOrderCount)
-                .isEqualTo(
-                        1L);
+                .isEqualTo(1);
 
         assertThat(persistedItemCount)
-                .isEqualTo(
-                        1L);
+                .isEqualTo(1);
+
+        assertThat(committed)
+                .isEqualTo(2);
+
+        assertThat(commitmentCount)
+                .isEqualTo(1);
+    }
+    private void seedActiveCatalogVariant(
+            UUID tenantId,
+            UUID variantId) {
+
+        var productId =
+                UUID.fromString(
+                        "44444444-4444-4444-4444-444444444444");
+
+        jdbcTemplate.update("""
+                INSERT INTO catalog.products (
+                    tenant_id,
+                    id,
+                    name,
+                    slug,
+                    description,
+                    status
+                )
+                VALUES (
+                    ?,
+                    ?,
+                    'Order fixture product',
+                    'order_fixture_product',
+                    NULL,
+                    'ACTIVE'
+                )
+                """,
+                tenantId,
+                productId);
+
+        jdbcTemplate.update("""
+                INSERT INTO catalog.product_variants (
+                    tenant_id,
+                    id,
+                    product_id,
+                    sku,
+                    status
+                )
+                VALUES (
+                    ?,
+                    ?,
+                    ?,
+                    'ORDER-FIXTURE-SKU',
+                    'ACTIVE'
+                )
+                """,
+                tenantId,
+                variantId,
+                productId);
     }
 }

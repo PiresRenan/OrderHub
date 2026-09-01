@@ -21,7 +21,12 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.CatalogOrderabilityRejectedException;
+import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.CatalogOrderabilityTechnicalException;
+import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryCommitmentRejectedException;
+import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryOperationException;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderPersistenceException;
+import io.github.piresrenan.orderhub.orders.application.port.out.TransactionExecutionException;
 
 @RestControllerAdvice
 public final class ApiExceptionHandler extends ResponseEntityExceptionHandler {
@@ -60,8 +65,55 @@ public final class ApiExceptionHandler extends ResponseEntityExceptionHandler {
          * @return privacy-safe RFC 9457 response for a persistence operation that
          *         could not be completed
          */
-        @ExceptionHandler(OrderPersistenceException.class)
-        protected ResponseEntity<Object> handleOrderPersistenceFailure() {
+        /**
+         * Converts fail-closed Inventory commitment rejection into a stable
+         * conflict response without exposing Tenant, Variant, policy, stock or
+         * position state.
+         */
+        /**
+         * Converts Catalog commercial-orderability rejection into a generic
+         * conflict response without exposing whether a Product/Variant exists,
+         * belongs to another Tenant or has a non-ACTIVE lifecycle state.
+         */
+        @ExceptionHandler(CatalogOrderabilityRejectedException.class)
+        protected ResponseEntity<Object> handleCatalogOrderabilityRejected() {
+
+                var status = HttpStatus.CONFLICT;
+
+                var problem = problem(
+                                status,
+                                "order-not-accepted",
+                                "Order could not be accepted",
+                                "The order could not be accepted.",
+                                "ORDER_NOT_ACCEPTED");
+
+                return ResponseEntity
+                                .status(status)
+                                .body(problem);
+        }
+        @ExceptionHandler(InventoryCommitmentRejectedException.class)
+        protected ResponseEntity<Object> handleInventoryCommitmentRejected() {
+
+                var status = HttpStatus.CONFLICT;
+
+                var problem = problem(
+                                status,
+                                "inventory-commitment-rejected",
+                                "Inventory commitment rejected",
+                                "The order could not be accepted.",
+                                "INVENTORY_COMMITMENT_REJECTED");
+
+                return ResponseEntity
+                                .status(status)
+                                .body(problem);
+        }
+        @ExceptionHandler({
+                        OrderPersistenceException.class,
+                        TransactionExecutionException.class,
+                        InventoryOperationException.class,
+                        CatalogOrderabilityTechnicalException.class
+        })
+        protected ResponseEntity<Object> handleInternalTechnicalFailure() {
 
                 var status = HttpStatus.INTERNAL_SERVER_ERROR;
 

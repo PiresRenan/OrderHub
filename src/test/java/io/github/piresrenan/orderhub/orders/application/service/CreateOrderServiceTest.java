@@ -3,230 +3,579 @@ package io.github.piresrenan.orderhub.orders.application.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 
 import org.junit.jupiter.api.Test;
 
+import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.CatalogOrderabilityRejectedException;
+import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.ValidateOrderableVariantsCommand;
+import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.ValidateOrderableVariantsUseCase;
+import io.github.piresrenan.orderhub.inventory.application.port.in.CommitOrderInventoryCommand;
+import io.github.piresrenan.orderhub.inventory.application.port.in.CommitOrderInventoryUseCase;
+import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryAllocationOutcome;
+import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryCommitmentRejectedException;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderIdGenerator;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderRepository;
+import io.github.piresrenan.orderhub.orders.application.port.out.TransactionExecutor;
 import io.github.piresrenan.orderhub.orders.domain.model.Order;
-import io.github.piresrenan.orderhub.orders.domain.model.OrderItem;
-import io.github.piresrenan.orderhub.orders.domain.model.OrderStatus;
 
 class CreateOrderServiceTest {
 
-        @Test
-        void createsAndPersistsOrder() {
-                // Why: order creation must coordinate identity generation, domain creation
-                // and persistence through the output port as one application use case.
-                // Covers: complete happy-path orchestration of CreateOrderService.
-                // Prevents: orders being created without persistence, persisted with incorrect
-                // data, or returned with a state different from the domain aggregate.
+    @Test
+    void persistsOrderThenValidatesCatalogThenCommitsInventoryInsideSameTransaction() {
 
-                var orderId = UUID.randomUUID();
-                var tenantId = UUID.randomUUID();
-                var customerId = UUID.randomUUID();
-                var productId = UUID.randomUUID();
+        var events =
+                new ArrayList<String>();
 
-                var repository = new RecordingOrderRepository();
+        var transaction =
+                new RecordingTransactionExecutor();
 
-                OrderIdGenerator idGenerator = () -> orderId;
+        var repository =
+                new RecordingOrderRepository(
+                        transaction::isActive,
+                        events);
 
-                var service = new CreateOrderService(
-                                repository,
-                                idGenerator);
+        var catalog =
+                new RecordingCatalogValidator(
+                        transaction::isActive,
+                        events);
 
-                var command = new CreateOrderCommand(
+        var inventory =
+                new RecordingInventoryCommitter(
+                        transaction::isActive,
+                        events);
+
+        var orderId =
+                UUID.randomUUID();
+
+        var tenantId =
+                UUID.randomUUID();
+
+        var customerId =
+                UUID.randomUUID();
+
+        var variantId =
+                UUID.randomUUID();
+
+        var service =
+                new CreateOrderService(
+                        repository,
+                        () -> orderId,
+                        transaction,
+                        catalog,
+                        inventory);
+
+        var result =
+                service.create(
+                        new CreateOrderCommand(
                                 tenantId,
                                 customerId,
                                 List.of(
-                                                new CreateOrderCommand.Item(
-                                                                productId,
-                                                                2)));
+                                        new CreateOrderCommand.Item(
+                                                variantId,
+                                                2))));
 
-                var order = service.create(command);
+        assertThat(result.order().id())
+                .isEqualTo(
+                        orderId);
 
-                assertThat(order.id()).isEqualTo(orderId);
-                assertThat(order.tenantId()).isEqualTo(tenantId);
-                assertThat(order.customerId()).isEqualTo(customerId);
+        assertThat(repository.saveCount)
+                .isEqualTo(1);
 
-                assertThat(order.items()).hasSize(1);
-                assertThat(order.items().getFirst().productId())
-                                .isEqualTo(productId);
-                assertThat(order.items().getFirst().quantity())
-                                .isEqualTo(2);
+        assertThat(repository.saveObservedInsideTransaction)
+                .isTrue();
 
-                assertThat(order.status())
-                                .isEqualTo(OrderStatus.CREATED);
+        assertThat(catalog.validateObservedInsideTransaction)
+                .isTrue();
 
-                assertThat(repository.savedOrder)
-                                .isSameAs(order);
+        assertThat(inventory.commitObservedInsideTransaction)
+                .isTrue();
 
-                assertThat(repository.saveCount)
-                                .isEqualTo(1);
-        }
+        assertThat(events)
+                .containsExactly(
+                        "order",
+                        "catalog",
+                        "inventory");
 
-        @Test
-        void mapsMultipleItems() {
-                // Why: real orders commonly contain multiple products and quantities.
-                // Covers: mapping every application command item into a domain OrderItem.
-                // Prevents: accidental truncation, overwriting, reordering or loss of items
-                // when translating the command into the aggregate.
+        assertThat(transaction.executionCount)
+                .isEqualTo(1);
 
-                var repository = new RecordingOrderRepository();
-                var generatedId = UUID.randomUUID();
+        assertThat(catalog.command.tenantId())
+                .isEqualTo(
+                        tenantId);
 
-                var service = new CreateOrderService(
-                                repository,
-                                () -> generatedId);
+        assertThat(catalog.command.variantIds())
+                .containsExactly(
+                        variantId);
 
-                var firstProduct = UUID.randomUUID();
-                var secondProduct = UUID.randomUUID();
+        assertThat(inventory.command.tenantId())
+                .isEqualTo(
+                        tenantId);
 
-                var order = service.create(
-                                new CreateOrderCommand(
-                                                UUID.randomUUID(),
-                                                UUID.randomUUID(),
-                                                List.of(
-                                                                new CreateOrderCommand.Item(
-                                                                                firstProduct,
-                                                                                2),
-                                                                new CreateOrderCommand.Item(
-                                                                                secondProduct,
-                                                                                4))));
+        assertThat(inventory.command.orderId())
+                .isEqualTo(
+                        orderId);
+    }
 
-                assertThat(order.items())
-                                .extracting(OrderItem::productId)
-                                .containsExactly(
-                                                firstProduct,
-                                                secondProduct);
+    @Test
+    void forwardsDuplicateVariantIdentityAndLeavesCatalogDeduplicationToCatalog() {
 
-                assertThat(order.items())
-                                .extracting(OrderItem::quantity)
-                                .containsExactly(
-                                                2,
-                                                4);
-        }
+        var transaction =
+                new RecordingTransactionExecutor();
 
-        @Test
-        void generatesOrderIdExactlyOnce() {
-                // Why: identity generation may later depend on database, distributed or
-                // externally coordinated mechanisms and must have deterministic cardinality.
-                // Covers: interaction count with OrderIdGenerator during one use-case
-                // execution.
-                // Prevents: multiple IDs being generated for the same logical order and
-                // inconsistencies between persisted and returned aggregate identities.
+        var catalog =
+                new RecordingCatalogValidator(
+                        transaction::isActive,
+                        new ArrayList<>());
 
-                var calls = new AtomicInteger();
-                var generatedId = UUID.randomUUID();
+        var inventory =
+                new RecordingInventoryCommitter(
+                        transaction::isActive,
+                        new ArrayList<>());
 
-                OrderIdGenerator generator = () -> {
-                        calls.incrementAndGet();
-                        return generatedId;
+        var variantId =
+                UUID.randomUUID();
+
+        var service =
+                new CreateOrderService(
+                        new RecordingOrderRepository(
+                                transaction::isActive,
+                                new ArrayList<>()),
+                        UUID::randomUUID,
+                        transaction,
+                        catalog,
+                        inventory);
+
+        service.create(
+                new CreateOrderCommand(
+                        UUID.randomUUID(),
+                        UUID.randomUUID(),
+                        List.of(
+                                new CreateOrderCommand.Item(
+                                        variantId,
+                                        2),
+                                new CreateOrderCommand.Item(
+                                        variantId,
+                                        3))));
+
+        assertThat(catalog.command.variantIds())
+                .containsExactly(
+                        variantId,
+                        variantId);
+
+        assertThat(inventory.command.demands())
+                .containsExactly(
+                        new CommitOrderInventoryCommand.Demand(
+                                variantId,
+                                2),
+                        new CommitOrderInventoryCommand.Demand(
+                                variantId,
+                                3));
+    }
+
+    @Test
+    void generatesOrderIdExactlyOnce() {
+
+        var calls =
+                new AtomicInteger();
+
+        var generatedId =
+                UUID.randomUUID();
+
+        OrderIdGenerator generator =
+                () -> {
+
+                    calls.incrementAndGet();
+
+                    return generatedId;
                 };
 
-                var service = new CreateOrderService(
-                                new RecordingOrderRepository(),
-                                generator);
+        var transaction =
+                new RecordingTransactionExecutor();
 
-                var order = service.create(
-                                new CreateOrderCommand(
-                                                UUID.randomUUID(),
-                                                UUID.randomUUID(),
-                                                List.of(
-                                                                new CreateOrderCommand.Item(
-                                                                                UUID.randomUUID(),
-                                                                                1))));
+        var service =
+                new CreateOrderService(
+                        new RecordingOrderRepository(
+                                transaction::isActive,
+                                new ArrayList<>()),
+                        generator,
+                        transaction,
+                        new RecordingCatalogValidator(
+                                transaction::isActive,
+                                new ArrayList<>()),
+                        new RecordingInventoryCommitter(
+                                transaction::isActive,
+                                new ArrayList<>()));
 
-                assertThat(calls)
-                                .hasValue(1);
-
-                assertThat(order.id())
-                                .isEqualTo(generatedId);
-        }
-
-        @Test
-        void doesNotPersistInvalidOrder() {
-                // Why: persistence must only receive aggregates that successfully satisfy
-                // domain invariants.
-                // Covers: execution ordering between domain creation and repository invocation.
-                // Prevents: invalid or partially constructed orders from crossing the
-                // persistence boundary when domain validation fails.
-
-                var repository = new RecordingOrderRepository();
-
-                var service = new CreateOrderService(
-                                repository,
-                                UUID::randomUUID);
-
-                var invalidCommand = new CreateOrderCommand(
+        var result =
+                service.create(
+                        new CreateOrderCommand(
                                 UUID.randomUUID(),
                                 UUID.randomUUID(),
-                                List.of());
+                                List.of(
+                                        new CreateOrderCommand.Item(
+                                                UUID.randomUUID(),
+                                                1))));
 
-                assertThatThrownBy(() -> service.create(invalidCommand))
-                                .isInstanceOf(IllegalArgumentException.class)
-                                .hasMessage("Order must contain at least one item");
+        assertThat(calls)
+                .hasValue(1);
 
-                assertThat(repository.saveCount)
-                                .isZero();
+        assertThat(result.order().id())
+                .isEqualTo(
+                        generatedId);
+    }
 
-                assertThat(repository.savedOrder)
-                                .isNull();
+    @Test
+    void doesNotOpenTransactionOrTouchCollaboratorsForInvalidOrder() {
+
+        var transaction =
+                new RecordingTransactionExecutor();
+
+        var repository =
+                new RecordingOrderRepository(
+                        transaction::isActive,
+                        new ArrayList<>());
+
+        var catalog =
+                new RecordingCatalogValidator(
+                        transaction::isActive,
+                        new ArrayList<>());
+
+        var inventory =
+                new RecordingInventoryCommitter(
+                        transaction::isActive,
+                        new ArrayList<>());
+
+        var service =
+                new CreateOrderService(
+                        repository,
+                        UUID::randomUUID,
+                        transaction,
+                        catalog,
+                        inventory);
+
+        assertThatThrownBy(() ->
+                service.create(
+                        new CreateOrderCommand(
+                                UUID.randomUUID(),
+                                UUID.randomUUID(),
+                                List.of())))
+                .isInstanceOf(
+                        IllegalArgumentException.class)
+                .hasMessage(
+                        "Order must contain at least one item");
+
+        assertThat(transaction.executionCount)
+                .isZero();
+
+        assertThat(repository.saveCount)
+                .isZero();
+
+        assertThat(catalog.validateCount)
+                .isZero();
+
+        assertThat(inventory.commitCount)
+                .isZero();
+    }
+
+    @Test
+    void propagatesCatalogRejectionAfterOrderPersistenceAndBeforeInventory() {
+
+        var transaction =
+                new RecordingTransactionExecutor();
+
+        var events =
+                new ArrayList<String>();
+
+        var repository =
+                new RecordingOrderRepository(
+                        transaction::isActive,
+                        events);
+
+        var catalog =
+                new RecordingCatalogValidator(
+                        transaction::isActive,
+                        events);
+
+        var inventory =
+                new RecordingInventoryCommitter(
+                        transaction::isActive,
+                        events);
+
+        var rejection =
+                new CatalogOrderabilityRejectedException();
+
+        catalog.failure =
+                rejection;
+
+        var service =
+                new CreateOrderService(
+                        repository,
+                        UUID::randomUUID,
+                        transaction,
+                        catalog,
+                        inventory);
+
+        assertThatThrownBy(() ->
+                service.create(
+                        new CreateOrderCommand(
+                                UUID.randomUUID(),
+                                UUID.randomUUID(),
+                                List.of(
+                                        new CreateOrderCommand.Item(
+                                                UUID.randomUUID(),
+                                                1)))))
+                .isSameAs(
+                        rejection);
+
+        assertThat(events)
+                .containsExactly(
+                        "order",
+                        "catalog");
+
+        assertThat(repository.saveCount)
+                .isEqualTo(1);
+
+        assertThat(catalog.validateCount)
+                .isEqualTo(1);
+
+        assertThat(inventory.commitCount)
+                .isZero();
+    }
+
+    @Test
+    void propagatesInventoryRejectionAfterCatalogAcceptance() {
+
+        var transaction =
+                new RecordingTransactionExecutor();
+
+        var events =
+                new ArrayList<String>();
+
+        var repository =
+                new RecordingOrderRepository(
+                        transaction::isActive,
+                        events);
+
+        var catalog =
+                new RecordingCatalogValidator(
+                        transaction::isActive,
+                        events);
+
+        var inventory =
+                new RecordingInventoryCommitter(
+                        transaction::isActive,
+                        events);
+
+        var rejection =
+                new InventoryCommitmentRejectedException();
+
+        inventory.failure =
+                rejection;
+
+        var service =
+                new CreateOrderService(
+                        repository,
+                        UUID::randomUUID,
+                        transaction,
+                        catalog,
+                        inventory);
+
+        assertThatThrownBy(() ->
+                service.create(
+                        new CreateOrderCommand(
+                                UUID.randomUUID(),
+                                UUID.randomUUID(),
+                                List.of(
+                                        new CreateOrderCommand.Item(
+                                                UUID.randomUUID(),
+                                                1)))))
+                .isSameAs(
+                        rejection);
+
+        assertThat(events)
+                .containsExactly(
+                        "order",
+                        "catalog",
+                        "inventory");
+
+        assertThat(repository.saveCount)
+                .isEqualTo(1);
+
+        assertThat(catalog.validateCount)
+                .isEqualTo(1);
+
+        assertThat(inventory.commitCount)
+                .isEqualTo(1);
+    }
+
+    private static final class RecordingTransactionExecutor
+            implements TransactionExecutor {
+
+        private int executionCount;
+        private boolean active;
+
+        @Override
+        public <T> T execute(
+                Supplier<T> work) {
+
+            executionCount++;
+            active = true;
+
+            try {
+
+                return work.get();
+
+            } finally {
+
+                active = false;
+            }
         }
 
-        private static final class RecordingOrderRepository
-                        implements OrderRepository {
+        boolean isActive() {
 
-                private Order savedOrder;
-                private int saveCount;
-
-                /**
-                 * Records persistence interactions performed by the application service.
-                 *
-                 * <p>
-                 * This test double intentionally contains no infrastructure behavior.
-                 * Its only responsibility is to expose whether an aggregate crossed the
-                 * repository output port and how many times that occurred.
-                 * </p>
-                 *
-                 * @param order aggregate sent for persistence
-                 * @return the same aggregate, reproducing the contract currently expected
-                 *         from OrderRepository.save
-                 */
-                @Override
-                public Order save(Order order) {
-                        this.savedOrder = order;
-                        this.saveCount++;
-
-                        return order;
-                }
-
-                /**
-                 * Satisfies the tenant-scoped read contract without introducing behavior that
-                 * is irrelevant to CreateOrderService tests.
-                 *
-                 * <p>
-                 * This test double exists only to record persistence writes. Read behavior
-                 * is therefore intentionally empty because the application service under test
-                 * never performs repository lookups.
-                 * </p>
-                 *
-                 * @param tenantId tenant boundary requested by the repository contract
-                 * @param orderId  Order aggregate identifier requested by the repository
-                 *                 contract
-                 * @return always empty because reads are outside this test double's purpose
-                 */
-                @Override
-                public Optional<Order> findById(
-                                UUID tenantId,
-                                UUID orderId) {
-
-                        return Optional.empty();
-                }
+            return active;
         }
+    }
+
+    private static final class RecordingOrderRepository
+            implements OrderRepository {
+
+        private final BooleanSupplier transactionActive;
+        private final List<String> events;
+
+        private int saveCount;
+        private boolean saveObservedInsideTransaction;
+
+        RecordingOrderRepository(
+                BooleanSupplier transactionActive,
+                List<String> events) {
+
+            this.transactionActive =
+                    transactionActive;
+
+            this.events =
+                    events;
+        }
+
+        @Override
+        public Order save(
+                Order order) {
+
+            saveCount++;
+
+            saveObservedInsideTransaction =
+                    transactionActive.getAsBoolean();
+
+            events.add(
+                    "order");
+
+            return order;
+        }
+
+        @Override
+        public Optional<Order> findById(
+                UUID tenantId,
+                UUID orderId) {
+
+            return Optional.empty();
+        }
+    }
+
+    private static final class RecordingCatalogValidator
+            implements ValidateOrderableVariantsUseCase {
+
+        private final BooleanSupplier transactionActive;
+        private final List<String> events;
+
+        private ValidateOrderableVariantsCommand command;
+        private int validateCount;
+        private boolean validateObservedInsideTransaction;
+        private RuntimeException failure;
+
+        RecordingCatalogValidator(
+                BooleanSupplier transactionActive,
+                List<String> events) {
+
+            this.transactionActive =
+                    transactionActive;
+
+            this.events =
+                    events;
+        }
+
+        @Override
+        public void validate(
+                ValidateOrderableVariantsCommand command) {
+
+            this.command =
+                    command;
+
+            validateCount++;
+
+            validateObservedInsideTransaction =
+                    transactionActive.getAsBoolean();
+
+            events.add(
+                    "catalog");
+
+            if (failure != null) {
+
+                throw failure;
+            }
+        }
+    }
+
+    private static final class RecordingInventoryCommitter
+            implements CommitOrderInventoryUseCase {
+
+        private final BooleanSupplier transactionActive;
+        private final List<String> events;
+
+        private CommitOrderInventoryCommand command;
+        private int commitCount;
+        private boolean commitObservedInsideTransaction;
+        private RuntimeException failure;
+
+        RecordingInventoryCommitter(
+                BooleanSupplier transactionActive,
+                List<String> events) {
+
+            this.transactionActive =
+                    transactionActive;
+
+            this.events =
+                    events;
+        }
+
+        @Override
+        public InventoryAllocationOutcome commit(
+                CommitOrderInventoryCommand command) {
+
+            this.command =
+                    command;
+
+            commitCount++;
+
+            commitObservedInsideTransaction =
+                    transactionActive.getAsBoolean();
+
+            events.add(
+                    "inventory");
+
+            if (failure != null) {
+
+                throw failure;
+            }
+
+            return InventoryAllocationOutcome.FULLY_ALLOCATED;
+        }
+    }
 }

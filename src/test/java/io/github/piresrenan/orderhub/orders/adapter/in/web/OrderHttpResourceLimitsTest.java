@@ -26,6 +26,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderAllocationOutcome;
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderResult;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
 import io.github.piresrenan.orderhub.orders.domain.model.Order;
 import io.github.piresrenan.orderhub.orders.domain.model.OrderItem;
@@ -251,7 +253,10 @@ class OrderHttpResourceLimitsTest {
                                                 2)));
 
                 when(createOrderUseCase.create(any(CreateOrderCommand.class)))
-                                .thenReturn(order);
+                                .thenReturn(
+                                                new CreateOrderResult(
+                                                                order,
+                                                                CreateOrderAllocationOutcome.FULLY_ALLOCATED));
         }
 
         /**
@@ -273,7 +278,7 @@ class OrderHttpResourceLimitsTest {
                 var items = IntStream.range(0, itemCount)
                                 .mapToObj(index -> """
                                                 {
-                                                  "productId": "33333333-3333-3333-3333-333333333333",
+                                                  "variantId": "33333333-3333-3333-3333-333333333333",
                                                   "quantity": 1
                                                 }
                                                 """)
@@ -298,7 +303,7 @@ class OrderHttpResourceLimitsTest {
                                 {
                                   "customerId": "22222222-2222-2222-2222-222222222222",
                                   "items": [{
-                                    "productId": "33333333-3333-3333-3333-333333333333",
+                                    "variantId": "33333333-3333-3333-3333-333333333333",
                                     "quantity": 1
                                   }]
                                 }

@@ -3,8 +3,9 @@ package io.github.piresrenan.orderhub.orders.domain.model;
 import java.util.UUID;
 
 public record OrderItem(
-        UUID productId,
+        UUID variantId,
         int quantity) {
+
     /**
      * Validates the invariants required for an item to participate in an order.
      *
@@ -14,16 +15,20 @@ public record OrderItem(
      * invalid order items by bypassing the web layer.
      * </p>
      *
-     * @throws IllegalArgumentException when the product identifier is absent or
+     * @throws IllegalArgumentException when the variant identifier is absent or
      *                                  the requested quantity is not greater than
      *                                  zero
      */
     public OrderItem {
-        if (productId == null) {
-            throw new IllegalArgumentException("O ID do produto não pode estar vazio.");
+
+        if (variantId == null) {
+            throw new IllegalArgumentException(
+                    "O ID da variante não pode estar vazio.");
         }
+
         if (quantity <= 0) {
-            throw new IllegalArgumentException("A quantidade do item deve ser maior que zero.");
+            throw new IllegalArgumentException(
+                    "A quantidade do item deve ser maior que zero.");
         }
     }
 }

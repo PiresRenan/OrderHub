@@ -40,6 +40,8 @@ import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.jwk.RSAKey;
 
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderAllocationOutcome;
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderResult;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
 import io.github.piresrenan.orderhub.orders.domain.model.Order;
 import io.github.piresrenan.orderhub.orders.domain.model.OrderItem;
@@ -109,7 +111,7 @@ class SecurityRealJwtOrdersHttpEndToEndTest {
         var customerId =
                 UUID.randomUUID();
 
-        var productId =
+        var variantId =
                 UUID.randomUUID();
 
         allowIdentity(
@@ -127,16 +129,21 @@ class SecurityRealJwtOrdersHttpEndToEndTest {
                                     0,
                                     CreateOrderCommand.class);
 
-                    return Order.create(
-                            UUID.randomUUID(),
-                            command.tenantId(),
-                            command.customerId(),
-                            command.items()
-                                    .stream()
-                                    .map(item -> new OrderItem(
-                                            item.productId(),
-                                            item.quantity()))
-                                    .toList());
+                    var order =
+                            Order.create(
+                                    UUID.randomUUID(),
+                                    command.tenantId(),
+                                    command.customerId(),
+                                    command.items()
+                                            .stream()
+                                            .map(item -> new OrderItem(
+                                                    item.variantId(),
+                                                    item.quantity()))
+                                            .toList());
+
+                    return new CreateOrderResult(
+                            order,
+                            CreateOrderAllocationOutcome.FULLY_ALLOCATED);
                 });
 
         mockMvc.perform(
@@ -153,7 +160,7 @@ class SecurityRealJwtOrdersHttpEndToEndTest {
                                 .content(
                                         validBody(
                                                 customerId,
-                                                productId)))
+                                                variantId)))
                 .andExpect(
                         status().isCreated())
                 .andExpect(
@@ -372,20 +379,25 @@ class SecurityRealJwtOrdersHttpEndToEndTest {
                                     0,
                                     CreateOrderCommand.class);
 
-                    return Order.create(
-                            UUID.randomUUID(),
-                            command.tenantId(),
-                            command.customerId(),
-                            List.of(
-                                    new OrderItem(
-                                            UUID.randomUUID(),
-                                            1)));
+                    var order =
+                            Order.create(
+                                    UUID.randomUUID(),
+                                    command.tenantId(),
+                                    command.customerId(),
+                                    List.of(
+                                            new OrderItem(
+                                                    UUID.randomUUID(),
+                                                    1)));
+
+                    return new CreateOrderResult(
+                            order,
+                            CreateOrderAllocationOutcome.FULLY_ALLOCATED);
                 });
 
         var customerId =
                 UUID.randomUUID();
 
-        var productId =
+        var variantId =
                 UUID.randomUUID();
 
         var token =
@@ -405,7 +417,7 @@ class SecurityRealJwtOrdersHttpEndToEndTest {
                                 .content(
                                         validBody(
                                                 customerId,
-                                                productId)))
+                                                variantId)))
                 .andExpect(
                         status().isCreated());
 
@@ -423,7 +435,7 @@ class SecurityRealJwtOrdersHttpEndToEndTest {
                                 .content(
                                         validBody(
                                                 customerId,
-                                                productId)))
+                                                variantId)))
                 .andExpect(
                         status().isForbidden());
 
@@ -514,19 +526,19 @@ class SecurityRealJwtOrdersHttpEndToEndTest {
 
     private static String validBody(
             UUID customerId,
-            UUID productId) {
+            UUID variantId) {
 
         return """
                 {
                   "customerId": "%s",
                   "items": [{
-                    "productId": "%s",
+                    "variantId": "%s",
                     "quantity": 2
                   }]
                 }
                 """.formatted(
                 customerId,
-                productId);
+                variantId);
     }
 
     private static RSAKey generateRsaKey(

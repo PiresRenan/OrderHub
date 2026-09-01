@@ -33,6 +33,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderAllocationOutcome;
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderResult;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
 import io.github.piresrenan.orderhub.orders.domain.model.Order;
 import io.github.piresrenan.orderhub.orders.domain.model.OrderItem;
@@ -90,28 +92,32 @@ class OrderControllerTest {
                 var orderId = UUID.randomUUID();
                 var tenantId = UUID.randomUUID();
                 var customerId = UUID.randomUUID();
-                var productId = UUID.randomUUID();
+                var variantId = UUID.randomUUID();
 
                 var order = Order.create(
                                 orderId,
                                 tenantId,
                                 customerId,
-                                List.of(new OrderItem(productId, 2)));
+                                List.of(new OrderItem(variantId, 2)));
 
                 when(createOrderUseCase.create(any(CreateOrderCommand.class)))
-                                .thenReturn(order);
+                                .thenReturn(
+                                                new CreateOrderResult(
+                                                                order,
+                                                                CreateOrderAllocationOutcome.FULLY_ALLOCATED));
 
                 mockMvc.perform(authenticatedPost()
                                 .header("X-Tenant-Id", tenantId)
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content(validBody(customerId, productId)))
+                                .content(validBody(customerId, variantId)))
                                 .andExpect(status().isCreated())
                                 .andExpect(jsonPath("$.id").value(orderId.toString()))
                                 .andExpect(jsonPath("$.tenantId").value(tenantId.toString()))
                                 .andExpect(jsonPath("$.customerId").value(customerId.toString()))
                                 .andExpect(jsonPath("$.status").value("CREATED"))
-                                .andExpect(jsonPath("$.items[0].productId")
-                                                .value(productId.toString()))
+                                .andExpect(jsonPath("$.allocationOutcome").value("FULLY_ALLOCATED"))
+                                .andExpect(jsonPath("$.items[0].variantId")
+                                                .value(variantId.toString()))
                                 .andExpect(jsonPath("$.items[0].quantity").value(2));
 
                 var captor = ArgumentCaptor.forClass(CreateOrderCommand.class);
@@ -238,7 +244,7 @@ class OrderControllerTest {
                 // Prevents: clients believing that an ignored field was processed.
 
                 var customerId = UUID.randomUUID();
-                var productId = UUID.randomUUID();
+                var variantId = UUID.randomUUID();
 
                 var body = """
                                 {
@@ -246,12 +252,12 @@ class OrderControllerTest {
                                   "unexpectedField": "ignored-by-loose-parsers",
                                   "items": [
                                     {
-                                      "productId": "%s",
+                                      "variantId": "%s",
                                       "quantity": 2
                                     }
                                   ]
                                 }
-                                """.formatted(customerId, productId);
+                                """.formatted(customerId, variantId);
 
                 mockMvc.perform(authenticatedPost()
                                 .header("X-Tenant-Id", UUID.randomUUID())
@@ -398,7 +404,7 @@ class OrderControllerTest {
                 // Prevents: unnecessarily rejecting standards-compatible client requests.
 
                 var customerId = UUID.randomUUID();
-                var productId = UUID.randomUUID();
+                var variantId = UUID.randomUUID();
 
                 stubSuccessfulOrder();
 
@@ -407,7 +413,7 @@ class OrderControllerTest {
                                 .contentType(MediaType.parseMediaType(
                                                 "application/json;charset=UTF-8"))
                                 .accept(MediaType.APPLICATION_JSON)
-                                .content(validBody(customerId, productId)))
+                                .content(validBody(customerId, variantId)))
                                 .andExpect(status().isCreated());
 
                 verify(createOrderUseCase).create(any(CreateOrderCommand.class));
@@ -446,7 +452,7 @@ class OrderControllerTest {
                                                                 {
                                                                   "customerId": "synthetic-invalid-customer-uuid",
                                                                   "items": [{
-                                                                    "productId": "33333333-3333-3333-3333-333333333333",
+                                                                    "variantId": "33333333-3333-3333-3333-333333333333",
                                                                     "quantity": 2
                                                                   }]
                                                                 }
@@ -459,7 +465,7 @@ class OrderControllerTest {
                                                                 {
                                                                   "customerId": "22222222-2222-2222-2222-222222222222",
                                                                   "items": [{
-                                                                    "productId": "synthetic-invalid-product-uuid",
+                                                                    "variantId": "synthetic-invalid-product-uuid",
                                                                     "quantity": 2
                                                                   }]
                                                                 }
@@ -472,7 +478,7 @@ class OrderControllerTest {
                                                                 {
                                                                   "customerId": 987654321,
                                                                   "items": [{
-                                                                    "productId": "33333333-3333-3333-3333-333333333333",
+                                                                    "variantId": "33333333-3333-3333-3333-333333333333",
                                                                     "quantity": 2
                                                                   }]
                                                                 }
@@ -480,12 +486,12 @@ class OrderControllerTest {
                                                 "987654321"),
 
                                 Arguments.of(
-                                                "object productId instead of UUID string",
+                                                "object variantId instead of UUID string",
                                                 """
                                                                 {
                                                                   "customerId": "22222222-2222-2222-2222-222222222222",
                                                                   "items": [{
-                                                                    "productId": {
+                                                                    "variantId": {
                                                                       "raw": "synthetic-product-object-marker"
                                                                     },
                                                                     "quantity": 2
@@ -500,7 +506,7 @@ class OrderControllerTest {
                                                                 {
                                                                   "customerId": "22222222-2222-2222-2222-222222222222",
                                                                   "items": [{
-                                                                    "productId": "33333333-3333-3333-3333-333333333333",
+                                                                    "variantId": "33333333-3333-3333-3333-333333333333",
                                                                     "quantity": 2.75
                                                                   }]
                                                                 }
@@ -513,7 +519,7 @@ class OrderControllerTest {
                                                                 {
                                                                   "customerId": "22222222-2222-2222-2222-222222222222",
                                                                   "items": [{
-                                                                    "productId": "33333333-3333-3333-3333-333333333333",
+                                                                    "variantId": "33333333-3333-3333-3333-333333333333",
                                                                     "quantity": 2147483648
                                                                   }]
                                                                 }
@@ -526,7 +532,7 @@ class OrderControllerTest {
                                                                 {
                                                                   "customerId": "22222222-2222-2222-2222-222222222222",
                                                                   "items": [{
-                                                                    "productId": "33333333-3333-3333-3333-333333333333",
+                                                                    "variantId": "33333333-3333-3333-3333-333333333333",
                                                                     "quantity": -2147483649
                                                                   }]
                                                                 }
@@ -549,7 +555,7 @@ class OrderControllerTest {
                                                                   "customerId": "11111111-1111-1111-1111-111111111111",
                                                                   "customerId": "22222222-2222-2222-2222-222222222222",
                                                                   "items": [{
-                                                                    "productId": "33333333-3333-3333-3333-333333333333",
+                                                                    "variantId": "33333333-3333-3333-3333-333333333333",
                                                                     "quantity": 2
                                                                   }]
                                                                 }
@@ -557,13 +563,13 @@ class OrderControllerTest {
                                                 "22222222-2222-2222-2222-222222222222"),
 
                                 Arguments.of(
-                                                "duplicate productId",
+                                                "duplicate variantId",
                                                 """
                                                                 {
                                                                   "customerId": "22222222-2222-2222-2222-222222222222",
                                                                   "items": [{
-                                                                    "productId": "33333333-3333-3333-3333-333333333333",
-                                                                    "productId": "44444444-4444-4444-4444-444444444444",
+                                                                    "variantId": "33333333-3333-3333-3333-333333333333",
+                                                                    "variantId": "44444444-4444-4444-4444-444444444444",
                                                                     "quantity": 2
                                                                   }]
                                                                 }
@@ -576,7 +582,7 @@ class OrderControllerTest {
                                                                 {
                                                                   "customerId": "22222222-2222-2222-2222-222222222222",
                                                                   "items": [{
-                                                                    "productId": "33333333-3333-3333-3333-333333333333",
+                                                                    "variantId": "33333333-3333-3333-3333-333333333333",
                                                                     "quantity": 2,
                                                                     "quantity": 999999937
                                                                   }]
@@ -600,7 +606,7 @@ class OrderControllerTest {
                                                                 {
                                                                   "customerId": "22222222-2222-2222-2222-222222222222",
                                                                   "items": [{
-                                                                    "productId": "33333333-3333-3333-3333-333333333333",
+                                                                    "variantId": "33333333-3333-3333-3333-333333333333",
                                                                     "quantity": null
                                                                   }]
                                                                 }
@@ -610,7 +616,7 @@ class OrderControllerTest {
                                                 """
                                                                 {
                                                                   "items": [{
-                                                                    "productId": "33333333-3333-3333-3333-333333333333",
+                                                                    "variantId": "33333333-3333-3333-3333-333333333333",
                                                                     "quantity": 2
                                                                   }]
                                                                 }
@@ -648,7 +654,7 @@ class OrderControllerTest {
 
                                 // Why: every order item must reference a concrete product.
                                 Arguments.of(
-                                                "missing productId",
+                                                "missing variantId",
                                                 """
                                                                 {
                                                                   "customerId": "22222222-2222-2222-2222-222222222222",
@@ -665,7 +671,7 @@ class OrderControllerTest {
                                                                 {
                                                                   "customerId": "22222222-2222-2222-2222-222222222222",
                                                                   "items": [{
-                                                                    "productId": "33333333-3333-3333-3333-333333333333"
+                                                                    "variantId": "33333333-3333-3333-3333-333333333333"
                                                                   }]
                                                                 }
                                                                 """),
@@ -677,7 +683,7 @@ class OrderControllerTest {
                                                                 {
                                                                   "customerId": "22222222-2222-2222-2222-222222222222",
                                                                   "items": [{
-                                                                    "productId": "33333333-3333-3333-3333-333333333333",
+                                                                    "variantId": "33333333-3333-3333-3333-333333333333",
                                                                     "quantity": 0
                                                                   }]
                                                                 }
@@ -690,7 +696,7 @@ class OrderControllerTest {
                                                                 {
                                                                   "customerId": "22222222-2222-2222-2222-222222222222",
                                                                   "items": [{
-                                                                    "productId": "33333333-3333-3333-3333-333333333333",
+                                                                    "variantId": "33333333-3333-3333-3333-333333333333",
                                                                     "quantity": -1
                                                                   }]
                                                                 }
@@ -713,7 +719,10 @@ class OrderControllerTest {
                                                 2)));
 
                 when(createOrderUseCase.create(any(CreateOrderCommand.class)))
-                                .thenReturn(order);
+                                .thenReturn(
+                                                new CreateOrderResult(
+                                                                order,
+                                                                CreateOrderAllocationOutcome.FULLY_ALLOCATED));
         }
 
         /**
@@ -722,18 +731,18 @@ class OrderControllerTest {
          */
         private static String validBody(
                         UUID customerId,
-                        UUID productId) {
+                        UUID variantId) {
 
                 return """
                                 {
                                   "customerId": "%s",
                                   "items": [
                                     {
-                                      "productId": "%s",
+                                      "variantId": "%s",
                                       "quantity": 2
                                     }
                                   ]
                                 }
-                                """.formatted(customerId, productId);
+                                """.formatted(customerId, variantId);
         }
 }
