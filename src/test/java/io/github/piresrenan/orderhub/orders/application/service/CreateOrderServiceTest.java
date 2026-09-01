@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 
 import io.github.piresrenan.orderhub.inventory.application.port.in.CommitOrderInventoryCommand;
 import io.github.piresrenan.orderhub.inventory.application.port.in.CommitOrderInventoryUseCase;
+import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryAllocationOutcome;
 import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryCommitmentRejectedException;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderIdGenerator;
@@ -62,7 +63,7 @@ class CreateOrderServiceTest {
                         transaction,
                         inventory);
 
-        var order =
+        var result =
                 service.create(
                         new CreateOrderCommand(
                                 tenantId,
@@ -72,7 +73,7 @@ class CreateOrderServiceTest {
                                                 variantId,
                                                 2))));
 
-        assertThat(order.id())
+        assertThat(result.order().id())
                 .isEqualTo(orderId);
 
         assertThat(repository.saveCount)
@@ -179,7 +180,7 @@ class CreateOrderServiceTest {
                                 transaction::isActive,
                                 new ArrayList<>()));
 
-        var order =
+        var result =
                 service.create(
                         new CreateOrderCommand(
                                 UUID.randomUUID(),
@@ -192,7 +193,7 @@ class CreateOrderServiceTest {
         assertThat(calls)
                 .hasValue(1);
 
-        assertThat(order.id())
+        assertThat(result.order().id())
                 .isEqualTo(generatedId);
     }
 
@@ -388,7 +389,7 @@ class CreateOrderServiceTest {
         }
 
         @Override
-        public void commit(
+        public InventoryAllocationOutcome commit(
                 CommitOrderInventoryCommand command) {
 
             this.command =
@@ -405,6 +406,8 @@ class CreateOrderServiceTest {
             if (failure != null) {
                 throw failure;
             }
+
+            return InventoryAllocationOutcome.FULLY_ALLOCATED;
         }
     }
 }

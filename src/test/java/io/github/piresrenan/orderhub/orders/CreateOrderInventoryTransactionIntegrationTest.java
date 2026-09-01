@@ -18,6 +18,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryCommitmentRejectedException;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderAllocationOutcome;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
 import io.github.piresrenan.orderhub.orders.domain.model.OrderStatus;
 import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
@@ -67,7 +68,7 @@ class CreateOrderInventoryTransactionIntegrationTest {
                 VARIANT_A,
                 10);
 
-        var order =
+        var result =
                 createOrderUseCase.create(
                         command(
                                 UUID.randomUUID(),
@@ -84,7 +85,7 @@ class CreateOrderInventoryTransactionIntegrationTest {
                           AND id = ?
                         """,
                         TENANT_ID,
-                        order.id()))
+                        result.order().id()))
                 .isEqualTo(1);
 
         assertThat(
@@ -97,7 +98,7 @@ class CreateOrderInventoryTransactionIntegrationTest {
                           AND quantity = 3
                         """,
                         TENANT_ID,
-                        order.id(),
+                        result.order().id(),
                         VARIANT_A))
                 .isEqualTo(1);
 
@@ -124,7 +125,7 @@ class CreateOrderInventoryTransactionIntegrationTest {
                           AND backordered_quantity = 0
                         """,
                         TENANT_ID,
-                        order.id(),
+                        result.order().id(),
                         VARIANT_A))
                 .isEqualTo(1);
     }
@@ -208,7 +209,7 @@ class CreateOrderInventoryTransactionIntegrationTest {
                 VARIANT_A,
                 5);
 
-        var order =
+        var result =
                 createOrderUseCase.create(
                         command(
                                 UUID.randomUUID(),
@@ -229,7 +230,7 @@ class CreateOrderInventoryTransactionIntegrationTest {
                           AND variant_id = ?
                         """,
                         TENANT_ID,
-                        order.id(),
+                        result.order().id(),
                         VARIANT_A))
                 .isEqualTo(2);
 
@@ -254,7 +255,7 @@ class CreateOrderInventoryTransactionIntegrationTest {
                           AND requested_quantity = 5
                         """,
                         TENANT_ID,
-                        order.id(),
+                        result.order().id(),
                         VARIANT_A))
                 .isEqualTo(1);
     }
@@ -269,7 +270,7 @@ class CreateOrderInventoryTransactionIntegrationTest {
                 VARIANT_A,
                 2);
 
-        var order =
+        var result =
                 createOrderUseCase.create(
                         command(
                                 UUID.randomUUID(),
@@ -278,9 +279,13 @@ class CreateOrderInventoryTransactionIntegrationTest {
                                                 VARIANT_A,
                                                 5))));
 
-        assertThat(order.status())
+        assertThat(result.order().status())
                 .isEqualTo(
                         OrderStatus.CREATED);
+
+        assertThat(result.allocationOutcome())
+                .isEqualTo(
+                        CreateOrderAllocationOutcome.PARTIALLY_BACKORDERED);
 
         assertThat(
                 scalar("""
@@ -316,7 +321,7 @@ class CreateOrderInventoryTransactionIntegrationTest {
                           AND backordered_quantity = 3
                         """,
                         TENANT_ID,
-                        order.id(),
+                        result.order().id(),
                         VARIANT_A))
                 .isEqualTo(1);
     }

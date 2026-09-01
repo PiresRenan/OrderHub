@@ -154,6 +154,10 @@ class CreateOrderIntegrationTest {
                                 .value(
                                         "CREATED"))
                 .andExpect(
+                        jsonPath("$.allocationOutcome")
+                                .value(
+                                        "FULLY_ALLOCATED"))
+                .andExpect(
                         jsonPath("$.items[0].variantId")
                                 .value(
                                         variantId.toString()));

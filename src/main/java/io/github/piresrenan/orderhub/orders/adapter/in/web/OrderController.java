@@ -55,7 +55,7 @@ public final class OrderController {
      *
      * @param tenantContext trusted Tenant context established by Security
      * @param request validated HTTP payload
-     * @return created Order represented by the public HTTP contract
+     * @return created Order and its independent Inventory allocation outcome
      */
     @PostMapping(
             consumes = MediaType.APPLICATION_JSON_VALUE,
@@ -83,7 +83,7 @@ public final class OrderController {
                         request.customerId(),
                         items);
 
-        var order =
+        var result =
                 createOrderUseCase.create(
                         command);
 
@@ -91,6 +91,6 @@ public final class OrderController {
                 .status(HttpStatus.CREATED)
                 .body(
                         OrderResponse.from(
-                                order));
+                                result));
     }
 }

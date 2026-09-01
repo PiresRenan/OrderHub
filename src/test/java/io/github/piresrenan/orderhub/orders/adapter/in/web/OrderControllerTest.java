@@ -33,6 +33,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderAllocationOutcome;
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderResult;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
 import io.github.piresrenan.orderhub.orders.domain.model.Order;
 import io.github.piresrenan.orderhub.orders.domain.model.OrderItem;
@@ -99,7 +101,10 @@ class OrderControllerTest {
                                 List.of(new OrderItem(variantId, 2)));
 
                 when(createOrderUseCase.create(any(CreateOrderCommand.class)))
-                                .thenReturn(order);
+                                .thenReturn(
+                                                new CreateOrderResult(
+                                                                order,
+                                                                CreateOrderAllocationOutcome.FULLY_ALLOCATED));
 
                 mockMvc.perform(authenticatedPost()
                                 .header("X-Tenant-Id", tenantId)
@@ -110,6 +115,7 @@ class OrderControllerTest {
                                 .andExpect(jsonPath("$.tenantId").value(tenantId.toString()))
                                 .andExpect(jsonPath("$.customerId").value(customerId.toString()))
                                 .andExpect(jsonPath("$.status").value("CREATED"))
+                                .andExpect(jsonPath("$.allocationOutcome").value("FULLY_ALLOCATED"))
                                 .andExpect(jsonPath("$.items[0].variantId")
                                                 .value(variantId.toString()))
                                 .andExpect(jsonPath("$.items[0].quantity").value(2));
@@ -713,7 +719,10 @@ class OrderControllerTest {
                                                 2)));
 
                 when(createOrderUseCase.create(any(CreateOrderCommand.class)))
-                                .thenReturn(order);
+                                .thenReturn(
+                                                new CreateOrderResult(
+                                                                order,
+                                                                CreateOrderAllocationOutcome.FULLY_ALLOCATED));
         }
 
         /**

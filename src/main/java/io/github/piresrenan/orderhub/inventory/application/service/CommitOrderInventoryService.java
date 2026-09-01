@@ -5,6 +5,7 @@ import java.util.TreeMap;
 
 import io.github.piresrenan.orderhub.inventory.application.port.in.CommitOrderInventoryCommand;
 import io.github.piresrenan.orderhub.inventory.application.port.in.CommitOrderInventoryUseCase;
+import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryAllocationOutcome;
 import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryCommitmentRejectedException;
 import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryOperationException;
 import io.github.piresrenan.orderhub.inventory.application.port.out.InventoryCommitmentIdGenerator;
@@ -14,7 +15,9 @@ import io.github.piresrenan.orderhub.inventory.application.port.out.InventoryPol
 import io.github.piresrenan.orderhub.inventory.application.port.out.InventoryPositionRepository;
 import io.github.piresrenan.orderhub.inventory.application.port.out.InventoryTimeProvider;
 import io.github.piresrenan.orderhub.inventory.domain.model.InsufficientInventoryException;
+import io.github.piresrenan.orderhub.inventory.domain.model.InventoryAllocation;
 import io.github.piresrenan.orderhub.inventory.domain.model.InventoryCommitment;
+import io.github.piresrenan.orderhub.inventory.domain.model.InventoryPolicy;
 
 /**
  * Commits all Inventory demand belonging to one Order.
@@ -68,7 +71,7 @@ public final class CommitOrderInventoryService
     }
 
     @Override
-    public void commit(
+    public InventoryAllocationOutcome commit(
             CommitOrderInventoryCommand command) {
 
         Objects.requireNonNull(
@@ -94,6 +97,12 @@ public final class CommitOrderInventoryService
                             .orElseThrow(
                                     InventoryCommitmentRejectedException::new);
 
+            var anyAllocated =
+                    false;
+
+            var anyBackordered =
+                    false;
+
             for (var demand :
                     aggregatedDemand.entrySet()) {
 
@@ -110,6 +119,16 @@ public final class CommitOrderInventoryService
                                 requestedQuantity,
                                 policy);
 
+                if (allocation.allocatedQuantity() > 0) {
+                    anyAllocated =
+                            true;
+                }
+
+                if (allocation.backorderedQuantity() > 0) {
+                    anyBackordered =
+                            true;
+                }
+
                 var commitment =
                         InventoryCommitment.create(
                                 commitmentIdGenerator.generate(),
@@ -125,6 +144,10 @@ public final class CommitOrderInventoryService
                         commitment);
             }
 
+            return classifyOutcome(
+                    anyAllocated,
+                    anyBackordered);
+
         } catch (InventoryPersistenceException exception) {
 
             throw new InventoryOperationException(
@@ -132,12 +155,25 @@ public final class CommitOrderInventoryService
         }
     }
 
-    private io.github.piresrenan.orderhub.inventory.domain.model.InventoryAllocation
-            commitPosition(
-                    CommitOrderInventoryCommand command,
-                    java.util.UUID variantId,
-                    long requestedQuantity,
-                    io.github.piresrenan.orderhub.inventory.domain.model.InventoryPolicy policy) {
+    private static InventoryAllocationOutcome classifyOutcome(
+            boolean anyAllocated,
+            boolean anyBackordered) {
+
+        if (anyBackordered) {
+
+            return anyAllocated
+                    ? InventoryAllocationOutcome.PARTIALLY_BACKORDERED
+                    : InventoryAllocationOutcome.FULLY_BACKORDERED;
+        }
+
+        return InventoryAllocationOutcome.FULLY_ALLOCATED;
+    }
+
+    private InventoryAllocation commitPosition(
+            CommitOrderInventoryCommand command,
+            java.util.UUID variantId,
+            long requestedQuantity,
+            InventoryPolicy policy) {
 
         try {
 

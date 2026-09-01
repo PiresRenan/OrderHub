@@ -8,7 +8,9 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
 
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderAllocationOutcome;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderResult;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
 import io.github.piresrenan.orderhub.orders.domain.model.Order;
 import io.github.piresrenan.orderhub.orders.domain.model.OrderItem;
@@ -18,11 +20,6 @@ class OrderControllerTrustedTenantContextTest {
 
     @Test
     void createsOrderCommandFromTrustedTenantContext() {
-        // Why: Orders must receive Tenant authority only after Security has
-        // verified the authenticated User's membership.
-        // Covers: TrustedTenantContext -> CreateOrderCommand tenant propagation.
-        // Prevents: the controller constructing application commands directly
-        // from an untrusted X-Tenant-Id value.
 
         var trustedTenantId =
                 UUID.randomUUID();
@@ -38,17 +35,23 @@ class OrderControllerTrustedTenantContextTest {
 
         CreateOrderUseCase createOrder =
                 command -> {
+
                     capturedCommand.set(
                             command);
 
-                    return Order.create(
-                            UUID.randomUUID(),
-                            command.tenantId(),
-                            command.customerId(),
-                            List.of(
-                                    new OrderItem(
-                                            variantId,
-                                            2)));
+                    var order =
+                            Order.create(
+                                    UUID.randomUUID(),
+                                    command.tenantId(),
+                                    command.customerId(),
+                                    List.of(
+                                            new OrderItem(
+                                                    variantId,
+                                                    2)));
+
+                    return new CreateOrderResult(
+                            order,
+                            CreateOrderAllocationOutcome.FULLY_ALLOCATED);
                 };
 
         var controller =
@@ -71,6 +74,7 @@ class OrderControllerTrustedTenantContextTest {
 
         assertThat(capturedCommand)
                 .hasValueSatisfying(command -> {
+
                     assertThat(command.tenantId())
                             .isEqualTo(
                                     trustedTenantId);
@@ -82,6 +86,7 @@ class OrderControllerTrustedTenantContextTest {
                     assertThat(command.items())
                             .singleElement()
                             .satisfies(item -> {
+
                                 assertThat(item.variantId())
                                         .isEqualTo(
                                                 variantId);
@@ -96,11 +101,6 @@ class OrderControllerTrustedTenantContextTest {
     @Test
     void createEndpointDeclaresTrustedTenantContextInsteadOfRawTenantUuid()
             throws Exception {
-
-        // Why: the controller signature itself is part of the trust boundary.
-        // Covers: removal of the raw Tenant UUID parameter from OrderController.
-        // Prevents: future refactoring from silently restoring X-Tenant-Id as
-        // authoritative controller input.
 
         var createMethod =
                 OrderController.class.getDeclaredMethod(

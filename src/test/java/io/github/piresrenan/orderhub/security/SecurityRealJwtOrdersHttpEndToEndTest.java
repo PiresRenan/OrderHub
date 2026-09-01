@@ -40,6 +40,8 @@ import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.jwk.RSAKey;
 
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderAllocationOutcome;
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderResult;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
 import io.github.piresrenan.orderhub.orders.domain.model.Order;
 import io.github.piresrenan.orderhub.orders.domain.model.OrderItem;
@@ -127,16 +129,21 @@ class SecurityRealJwtOrdersHttpEndToEndTest {
                                     0,
                                     CreateOrderCommand.class);
 
-                    return Order.create(
-                            UUID.randomUUID(),
-                            command.tenantId(),
-                            command.customerId(),
-                            command.items()
-                                    .stream()
-                                    .map(item -> new OrderItem(
-                                            item.variantId(),
-                                            item.quantity()))
-                                    .toList());
+                    var order =
+                            Order.create(
+                                    UUID.randomUUID(),
+                                    command.tenantId(),
+                                    command.customerId(),
+                                    command.items()
+                                            .stream()
+                                            .map(item -> new OrderItem(
+                                                    item.variantId(),
+                                                    item.quantity()))
+                                            .toList());
+
+                    return new CreateOrderResult(
+                            order,
+                            CreateOrderAllocationOutcome.FULLY_ALLOCATED);
                 });
 
         mockMvc.perform(
@@ -372,14 +379,19 @@ class SecurityRealJwtOrdersHttpEndToEndTest {
                                     0,
                                     CreateOrderCommand.class);
 
-                    return Order.create(
-                            UUID.randomUUID(),
-                            command.tenantId(),
-                            command.customerId(),
-                            List.of(
-                                    new OrderItem(
-                                            UUID.randomUUID(),
-                                            1)));
+                    var order =
+                            Order.create(
+                                    UUID.randomUUID(),
+                                    command.tenantId(),
+                                    command.customerId(),
+                                    List.of(
+                                            new OrderItem(
+                                                    UUID.randomUUID(),
+                                                    1)));
+
+                    return new CreateOrderResult(
+                            order,
+                            CreateOrderAllocationOutcome.FULLY_ALLOCATED);
                 });
 
         var customerId =

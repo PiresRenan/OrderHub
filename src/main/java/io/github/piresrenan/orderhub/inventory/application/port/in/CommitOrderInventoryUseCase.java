@@ -10,6 +10,12 @@ package io.github.piresrenan.orderhub.inventory.application.port.in;
  */
 public interface CommitOrderInventoryUseCase {
 
-    void commit(
+    /**
+     * Commits every demand line belonging to one Order.
+     *
+     * @param command tenant-scoped Order demand
+     * @return aggregate allocation outcome after every durable Inventory effect
+     */
+    InventoryAllocationOutcome commit(
             CommitOrderInventoryCommand command);
 }

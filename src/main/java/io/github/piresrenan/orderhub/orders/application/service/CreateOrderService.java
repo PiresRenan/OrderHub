@@ -2,7 +2,10 @@ package io.github.piresrenan.orderhub.orders.application.service;
 
 import io.github.piresrenan.orderhub.inventory.application.port.in.CommitOrderInventoryCommand;
 import io.github.piresrenan.orderhub.inventory.application.port.in.CommitOrderInventoryUseCase;
+import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryAllocationOutcome;
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderAllocationOutcome;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderResult;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderIdGenerator;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderRepository;
@@ -42,7 +45,7 @@ public final class CreateOrderService
     }
 
     @Override
-    public Order create(
+    public CreateOrderResult create(
             CreateOrderCommand command) {
 
         var items =
@@ -84,10 +87,32 @@ public final class CreateOrderService
                             orderRepository.save(
                                     order);
 
-                    inventory.commit(
-                            inventoryCommand);
+                    var inventoryOutcome =
+                            inventory.commit(
+                                    inventoryCommand);
 
-                    return persistedOrder;
+                    return new CreateOrderResult(
+                            persistedOrder,
+                            mapAllocationOutcome(
+                                    inventoryOutcome));
                 });
+    }
+
+    private static CreateOrderAllocationOutcome mapAllocationOutcome(
+            InventoryAllocationOutcome inventoryOutcome) {
+
+        if (inventoryOutcome == null) {
+            throw new IllegalStateException(
+                    "Inventory allocation outcome is required");
+        }
+
+        return switch (inventoryOutcome) {
+            case FULLY_ALLOCATED ->
+                    CreateOrderAllocationOutcome.FULLY_ALLOCATED;
+            case PARTIALLY_BACKORDERED ->
+                    CreateOrderAllocationOutcome.PARTIALLY_BACKORDERED;
+            case FULLY_BACKORDERED ->
+                    CreateOrderAllocationOutcome.FULLY_BACKORDERED;
+        };
     }
 }

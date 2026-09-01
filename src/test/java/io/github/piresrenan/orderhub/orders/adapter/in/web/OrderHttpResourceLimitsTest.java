@@ -26,6 +26,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderAllocationOutcome;
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderResult;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
 import io.github.piresrenan.orderhub.orders.domain.model.Order;
 import io.github.piresrenan.orderhub.orders.domain.model.OrderItem;
@@ -251,7 +253,10 @@ class OrderHttpResourceLimitsTest {
                                                 2)));
 
                 when(createOrderUseCase.create(any(CreateOrderCommand.class)))
-                                .thenReturn(order);
+                                .thenReturn(
+                                                new CreateOrderResult(
+                                                                order,
+                                                                CreateOrderAllocationOutcome.FULLY_ALLOCATED));
         }
 
         /**
