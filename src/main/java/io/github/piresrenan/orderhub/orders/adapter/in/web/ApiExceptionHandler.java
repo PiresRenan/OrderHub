@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.CatalogOrderabilityRejectedException;
+import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.CatalogOrderabilityTechnicalException;
 import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryCommitmentRejectedException;
 import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryOperationException;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderPersistenceException;
@@ -109,7 +110,8 @@ public final class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         @ExceptionHandler({
                         OrderPersistenceException.class,
                         TransactionExecutionException.class,
-                        InventoryOperationException.class
+                        InventoryOperationException.class,
+                        CatalogOrderabilityTechnicalException.class
         })
         protected ResponseEntity<Object> handleInternalTechnicalFailure() {
 

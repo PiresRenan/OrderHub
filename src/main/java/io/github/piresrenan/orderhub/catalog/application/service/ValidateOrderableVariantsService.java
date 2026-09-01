@@ -5,9 +5,11 @@ import java.util.TreeSet;
 import java.util.UUID;
 
 import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.CatalogOrderabilityRejectedException;
+import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.CatalogOrderabilityTechnicalException;
 import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.ValidateOrderableVariantsCommand;
 import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.ValidateOrderableVariantsUseCase;
 import io.github.piresrenan.orderhub.catalog.application.port.out.CatalogOrderabilityRepository;
+import io.github.piresrenan.orderhub.catalog.application.port.out.CatalogPersistenceException;
 
 /**
  * Validates Catalog commercial eligibility in deterministic lock order.
@@ -46,30 +48,37 @@ public final class ValidateOrderableVariantsService
         var orderedProductIds =
                 new TreeSet<UUID>();
 
-        for (var variantId : orderedVariantIds) {
+        try {
 
-            var productId =
-                    repository
-                            .lockActiveVariantProductId(
-                                    command.tenantId(),
-                                    variantId)
-                            .orElseThrow(
-                                    CatalogOrderabilityRejectedException::new);
+            for (var variantId : orderedVariantIds) {
 
-            orderedProductIds.add(
-                    productId);
-        }
+                var productId =
+                        repository
+                                .lockActiveVariantProductId(
+                                        command.tenantId(),
+                                        variantId)
+                                .orElseThrow(
+                                        CatalogOrderabilityRejectedException::new);
 
-        for (var productId : orderedProductIds) {
-
-            if (
-                !repository.lockActiveProduct(
-                        command.tenantId(),
-                        productId)
-            ) {
-
-                throw new CatalogOrderabilityRejectedException();
+                orderedProductIds.add(
+                        productId);
             }
+
+            for (var productId : orderedProductIds) {
+
+                if (
+                    !repository.lockActiveProduct(
+                            command.tenantId(),
+                            productId)
+                ) {
+
+                    throw new CatalogOrderabilityRejectedException();
+                }
+            }
+        } catch (CatalogPersistenceException exception) {
+
+            throw new CatalogOrderabilityTechnicalException(
+                    exception);
         }
     }
 }

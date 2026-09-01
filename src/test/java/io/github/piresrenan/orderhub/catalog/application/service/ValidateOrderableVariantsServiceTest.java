@@ -15,8 +15,10 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.CatalogOrderabilityRejectedException;
+import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.CatalogOrderabilityTechnicalException;
 import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.ValidateOrderableVariantsCommand;
 import io.github.piresrenan.orderhub.catalog.application.port.out.CatalogOrderabilityRepository;
+import io.github.piresrenan.orderhub.catalog.application.port.out.CatalogPersistenceException;
 
 class ValidateOrderableVariantsServiceTest {
 
@@ -153,6 +155,49 @@ class ValidateOrderableVariantsServiceTest {
                         PRODUCT_1);
     }
 
+    @Test
+    void translatesPersistenceFailureToPublicTechnicalOrderabilityFailure() {
+
+        CatalogOrderabilityRepository repository =
+                new CatalogOrderabilityRepository() {
+
+                    @Override
+                    public Optional<UUID> lockActiveVariantProductId(
+                            UUID tenantId,
+                            UUID variantId) {
+
+                        throw new CatalogPersistenceException(
+                                new IllegalStateException(
+                                        "synthetic-catalog-storage-failure"));
+                    }
+
+                    @Override
+                    public boolean lockActiveProduct(
+                            UUID tenantId,
+                            UUID productId) {
+
+                        throw new AssertionError(
+                                "Product locking must not run after Variant persistence failure.");
+                    }
+                };
+
+        var service =
+                new ValidateOrderableVariantsService(
+                        repository);
+
+        assertThatThrownBy(() ->
+                service.validate(
+                        new ValidateOrderableVariantsCommand(
+                                TENANT_ID,
+                                List.of(
+                                        VARIANT_1))))
+                .isInstanceOf(
+                        CatalogOrderabilityTechnicalException.class)
+                .hasMessage(
+                        "Catalog orderability validation could not be completed.")
+                .hasCauseInstanceOf(
+                        CatalogPersistenceException.class);
+    }
     private static final class RecordingRepository
             implements CatalogOrderabilityRepository {
 

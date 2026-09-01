@@ -21,6 +21,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.CatalogOrderabilityRejectedException;
+import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.CatalogOrderabilityTechnicalException;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
 import io.github.piresrenan.orderhub.security.adapter.in.authentication.AuthenticatedUserAuthenticationToken;
@@ -140,6 +141,82 @@ class OrderCatalogFailureHttpTest {
                         "lifecycle");
     }
 
+    @Test
+    void mapsCatalogTechnicalFailureToExistingSanitizedInternalError()
+            throws Exception {
+
+        var tenantId =
+                UUID.randomUUID();
+
+        var customerId =
+                UUID.randomUUID();
+
+        var variantId =
+                UUID.randomUUID();
+
+        when(createOrderUseCase.create(
+                any(CreateOrderCommand.class)))
+                .thenThrow(
+                        new CatalogOrderabilityTechnicalException(
+                                new IllegalStateException(
+                                        "synthetic-catalog-storage-failure jdbc sql")));
+
+        var result =
+                mockMvc.perform(
+                                authenticatedPost(
+                                        tenantId)
+                                        .content(
+                                                body(
+                                                        customerId,
+                                                        variantId)))
+                        .andExpect(
+                                status().isInternalServerError())
+                        .andExpect(
+                                content().contentTypeCompatibleWith(
+                                        MediaType.APPLICATION_PROBLEM_JSON))
+                        .andExpect(
+                                jsonPath("$.type")
+                                        .value(
+                                                "urn:orderhub:problem:internal-error"))
+                        .andExpect(
+                                jsonPath("$.title")
+                                        .value(
+                                                "Internal server error"))
+                        .andExpect(
+                                jsonPath("$.detail")
+                                        .value(
+                                                "The request could not be completed."))
+                        .andExpect(
+                                jsonPath("$.code")
+                                        .value(
+                                                "INTERNAL_ERROR"))
+                        .andReturn();
+
+        var responseBody =
+                result.getResponse()
+                        .getContentAsString();
+
+        assertThat(responseBody)
+                .doesNotContain(
+                        tenantId.toString(),
+                        customerId.toString(),
+                        variantId.toString(),
+                        "CatalogOrderabilityTechnicalException",
+                        "Catalog orderability validation could not be completed.",
+                        "synthetic-catalog-storage-failure",
+                        "jdbc",
+                        "sql",
+                        "product_id",
+                        "variant_id");
+
+        assertThat(responseBody.toLowerCase())
+                .doesNotContain(
+                        "catalog",
+                        "database",
+                        "postgres",
+                        "exception",
+                        "stack");
+    }
     private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder
             authenticatedPost(
                     UUID tenantId) {
