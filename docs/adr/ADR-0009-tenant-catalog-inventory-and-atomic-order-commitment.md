@@ -151,9 +151,35 @@ The initial Product model is expected to contain at least:
 - category assignments;
 - created/updated metadata at persistence/application boundaries where required.
 
+A Product may exist as `DRAFT` without any Variant while catalog authoring is
+incomplete. Commercial usability is stricter: activation requires at least one
+sellable Variant belonging to the same Tenant and Product.
 Product lifecycle must preserve historical referential meaning. A Product or
 Variant referenced by an existing Order must not silently become a different
 business item through identifier reuse.
+
+### Product commercial metadata invariants
+
+`brand` remains optional Product metadata.
+
+When a brand is present:
+
+- it must contain non-whitespace content;
+- surrounding Unicode whitespace is removed at the domain boundary;
+- the normalized value must contain at most 120 Unicode code points;
+- ISO control characters are forbidden;
+- internal spacing, capitalization, punctuation and Unicode representation are otherwise preserved.
+
+ProductVariant may additionally provide an optional `displayName` when the
+sellable SKU needs presentation text distinct from its parent Product.
+
+When `displayName` is present:
+
+- it must contain non-whitespace content;
+- surrounding Unicode whitespace is removed at the domain boundary;
+- the normalized value must contain at most 160 Unicode code points;
+- ISO control characters are forbidden;
+- its remaining representation is preserved exactly.
 
 ### ProductVariant
 
@@ -172,6 +198,40 @@ It is expected to contain at least:
   size/color/material;
 - lifecycle state allowing a variant to stop accepting new business without
   destroying historical references.
+
+The initial ProductVariant lifecycle is:
+
+- `DRAFT` - catalog authoring state; not sellable;
+- `ACTIVE` - sellable and eligible for new business;
+- `INACTIVE` - temporarily unavailable for new business while identity and history remain intact;
+- `ARCHIVED` - retired from normal commercial use while historical identity remains preserved.
+
+Only an `ACTIVE` ProductVariant is considered sellable for Product activation
+and new Order placement. `INACTIVE` is deliberately distinct from `ARCHIVED`
+so temporary commercial suspension does not imply permanent retirement.
+### ProductVariant identifier invariants
+
+GTIN and MPN remain optional commercial identifiers. Their absence is valid
+and OrderHub must never fabricate either value merely to satisfy persistence.
+
+When a GTIN is present:
+
+- it is stored as an opaque digit string rather than a numeric type;
+- its supplied representation is preserved, including meaningful leading zeroes;
+- accepted lengths are GTIN-8, GTIN-12, GTIN-13 and GTIN-14;
+- only decimal digits are accepted;
+- the GS1 check digit must be valid;
+- OrderHub does not silently pad a shorter GTIN to fourteen digits.
+
+When an MPN is present:
+
+- it represents a manufacturer-assigned part number rather than an OrderHub identifier;
+- it must contain between 1 and 70 Unicode code points;
+- surrounding Unicode whitespace is forbidden;
+- ISO control characters are forbidden;
+- otherwise the supplied representation is preserved exactly;
+- case conversion or punctuation normalization is forbidden;
+- an unknown MPN remains absent rather than being guessed or synthesized.
 
 The Product/Variant relationship is not replaced with duplicated Products for
 every SKU merely to simplify persistence.
@@ -223,13 +283,31 @@ OH-011 must support the idea that different variants may carry differentiating
 attributes, but it will not build a complete dynamic Product-Type/PIM schema
 engine.
 
-The initial attribute representation must:
+The initial attribute representation is a collection of explicit key/value
+facts owned by one ProductVariant.
 
-- preserve an explicit key and value;
-- reject blank keys;
-- remain tenant/product scoped through its owning Variant;
-- avoid making arbitrary JSON blobs the primary source of correctness for SKU,
-  price, inventory or standard identifiers.
+Attribute keys are machine-readable identifiers and must:
+
+- contain between 1 and 64 characters;
+- start with an ASCII letter;
+- contain only ASCII letters, digits, period, underscore or hyphen after the first character;
+- be unique within one Variant using exact case-sensitive comparison;
+- be preserved exactly rather than silently lowercased or otherwise canonicalized.
+
+Attribute values must:
+
+- exist and contain non-whitespace content;
+- contain at most 256 Unicode code points;
+- contain no ISO control characters;
+- contain no surrounding Unicode whitespace;
+- otherwise be preserved exactly.
+
+Attributes remain tenant/product scoped transitively through their owning Variant.
+They are persisted relationally rather than using an arbitrary JSON blob as the
+primary correctness boundary.
+
+SKU, GTIN, MPN, price and Inventory remain first-class concepts and must not be
+hidden inside the attribute collection.
 
 If later catalog requirements need typed attribute definitions, localization,
 faceting or validation schemas, that becomes a separate evidence-driven Product
@@ -247,12 +325,70 @@ The initial base-price capability must include at least:
 - tenant scope;
 - Variant identity;
 - ISO currency code;
-- exact decimal amount using `BigDecimal` or an equivalent exact representation;
+- exact amount represented as non-negative integer minor units;
 - non-negative invariant;
 - optional validity metadata only if a concrete OH-011 use case/tests require it.
 
-The relational representation uses exact `NUMERIC` semantics, not PostgreSQL
-floating-point money arithmetic.
+OH-011 standardizes the initial `Money` representation on an ISO 4217
+currency code plus non-negative integer minor units.
+
+Conceptually:
+
+```text
+Money
+  currencyCode
+  minorUnits
+```
+
+The persistence model stores the currency code and integer minor-unit amount
+directly, without binary floating-point arithmetic or implicit rounding.
+
+### Money and base-price invariants
+
+The initial Money value is structurally represented by:
+
+```text
+currencyCode
+minorUnits
+```
+
+`currencyCode` must:
+
+- be a three-letter ISO 4217 currency code recognized by the Java runtime;
+- use its canonical uppercase representation;
+- never be guessed from Tenant, locale, country or request context.
+
+`minorUnits` must:
+
+- use signed 64-bit integer storage;
+- be greater than or equal to zero;
+- represent the exact amount in the currency minor unit;
+- never pass through binary floating-point arithmetic.
+
+Zero-valued Money is valid. Whether a zero price is commercially appropriate is
+a pricing/business-policy concern rather than a structural Money invariant.
+
+OH-011 introduces `VariantBasePrice` as a separate Catalog-owned concept.
+
+A VariantBasePrice contains:
+
+- `tenantId`;
+- `variantId`;
+- `currencyCode`;
+- `minorUnits`.
+
+There is at most one base price for the same
+`(tenantId, variantId, currencyCode)` tuple.
+
+The Variant reference is tenant-safe and may use a same-module composite foreign
+key to `catalog.product_variants (tenant_id, id)`.
+
+A Variant may have zero or multiple base prices when those prices use different
+currencies. Base price presence does not itself activate a Product or Variant.
+
+OH-011 does not perform runtime price selection. Customer groups, channels,
+validity windows, negotiated prices, promotions, discounts and tax remain
+separate future pricing concerns.
 
 The schema/model must leave a clear migration path toward future B2B price lists
 or scopes such as customer group/channel/validity, but OH-011 does not implement
@@ -271,6 +407,65 @@ The initial representation may contain:
 - reference/URL or future storage key;
 - optional alt text;
 - sort order / primary presentation marker.
+
+### Catalog media invariants
+
+The initial media record contains:
+
+- `mediaId`;
+- `tenantId`;
+- exactly one owner: `productId` XOR `variantId`;
+- `mediaType`;
+- `reference`;
+- optional `altText`;
+- `sortOrder`;
+- `primary`.
+
+Media ownership is constrained as follows:
+
+- exactly one of `productId` or `variantId` must be present;
+- both owner columns belonging to the same record is invalid;
+- both owner columns being absent is invalid;
+- Product ownership uses a tenant-safe same-module foreign key;
+- Variant ownership uses a tenant-safe same-module foreign key;
+- cross-Tenant ownership is impossible at the relational boundary.
+
+`mediaType` initially supports:
+
+- `IMAGE`;
+- `VIDEO`;
+- `DOCUMENT`;
+- `OTHER`.
+
+`reference` is metadata, not an instruction to perform a network request.
+
+A media reference must:
+
+- contain non-whitespace content;
+- contain at most 2048 Unicode code points;
+- contain no surrounding Unicode whitespace;
+- contain no ISO control characters;
+- otherwise be preserved exactly.
+
+OrderHub does not require the reference to be an HTTP URL. It may represent a
+future object-storage key, CDN identifier, URI or other externally interpreted
+media reference.
+
+When `altText` is present:
+
+- it must contain non-whitespace content;
+- it must contain at most 512 Unicode code points;
+- surrounding Unicode whitespace is removed;
+- ISO control characters are forbidden.
+
+`sortOrder` is a non-negative integer.
+
+At most one media record may be `primary = true` for a Product and at most one
+may be primary for a ProductVariant. PostgreSQL partial unique indexes provide
+the relational enforcement for those two owner forms.
+
+Multiple non-primary media records remain valid and are ordered deterministically
+by `sortOrder`, with `mediaId` available as the stable tie-breaker.
 
 OH-011 does not implement binary upload, object storage, image transformation or
 server-side retrieval of arbitrary external URLs. Treating media as metadata
@@ -304,7 +499,17 @@ onHand >= 0
 committed >= 0
 backordered >= 0
 safetyStock >= 0
-committed + safetyStock <= onHand
+committed <= onHand
+```
+
+`safetyStock` is a commercial availability threshold, not a second physical
+allocation counter. It may therefore exceed the currently available physical
+stock.
+
+When available-to-promise is negative, allocatable demand is clamped at zero:
+
+```text
+allocatable = max(0, availableToPromise)
 ```
 
 Physical stock does not become negative to represent backorder demand.
@@ -530,9 +735,10 @@ with current business state.
 
 ## Database ownership and migrations
 
-Accepted Flyway V1-V5 migrations remain immutable.
+Accepted Flyway V1-V8 migrations remain immutable.
 
-OH-011 begins schema evolution at V6+.
+Catalog commercial completion continues through forward migration V9.
+V6-V8 are accepted history and are not edited.
 
 Dedicated schemas:
 
@@ -632,7 +838,7 @@ evidence:
 - [ ] Category hierarchy and multi-category assignment are tenant-safe.
 - [ ] same-tenant SKU uniqueness is deterministic.
 - [ ] standardized identifiers are optional and cannot be fabricated by default.
-- [ ] money uses exact decimal semantics and database exact numeric storage.
+- [ ] money uses ISO 4217 currency plus exact integer minor-unit storage.
 - [ ] media metadata cannot create an implicit arbitrary-URL server-fetch path.
 - [ ] Order-line terminology is migrated from Product identity to Variant identity.
 
