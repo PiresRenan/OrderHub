@@ -14,6 +14,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.ValidateOrderableVariantsUseCase;
 import io.github.piresrenan.orderhub.inventory.application.port.in.CommitOrderInventoryUseCase;
+import io.github.piresrenan.orderhub.orders.adapter.out.observability.micrometer.MicrometerObservedCreateOrderIdempotencyRepository;
 import io.github.piresrenan.orderhub.orders.adapter.out.observability.micrometer.MicrometerObservedCreateOrderUseCase;
 import io.github.piresrenan.orderhub.orders.adapter.out.observability.micrometer.MicrometerObservedTransactionExecutor;
 import io.github.piresrenan.orderhub.orders.adapter.out.persistence.postgresql.PostgreSqlCreateOrderIdempotencyRepository;
@@ -53,11 +54,17 @@ public class OrdersConfiguration {
     CreateOrderIdempotencyRepository createOrderIdempotencyRepository(
             JdbcTemplate jdbcTemplate,
             @Value("${orderhub.orders.idempotency.acquisition-timeout}")
-            Duration acquisitionTimeout) {
+            Duration acquisitionTimeout,
+            MeterRegistry meterRegistry) {
 
-        return new PostgreSqlCreateOrderIdempotencyRepository(
-                jdbcTemplate,
-                acquisitionTimeout);
+        var postgreSqlRepository =
+                new PostgreSqlCreateOrderIdempotencyRepository(
+                        jdbcTemplate,
+                        acquisitionTimeout);
+
+        return new MicrometerObservedCreateOrderIdempotencyRepository(
+                postgreSqlRepository,
+                meterRegistry);
     }
 
     /**

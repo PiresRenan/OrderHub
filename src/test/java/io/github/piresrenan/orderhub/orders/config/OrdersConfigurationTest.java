@@ -7,9 +7,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 
+import io.github.piresrenan.orderhub.orders.adapter.out.observability.micrometer.MicrometerObservedCreateOrderIdempotencyRepository;
 import io.github.piresrenan.orderhub.orders.adapter.out.observability.micrometer.MicrometerObservedCreateOrderUseCase;
 import io.github.piresrenan.orderhub.orders.adapter.out.observability.micrometer.MicrometerObservedTransactionExecutor;
-import io.github.piresrenan.orderhub.orders.adapter.out.persistence.postgresql.PostgreSqlCreateOrderIdempotencyRepository;
 import io.github.piresrenan.orderhub.orders.adapter.out.persistence.postgresql.PostgreSqlOrderRepository;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
 import io.github.piresrenan.orderhub.orders.application.port.out.CreateOrderIdempotencyRepository;
@@ -50,7 +50,7 @@ class OrdersConfigurationTest {
 
         assertThat(idempotencyRepository)
                 .isInstanceOf(
-                        PostgreSqlCreateOrderIdempotencyRepository.class);
+                        MicrometerObservedCreateOrderIdempotencyRepository.class);
 
         assertThat(orderIdGenerator)
                 .isNotNull();
