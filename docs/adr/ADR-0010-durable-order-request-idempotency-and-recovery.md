@@ -170,7 +170,7 @@ Completed key reused with another request:
 422 Unprocessable Content
 type   = urn:orderhub:problem:idempotency-key-reused
 code   = IDEMPOTENCY_KEY_REUSED
-detail = The idempotency key was already used for a different request.
+detail = The request idempotency key cannot be reused for different request content.
 ```
 
 Concurrent owner exceeding the bounded wait:
@@ -179,7 +179,7 @@ Concurrent owner exceeding the bounded wait:
 409 Conflict
 type   = urn:orderhub:problem:idempotency-request-in-progress
 code   = IDEMPOTENCY_REQUEST_IN_PROGRESS
-detail = A request with the same idempotency key is still being processed.
+detail = A request with this idempotency key is still being processed.
 ```
 
 None of these responses exposes raw keys, fingerprints or owner identifiers.
@@ -432,259 +432,33 @@ if fingerprint different:
 If another transaction currently owns an uncommitted conflicting insertion,
 PostgreSQL uniqueness arbitration coordinates the sessions.
 
-The wait remains bounded by the create-Order transaction timeout.
+The acquisition statement uses a dedicated PostgreSQL lock-wait boundary rather
+than borrowing the total create-Order transaction timeout.
 
-If acquisition itself times out waiting for the same durable key identity, the
-idempotency adapter translates that specific acquisition failure into the public
-in-progress conflict contract.
+The adapter temporarily applies the externally configured
+`orderhub.orders.idempotency.acquisition-timeout`.
 
-The system must not translate arbitrary later Catalog/Inventory lock timeouts into
-idempotency conflicts.
+The initial value is `500ms`. It is a provisional safety policy, not a measured
+latency SLA.
 
-### 10. Business execution after ownership
+The previous transaction-local `lock_timeout` is restored immediately after a
+normal acquisition statement completes and before later Catalog or Inventory
+work begins.
 
-Only the transaction that successfully inserted the PROCESSING row may generate
-a new Order ID and execute Order creation.
+If PostgreSQL reports SQLSTATE `55P03` while the acquisition statement is waiting
+for a lock, the idempotency adapter translates that acquisition-scoped failure
+into the public in-progress conflict contract.
 
-The desired ordering becomes:
+This classification is deliberately statement-scoped. SQLSTATE alone does not
+identify the precise lock object, so OrderHub does not claim stronger lock
+provenance than PostgreSQL reports.
 
-```text
-validate HTTP request/key
-build application command
-compute key digest/fingerprint
+Later Catalog/Inventory lock waits occur after the prior `lock_timeout` has been
+restored and are therefore not translated by the idempotency adapter into
+idempotency in-progress conflicts.
 
-BEGIN
-    acquire idempotency identity
-
-    if REPLAY:
-        reconstruct original successful result
-        COMMIT/return
-
-    generate Order ID
-    persist Order
-    validate/lock Catalog
-    commit Inventory
-    persist Inventory commitments
-    complete idempotency record
-COMMIT
-
-return 201
-```
-
-Generating Order IDs before idempotency ownership is avoided.
-### 6. Canonical request fingerprint
-
-Raw JSON bytes are not fingerprinted.
-
-Whitespace, JSON object property order and serializer formatting are transport
-details rather than Order business identity.
-
-Fingerprinting occurs after the request has been parsed and validated into the
-application command.
-
-The canonical fingerprint includes:
-
-```text
-fingerprintVersion = 1
-operation          = CREATE_ORDER_V1
-tenantId
-customerId
-itemCount
-for each item in list order:
-    itemIndex
-    variantId
-    quantity
-```
-
-UUIDs use their canonical 128-bit value rather than locale-dependent formatted
-text.
-
-Integer quantities use their exact integer value.
-
-The canonical preimage is encoded with explicit field boundaries/lengths before
-SHA-256 is applied; ambiguous delimiter concatenation is forbidden.
-
-The digest is:
-
-```text
-SHA-256(canonical business-command encoding)
-```
-
-#### Item ordering decision
-
-OH-012 does not sort or aggregate Order items for fingerprinting.
-
-The current public Order representation preserves item sequence and multiplicity.
-
-Changing:
-
-```text
-[A, B]
-```
-
-to:
-
-```text
-[B, A]
-```
-
-or:
-
-```text
-[A quantity=1, A quantity=1]
-```
-
-to:
-
-```text
-[A quantity=2]
-```
-
-is therefore not silently declared equivalent by the idempotency layer.
-
-If Order semantics are normalized in a future domain change, the fingerprint
-version must evolve with that contract.
-
-### 7. Persistence model
-
-Introduce an Orders-owned PostgreSQL table conceptually equivalent to:
-
-```text
-orders.order_request_idempotency
-
-tenant_id
-operation
-key_digest
-request_fingerprint
-state
-order_id
-order_status
-allocation_outcome
-created_at
-completed_at
-```
-
-Key/fingerprint digests use fixed 32-byte SHA-256 values.
-
-The uniqueness boundary is:
-
-```text
-UNIQUE (
-    tenant_id,
-    operation,
-    key_digest
-)
-```
-
-The table is Orders-owned persistence.
-
-No cross-module foreign key is introduced.
-
-A same-module Order FK may be used only if it preserves the required insertion
-and completion sequence without weakening transaction semantics.
-
-### 8. Transaction-local state machine
-
-The state model is intentionally small:
-
-```text
-ABSENT
-  |
-  | INSERT PROCESSING
-  v
-PROCESSING
-  |
-  | successful Order + Catalog + Inventory work
-  | store response outcome
-  v
-COMPLETED
-  |
-  | COMMIT
-  v
-durable COMPLETED
-```
-
-Failure path:
-
-```text
-ABSENT
-  |
-  v
-PROCESSING
-  |
-  | any business/technical failure
-  v
-ROLLBACK
-  |
-  v
-ABSENT
-```
-
-`PROCESSING` is never intentionally committed.
-
-This is a critical design property.
-
-It means OH-012 does not need:
-
-- ownership leases;
-- stale-PENDING reclamation;
-- lease heartbeats;
-- replica clock synchronization;
-- cleanup of abandoned claims;
-- a distributed lock service.
-
-Every committed idempotency row represents a completed successful create-Order
-outcome.
-
-### 9. Acquisition algorithm
-
-Idempotency acquisition is the first database coordination operation inside the
-create-Order transaction.
-
-Conceptually:
-
-```text
-BEGIN
-
-INSERT idempotency(
-    tenant,
-    operation,
-    keyDigest,
-    fingerprint,
-    PROCESSING)
-ON CONFLICT DO NOTHING
-RETURNING ownership
-```
-
-If insertion succeeds:
-
-```text
-this transaction owns first execution
-```
-
-If a committed row already exists:
-
-```text
-read immutable completed row
-
-if fingerprint equal:
-    replay
-
-if fingerprint different:
-    422
-```
-
-If another transaction currently owns an uncommitted conflicting insertion,
-PostgreSQL uniqueness arbitration coordinates the sessions.
-
-The wait remains bounded by the create-Order transaction timeout.
-
-If acquisition itself times out waiting for the same durable key identity, the
-idempotency adapter translates that specific acquisition failure into the public
-in-progress conflict contract.
-
-The system must not translate arbitrary later Catalog/Inventory lock timeouts into
-idempotency conflicts.
+The total create-Order transaction timeout remains an independent outer safety
+boundary.
 
 ### 10. Business execution after ownership
 
@@ -952,9 +726,9 @@ to execute again after deletion.
 Rejected because it couples durable application consistency to an adapter-specific
 serialization representation.
 
-## Implementation direction
+## Implemented structure
 
-Expected responsibilities are provisional until RED tests establish the contract.
+The implemented responsibilities after RED/GREEN verification are:
 
 Likely structure:
 
@@ -983,6 +757,49 @@ A new forward-only Flyway migration begins at V11.
 
 V1-V10 remain immutable.
 
+## Implementation evidence — 2026-09-02
+
+OH-012 was implemented incrementally from the OH-011 `pre-release` merge base.
+
+Final functional checkpoint before adversarial hardening:
+
+`dd3a17053d88fd645b7b91a309d3e00227e2694e`
+
+Final local adversarial-hardening checkpoint:
+
+`cef34379ed7bc5a5f3c50a246fc0f3549b2f3e29`
+
+Local executable evidence includes:
+
+- exactly one required `Idempotency-Key` at the HTTP boundary;
+- SHA-256 raw-key identity propagation without raw-key persistence;
+- deterministic versioned canonical business-request fingerprinting;
+- PostgreSQL V11 schema with database-enforced relational constraints;
+- PostgreSQL unique-key arbitration across concurrent transactions;
+- owner commit followed by replay;
+- owner rollback followed by contender/new retry acquisition;
+- dedicated acquisition-only PostgreSQL lock timeout and restoration;
+- idempotency acquisition before Order ID generation;
+- replay without repeated Order, Catalog or Inventory effects;
+- stable privacy-safe 400, 409, 422 and technical-failure mappings;
+- authenticated HTTP first execution/retry/replay against real PostgreSQL;
+- successful same-key retry after business rollback;
+- completion-persistence failure injection proving atomic rollback of Order,
+  Inventory and transient PROCESSING state;
+- same-key/same-request correctness across two independent OrderHub JVMs sharing
+  PostgreSQL;
+- transport JSON whitespace/property ordering excluded from fingerprint identity;
+- bounded idempotency metrics with no business/idempotency identity labels;
+- no Redis, broker, distributed mutex or JVM-local correctness lock.
+
+Final local suite:
+
+`714 tests, 0 failures, 0 errors, 0 skipped`
+
+`git diff --check` is clean.
+
+ADR status intentionally remains `DESIGNED` because pull-request checks and
+independent final review are still pending.
 ## Verification plan
 
 ADR-0010 remains `DESIGNED` until every required item below has executable

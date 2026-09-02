@@ -95,7 +95,7 @@ problems.
 
 ## OH-012 — Durable order request idempotency and recovery
 
-Status: ACTIVE
+Status: IMPLEMENTED — local verification complete; PR/remote validation pending
 
 OH-011 made Order persistence, Catalog orderability validation and Inventory
 commitment one atomic business transaction. The next exposed reliability gap is
@@ -115,8 +115,9 @@ Direction:
 - commit the successful idempotency outcome atomically with Order and Inventory;
 - replay a completed successful result without repeating business effects;
 - reject a completed key reused for a different fingerprint;
-- bound concurrent duplicate waiting through the existing create-Order transaction
-  timeout rather than using JVM-local locks;
+- bound only idempotency acquisition lock waiting through a dedicated externally
+  configured PostgreSQL `lock_timeout`, restoring the prior value before
+  Catalog/Inventory work;
 - retain completed records without automatic expiry in the initial implementation;
 - never expose raw idempotency keys or fingerprints through logs, metrics or
   Problem Details.
@@ -253,21 +254,6 @@ Direction:
 - later evolution may introduce just-in-time privileged activation, expiry,
   approval and periodic access review when the operational complexity warrants
   it.
-
-## Durable request idempotency and recovery — planned
-
-After the complete Order + Inventory unit of business consistency exists,
-implement durable idempotency for external order creation.
-
-The contract must distinguish:
-
-- same tenant + idempotency key + same request -> deterministic replay;
-- same key + different request -> conflict;
-- unknown client outcome after commit -> safe recovery without duplicate Order or
-  duplicate Inventory commitment.
-
-Order cancellation/release and recovery will build on durable InventoryCommitment
-state and must be idempotent so the same stock cannot be released twice.
 
 ## Transactional outbox — planned
 
