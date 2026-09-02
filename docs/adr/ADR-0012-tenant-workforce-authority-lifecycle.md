@@ -324,11 +324,40 @@ The V13 foundation rejects relationally enforceable invalid state including:
 - self-reporting relationships;
 - cross-Tenant reporting references.
 
-Reporting-cycle arbitration, inactive-supervisor lifecycle handling,
-last-governance concurrency and append-oriented audit persistence are not
-implemented by this foundation migration. Reporting-cycle rejection remains an
-explicit domain/application policy until its persistence/concurrency boundary is
-implemented and measured separately.
+The V13 foundation itself does not arbitrate reporting cycles or lifecycle races.
+Those concurrency-sensitive reporting invariants are introduced separately by
+V14.
+
+### PostgreSQL reporting integrity arbitration
+
+V14 makes PostgreSQL the correctness boundary for concurrent reporting
+mutations.
+
+Reporting-edge creation/update and Staff transition to INACTIVE acquire the
+same transaction-scoped PostgreSQL advisory lock derived from the Tenant scope.
+The lock is database-visible and therefore coordinates independent application
+replicas without relying on JVM-local synchronization.
+
+After obtaining the Tenant lock, reporting mutation validates that the supervisor
+is still ACTIVE and recursively checks the committed Tenant reporting graph for
+a path from the proposed subordinate back to the proposed supervisor. A detected
+path rejects the mutation because adding the candidate edge would close a cycle.
+
+A transition to INACTIVE obtains the same Tenant lock and is rejected while the
+StaffProfile still owns an active supervisor edge. Deactivation therefore
+requires supervisor relationships to be removed/reassigned before the lifecycle
+transition can commit.
+
+This shared arbitration means competing operations such as A -> B versus
+B -> A, or supervisor-edge creation versus supervisor deactivation, cannot both
+commit into an invalid final state.
+
+ReportingStructurePolicy remains the framework-neutral domain precondition for
+ordinary in-memory composition; PostgreSQL provides the durable multi-replica
+correctness boundary.
+
+V14 does not implement last-governance arbitration or append-oriented audit
+persistence. Those remain separate high-assurance boundaries.
 
 ### Audit evidence
 
