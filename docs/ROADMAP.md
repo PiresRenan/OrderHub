@@ -154,8 +154,8 @@ Authorization hierarchy is not blind permission inheritance.
 
 ### OH-013 — Identity personas and scoped authorization kernel
 
-Status: IN PROGRESS — issue #26 on
-`feat/OH-013-identity-personas-authorization`.
+Status: COMPLETED — merged into `pre-release` at
+`7344c5e1b573f3d79846719cd93aa951716c0f17` on 2026-09-02 via PR #27.
 
 OH-013 introduces a first-class framework-neutral authorization module and the
 minimum persona vocabulary required by later workforce and customer domains.
@@ -237,7 +237,7 @@ Privacy/data posture:
 
 ### OH-014 — Tenant workforce administration
 
-Status: PLANNED — depends on OH-013.
+Status: IN PROGRESS — issue #28; depends on completed OH-013.
 
 Build the Staff persona into a complete Tenant workforce model rather than adding
 job attributes to User.
