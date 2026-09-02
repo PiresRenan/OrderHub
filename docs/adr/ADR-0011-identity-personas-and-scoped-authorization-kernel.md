@@ -548,9 +548,15 @@ later slices without granting customer access through Staff roles.
 
 ## Persistence direction
 
-OH-013 introduces a new PostgreSQL schema owned by authorization:
+OH-013 introduces a new PostgreSQL schema owned by the authorization module:
 
-`authorization`
+`access_control`
+
+The Java application module remains named `authorization`. The PostgreSQL
+namespace intentionally uses `access_control` because `AUTHORIZATION` is a
+reserved PostgreSQL keyword and is also part of the `CREATE SCHEMA` grammar.
+Using a non-reserved database identifier avoids permanent quoted-identifier
+requirements throughout migrations and persistence adapters.
 
 Accepted migrations V1 through V11 remain immutable.
 
