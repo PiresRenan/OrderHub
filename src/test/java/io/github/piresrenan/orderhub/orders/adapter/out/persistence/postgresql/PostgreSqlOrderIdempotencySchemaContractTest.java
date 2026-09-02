@@ -204,22 +204,23 @@ class PostgreSqlOrderIdempotencySchemaContractTest {
                         "Idempotency storage must not introduce relational coupling to other module tables")
                 .isZero();
 
-        var migrationVersion =
+        var v11MigrationApplied =
                 jdbcTemplate.queryForObject(
                         """
-                        SELECT MAX(
-                            CAST(version AS INTEGER)
+                        SELECT EXISTS (
+                            SELECT 1
+                            FROM flyway_schema_history
+                            WHERE success = TRUE
+                              AND version = '11'
+                              AND script = 'V11__create_order_request_idempotency.sql'
                         )
-                        FROM flyway_schema_history
-                        WHERE success = TRUE
                         """,
-                        Integer.class);
+                        Boolean.class);
 
-        assertThat(migrationVersion)
+        assertThat(v11MigrationApplied)
                 .as(
-                        "Durable idempotency storage must be introduced by V11")
-                .isEqualTo(
-                        11);
+                        "Durable idempotency storage must be introduced by the successful V11 migration")
+                .isTrue();
     }
 
     private record ColumnDefinition(
