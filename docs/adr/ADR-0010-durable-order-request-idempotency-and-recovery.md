@@ -966,10 +966,21 @@ evidence.
 - [x] `git diff --check` passes;
 - [x] `.\mvnw.cmd clean verify` passes;
 - [x] multi-replica acceptance remains green;
-- [x] independent final review reports no unresolved correctness blocker;
-- [x] `branch-policy`, `ci-build` and `platform-validation` pass on final PR HEAD.
+- [x] independent review of implementation checkpoint
+      `75d6bec98da2d66e2cfe65f4b438d7aebdda280c` reports no unresolved
+      correctness blocker before ADR promotion;
+- [x] `branch-policy`, `ci-build` and `platform-validation` pass on reviewed
+      implementation checkpoint
+      `75d6bec98da2d66e2cfe65f4b438d7aebdda280c` before ADR promotion.
 
-The full verification evidence now exists; ADR-0010 is `TESTED`.
+The implementation verification evidence now exists; ADR-0010 is `TESTED`.
+
+`TESTED` records evidence for the reviewed implementation checkpoint. It does not
+waive repository merge governance for later documentation-only commits.
+
+Any subsequent pull-request HEAD, including documentation changes that record or
+clarify this evidence, must independently pass the repository-required workflows
+and final review gates before merge.
 
 ## Explicitly deferred
 
