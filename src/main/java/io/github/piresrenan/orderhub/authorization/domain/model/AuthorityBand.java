@@ -1,5 +1,7 @@
 package io.github.piresrenan.orderhub.authorization.domain.model;
 
+import org.springframework.modulith.NamedInterface;
+
 /**
  * Organizational authority ceiling used by authorization policy.
  *
@@ -8,6 +10,7 @@ package io.github.piresrenan.orderhub.authorization.domain.model;
  * automatically inherits the operational permissions of a lower band.
  * </p>
  */
+@NamedInterface("policy-model")
 public enum AuthorityBand {
 
     OPERATIONAL(10),

@@ -1,5 +1,7 @@
 package io.github.piresrenan.orderhub.authorization.domain.model;
 
+import org.springframework.modulith.NamedInterface;
+
 /**
  * System-owned atomic business authorization vocabulary.
  *
@@ -8,6 +10,7 @@ package io.github.piresrenan.orderhub.authorization.domain.model;
  * but cannot invent new executable permission codes.
  * </p>
  */
+@NamedInterface("policy-model")
 public enum PermissionCode {
 
     TENANT_MEMBERS_VIEW,
