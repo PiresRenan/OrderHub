@@ -70,6 +70,8 @@ class CreateOrderIdempotencyHttpRecoveryAcceptanceTest {
 
     private static final String CREATE_ALLOCATION_METRIC =
             "orderhub.orders.create.allocation";
+    private static final String CREATE_FAILURE_METRIC =
+            "orderhub.orders.create.failure";
 
     private static final UUID USER_ID =
             UUID.fromString(
@@ -426,6 +428,8 @@ class CreateOrderIdempotencyHttpRecoveryAcceptanceTest {
                 "fingerprint_conflict",
                 1.0d);
 
+        assertNoCreateFailureMetric();
+
         assertIdempotencyMetricHasOnlyBoundedOutcomeTags();
     }
 
@@ -757,6 +761,21 @@ class CreateOrderIdempotencyHttpRecoveryAcceptanceTest {
                         expectedCount);
     }
 
+    private void assertNoCreateFailureMetric() {
+
+        assertThat(
+                meterRegistry.getMeters()
+                        .stream()
+                        .filter(meter ->
+                                CREATE_FAILURE_METRIC.equals(
+                                        meter.getId()
+                                                .getName()))
+                        .toList())
+                .as(
+                        "Expected idempotency conflict must not contaminate create-failure metrics")
+                .isEmpty();
+    }
+
     private void assertIdempotencyMetricHasOnlyBoundedOutcomeTags() {
 
         var meters =
@@ -818,7 +837,8 @@ class CreateOrderIdempotencyHttpRecoveryAcceptanceTest {
                             .getName();
 
             if (METRIC.equals(name)
-                    || CREATE_ALLOCATION_METRIC.equals(name)) {
+                    || CREATE_ALLOCATION_METRIC.equals(name)
+                    || CREATE_FAILURE_METRIC.equals(name)) {
 
                 meterRegistry.remove(
                         meter);

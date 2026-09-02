@@ -15,7 +15,9 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.CatalogOrderabilityRejectedException;
 import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryCommitmentRejectedException;
+import io.github.piresrenan.orderhub.orders.application.idempotency.CreateOrderIdempotencyKeyReusedException;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderAllocationOutcome;
+import io.github.piresrenan.orderhub.orders.application.port.out.CreateOrderIdempotencyInProgressException;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderExecutionKind;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderResult;
@@ -80,6 +82,18 @@ public final class MicrometerObservedCreateOrderUseCase
             }
 
             return result;
+
+        } catch (CreateOrderIdempotencyKeyReusedException
+                | CreateOrderIdempotencyInProgressException expectedConflict) {
+
+            /*
+             * These are expected durable-idempotency protocol outcomes.
+             *
+             * Their dedicated idempotency metrics already describe the event.
+             * Recording them again as generic create failures would contaminate
+             * technical alerting and double-count retry/control traffic.
+             */
+            throw expectedConflict;
 
         } catch (RuntimeException failure) {
 

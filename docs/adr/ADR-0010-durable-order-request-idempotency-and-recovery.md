@@ -665,6 +665,21 @@ Replay request volume is represented independently by:
 This separation prevents client retry volume from inflating Order creation and
 Inventory allocation throughput dashboards.
 
+Expected durable-idempotency protocol conflicts are likewise excluded from the
+generic create-failure metric:
+
+- `IDEMPOTENCY_KEY_REUSED` / HTTP 422 is represented by
+  `orderhub.orders.idempotency{outcome=fingerprint_conflict}`;
+- `IDEMPOTENCY_REQUEST_IN_PROGRESS` / HTTP 409 is represented by
+  `orderhub.orders.idempotency{outcome=in_progress_conflict}`.
+
+Neither condition increments `orderhub.orders.create.failure`, because both are
+expected bounded idempotency-control outcomes rather than Catalog, Inventory or
+technical create-Order failures.
+
+Actual idempotency persistence or infrastructure failures remain eligible for
+`orderhub.orders.create.failure{reason=technical_failure}`.
+
 ### 18. No automatic retry framework
 
 OH-012 enables clients to retry safely.
