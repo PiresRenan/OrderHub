@@ -191,7 +191,9 @@ class PostgreSqlAuthorizationConcurrencyTest {
                                 jdbcTemplate),
                         new PostgreSqlUserPermissionOverrideRepository(
                                 jdbcTemplate),
-                        transactionBoundary);
+                        transactionBoundary,
+                        observation -> {
+                        });
 
         var request =
                 new TenantAuthorizationRequest(

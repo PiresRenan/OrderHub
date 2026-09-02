@@ -4,7 +4,10 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 
+import io.github.piresrenan.orderhub.authorization.application.observability.AuthorizationDecisionObservation;
+import io.github.piresrenan.orderhub.authorization.application.observability.AuthorizationDecisionReason;
 import io.github.piresrenan.orderhub.authorization.application.port.in.AuthorizeTenantActionUseCase;
+import io.github.piresrenan.orderhub.authorization.application.port.out.AuthorizationDecisionObserver;
 import io.github.piresrenan.orderhub.authorization.application.port.out.AuthorizationDecisionReadTransaction;
 import io.github.piresrenan.orderhub.authorization.application.port.out.AuthorizationPersistenceException;
 import io.github.piresrenan.orderhub.authorization.application.port.out.RoleAssignmentRepository;
@@ -21,15 +24,13 @@ import io.github.piresrenan.orderhub.authorization.domain.service.ScopedAuthoriz
 /**
  * Composes durable authorization state and restrictive policy before evaluating
  * one Tenant-scoped STAFF decision.
- *
- * <p>
- * Durable construction requires an explicit coherent read transaction so one
- * decision cannot combine role, assignment or override state belonging to
- * different PostgreSQL snapshots.
- * </p>
  */
 public final class DurableTenantAuthorizationService
         implements AuthorizeTenantActionUseCase {
+
+    private static final AuthorizationDecisionObserver NOOP_OBSERVER =
+            observation -> {
+            };
 
     private final RoleAssignmentRepository roleAssignmentRepository;
 
@@ -41,11 +42,12 @@ public final class DurableTenantAuthorizationService
 
     private final AuthorizationDecisionReadTransaction readTransaction;
 
+    private final AuthorizationDecisionObserver decisionObserver;
+
     private final ScopedAuthorizationEvaluator authorizationEvaluator;
 
     /*
      * Package-private synthetic constructor retained for focused unit tests.
-     * External production composition cannot select this non-transactional path.
      */
     DurableTenantAuthorizationService(
             RoleAssignmentRepository roleAssignmentRepository,
@@ -59,13 +61,13 @@ public final class DurableTenantAuthorizationService
                 List.of(),
                 decision ->
                         decision.get(),
+                NOOP_OBSERVER,
                 new ScopedAuthorizationEvaluator());
     }
 
     /*
      * Package-private synthetic constructor retained for focused constraint
-     * tests. Production composition must use one of the public constructors
-     * requiring AuthorizationDecisionReadTransaction.
+     * tests.
      */
     DurableTenantAuthorizationService(
             RoleAssignmentRepository roleAssignmentRepository,
@@ -80,6 +82,7 @@ public final class DurableTenantAuthorizationService
                 constraints,
                 decision ->
                         decision.get(),
+                NOOP_OBSERVER,
                 new ScopedAuthorizationEvaluator());
     }
 
@@ -87,7 +90,8 @@ public final class DurableTenantAuthorizationService
             RoleAssignmentRepository roleAssignmentRepository,
             RoleDefinitionRepository roleDefinitionRepository,
             UserPermissionOverrideRepository permissionOverrideRepository,
-            AuthorizationDecisionReadTransaction readTransaction) {
+            AuthorizationDecisionReadTransaction readTransaction,
+            AuthorizationDecisionObserver decisionObserver) {
 
         this(
                 roleAssignmentRepository,
@@ -95,6 +99,7 @@ public final class DurableTenantAuthorizationService
                 permissionOverrideRepository,
                 List.of(),
                 readTransaction,
+                decisionObserver,
                 new ScopedAuthorizationEvaluator());
     }
 
@@ -103,7 +108,8 @@ public final class DurableTenantAuthorizationService
             RoleDefinitionRepository roleDefinitionRepository,
             UserPermissionOverrideRepository permissionOverrideRepository,
             Collection<AuthorizationConstraint> constraints,
-            AuthorizationDecisionReadTransaction readTransaction) {
+            AuthorizationDecisionReadTransaction readTransaction,
+            AuthorizationDecisionObserver decisionObserver) {
 
         this(
                 roleAssignmentRepository,
@@ -111,6 +117,7 @@ public final class DurableTenantAuthorizationService
                 permissionOverrideRepository,
                 constraints,
                 readTransaction,
+                decisionObserver,
                 new ScopedAuthorizationEvaluator());
     }
 
@@ -120,6 +127,7 @@ public final class DurableTenantAuthorizationService
             UserPermissionOverrideRepository permissionOverrideRepository,
             Collection<AuthorizationConstraint> constraints,
             AuthorizationDecisionReadTransaction readTransaction,
+            AuthorizationDecisionObserver decisionObserver,
             ScopedAuthorizationEvaluator authorizationEvaluator) {
 
         if (roleAssignmentRepository == null) {
@@ -151,6 +159,11 @@ public final class DurableTenantAuthorizationService
                     "Authorization read transaction is required");
         }
 
+        if (decisionObserver == null) {
+            throw new IllegalArgumentException(
+                    "Authorization decision observer is required");
+        }
+
         if (authorizationEvaluator == null) {
             throw new IllegalArgumentException(
                     "Scoped authorization evaluator is required");
@@ -171,6 +184,9 @@ public final class DurableTenantAuthorizationService
 
         this.readTransaction =
                 readTransaction;
+
+        this.decisionObserver =
+                decisionObserver;
 
         this.authorizationEvaluator =
                 authorizationEvaluator;
@@ -194,19 +210,33 @@ public final class DurableTenantAuthorizationService
         if (request.persona()
                 != AuthorizationPersona.STAFF) {
 
-            return AuthorizationDecision.DENY;
+            return observed(
+                    request,
+                    AuthorizationDecision.DENY,
+                    AuthorizationDecisionReason.UNSUPPORTED_PERSONA);
         }
 
         try {
-            return readTransaction.execute(
-                    () ->
-                            authorizeWithinSnapshot(
-                                    request,
-                                    actorEnvelope));
+            var decision =
+                    readTransaction.execute(
+                            () ->
+                                    authorizeWithinSnapshot(
+                                            request,
+                                            actorEnvelope));
+
+            return observed(
+                    request,
+                    decision,
+                    decision == AuthorizationDecision.ALLOW
+                            ? AuthorizationDecisionReason.ELIGIBLE
+                            : AuthorizationDecisionReason.POLICY_DENIED);
 
         } catch (AuthorizationPersistenceException exception) {
 
-            return AuthorizationDecision.DENY;
+            return observed(
+                    request,
+                    AuthorizationDecision.DENY,
+                    AuthorizationDecisionReason.PERSISTENCE_FAILURE);
         }
     }
 
@@ -293,5 +323,29 @@ public final class DurableTenantAuthorizationService
                 actorEnvelope,
                 overrides,
                 constraints);
+    }
+
+    private AuthorizationDecision observed(
+            TenantAuthorizationRequest request,
+            AuthorizationDecision decision,
+            AuthorizationDecisionReason reason) {
+
+        try {
+            decisionObserver.observe(
+                    new AuthorizationDecisionObservation(
+                            decision,
+                            request.persona(),
+                            request.permission(),
+                            reason));
+
+        } catch (RuntimeException ignored) {
+
+            /*
+             * Telemetry is intentionally non-authoritative. A metrics backend
+             * failure must never alter an authorization decision.
+             */
+        }
+
+        return decision;
     }
 }

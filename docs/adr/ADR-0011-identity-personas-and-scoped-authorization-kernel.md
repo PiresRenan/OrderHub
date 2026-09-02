@@ -622,6 +622,26 @@ SYSTEM versus TENANT_CUSTOM role-code reservation.
 Customer/resource authorization will extend the contextual relationship inputs in
 later slices without granting customer access through Staff roles.
 
+OH-013 now exposes an executable framework-neutral relationship policy hook.
+Resource-owning modules resolve bounded relationship facts such as
+`RESOURCE_OWNER` and supply those facts to Authorization; Authorization does not
+import foreign resource entities or persistence.
+
+The relationship context carries internal actor identity, persona, Tenant scope
+and bounded relationship facts, but intentionally carries no resource identifier.
+This allows future CUSTOMER ownership policy to compose with resource-domain
+state without turning Customer into a Staff role or duplicating resource
+identifiers into authorization state.
+
+Authorization decision observability is bounded by construction. The application
+observation model exposes only `decision`, `persona`, system-owned `permission`
+and a finite `reason` vocabulary.
+
+The Micrometer adapter therefore cannot create metric labels from User, Tenant,
+resource or external identity-provider identifiers through this boundary.
+Telemetry failure is non-authoritative and cannot alter an authorization
+decision.
+
 ## Persistence direction
 
 OH-013 introduces a new PostgreSQL schema owned by the authorization module:
