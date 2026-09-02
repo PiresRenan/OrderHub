@@ -283,6 +283,11 @@ Permission is the atomic executable authorization vocabulary.
 
 Permissions are system-owned and versioned by OrderHub.
 
+The persona classification of an existing permission code is immutable.
+`role_permissions` also enforces persona compatibility at the PostgreSQL
+boundary, preventing a Staff RoleDefinition from durably containing a
+Customer-only permission or vice versa.
+
 Tenants may later compose allowed permissions into custom roles, but they cannot
 invent arbitrary permission strings that magically become executable code.
 
@@ -441,6 +446,10 @@ other namespace.
 
 The reservation survives deletion of an individual RoleDefinition. Stable role
 codes therefore cannot silently change authorization meaning over time.
+
+V12 also makes the `code` of an existing RoleDefinition immutable. A durable
+`role_id` therefore cannot be retained while silently rewriting the role's stable
+authorization code.
 
 OH-013 also exposes a read-only durable RoleDefinition repository. The
 repository resolves the definition visible in one Tenant scope and reconstructs

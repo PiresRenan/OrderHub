@@ -7,6 +7,7 @@ import java.util.Arrays;
 import java.util.UUID;
 
 import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -298,6 +299,95 @@ class PostgreSqlAuthorizationSchemaConstraintsTest {
                         DataIntegrityViolationException.class);
     }
     @Test
+    void databaseRejectsStableRoleCodeRewrite() {
+
+        var roleId =
+                insertSystemRole(
+                        "IMMUTABLE_ROLE_CODE");
+
+        assertThatThrownBy(() ->
+                jdbcTemplate.update(
+                        """
+                        UPDATE access_control.role_definitions
+                        SET code = 'REWRITTEN_ROLE_CODE'
+                        WHERE role_id = ?
+                        """,
+                        roleId))
+                .isInstanceOf(
+                        DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void databaseRejectsRolePermissionPersonaMismatchAndPermissionPersonaRewrite() {
+
+        var roleId =
+                insertSystemRole(
+                        "PERSONA_BOUND_ROLE");
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO access_control.permissions (
+                    code,
+                    persona
+                )
+                VALUES (
+                    'CUSTOMER_RESOURCE_VIEW_TEST',
+                    'CUSTOMER'
+                )
+                """);
+
+        assertThatThrownBy(() ->
+                jdbcTemplate.update(
+                        """
+                        INSERT INTO access_control.role_permissions (
+                            role_id,
+                            permission_code
+                        )
+                        VALUES (
+                            ?,
+                            'CUSTOMER_RESOURCE_VIEW_TEST'
+                        )
+                        """,
+                        roleId))
+                .isInstanceOf(
+                        DataIntegrityViolationException.class);
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO access_control.permissions (
+                    code,
+                    persona
+                )
+                VALUES (
+                    'STAFF_IMMUTABLE_PERSONA_TEST',
+                    'STAFF'
+                )
+                """);
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO access_control.role_permissions (
+                    role_id,
+                    permission_code
+                )
+                VALUES (
+                    ?,
+                    'STAFF_IMMUTABLE_PERSONA_TEST'
+                )
+                """,
+                roleId);
+
+        assertThatThrownBy(() ->
+                jdbcTemplate.update(
+                        """
+                        UPDATE access_control.permissions
+                        SET persona = 'CUSTOMER'
+                        WHERE code = 'STAFF_IMMUTABLE_PERSONA_TEST'
+                        """))
+                .isInstanceOf(
+                        DataIntegrityViolationException.class);
+    }
+    @Test
     void authorizationForeignKeysNeverTargetUsersOrTenantsSchemas() {
 
         var referencedSchemas =
@@ -324,6 +414,36 @@ class PostgreSqlAuthorizationSchemaConstraintsTest {
                         "access_control");
     }
 
+    @AfterEach
+    void cleanFinalCandidateSyntheticFixtures() {
+
+        jdbcTemplate.update(
+                """
+                DELETE FROM access_control.role_permissions
+                WHERE permission_code IN (
+                    'CUSTOMER_RESOURCE_VIEW_TEST',
+                    'STAFF_IMMUTABLE_PERSONA_TEST'
+                )
+                """);
+
+        jdbcTemplate.update(
+                """
+                DELETE FROM access_control.permissions
+                WHERE code IN (
+                    'CUSTOMER_RESOURCE_VIEW_TEST',
+                    'STAFF_IMMUTABLE_PERSONA_TEST'
+                )
+                """);
+
+        jdbcTemplate.update(
+                """
+                DELETE FROM access_control.role_definitions
+                WHERE code IN (
+                    'IMMUTABLE_ROLE_CODE',
+                    'PERSONA_BOUND_ROLE'
+                )
+                """);
+    }
     private static UUID insertSystemRole(
             String code) {
 

@@ -197,6 +197,30 @@ BEFORE UPDATE OF tenant_id
 ON access_control.role_definitions
 FOR EACH ROW
 EXECUTE FUNCTION access_control.enforce_role_definition_scope_immutability();
+CREATE FUNCTION access_control.enforce_role_definition_code_immutability()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF OLD.code IS DISTINCT FROM NEW.code THEN
+
+        RAISE check_violation
+            USING
+                MESSAGE =
+                    'Role definition code is immutable',
+                CONSTRAINT =
+                    'ck_authorization_role_definition_code_immutable';
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_authorization_role_definition_code_immutability
+BEFORE UPDATE OF code
+ON access_control.role_definitions
+FOR EACH ROW
+EXECUTE FUNCTION access_control.enforce_role_definition_code_immutability();
 CREATE TABLE access_control.role_permissions (
     role_id UUID NOT NULL,
     permission_code TEXT NOT NULL,
@@ -217,6 +241,78 @@ CREATE TABLE access_control.role_permissions (
         REFERENCES access_control.permissions (code)
 );
 
+CREATE FUNCTION access_control.enforce_role_permission_persona()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    role_persona TEXT;
+    permission_persona TEXT;
+BEGIN
+    SELECT role.persona
+    INTO role_persona
+    FROM access_control.role_definitions role
+    WHERE role.role_id = NEW.role_id;
+
+    IF NOT FOUND THEN
+        RETURN NEW;
+    END IF;
+
+    SELECT permission.persona
+    INTO permission_persona
+    FROM access_control.permissions permission
+    WHERE permission.code = NEW.permission_code;
+
+    IF NOT FOUND THEN
+        RETURN NEW;
+    END IF;
+
+    IF role_persona IS DISTINCT FROM permission_persona THEN
+
+        RAISE check_violation
+            USING
+                MESSAGE =
+                    'Role and permission personas must match',
+                CONSTRAINT =
+                    'ck_authorization_role_permission_persona';
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_authorization_role_permission_persona
+BEFORE INSERT OR UPDATE OF
+    role_id,
+    permission_code
+ON access_control.role_permissions
+FOR EACH ROW
+EXECUTE FUNCTION access_control.enforce_role_permission_persona();
+
+CREATE FUNCTION access_control.enforce_permission_persona_immutability()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF OLD.persona IS DISTINCT FROM NEW.persona THEN
+
+        RAISE check_violation
+            USING
+                MESSAGE =
+                    'Permission persona classification is immutable',
+                CONSTRAINT =
+                    'ck_authorization_permission_persona_immutable';
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_authorization_permission_persona_immutability
+BEFORE UPDATE OF persona
+ON access_control.permissions
+FOR EACH ROW
+EXECUTE FUNCTION access_control.enforce_permission_persona_immutability();
 CREATE TABLE access_control.role_assignments (
     assignment_id UUID PRIMARY KEY,
     user_id UUID NOT NULL,
