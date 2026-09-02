@@ -7,6 +7,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
 
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderAllocationOutcome;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
@@ -67,9 +68,17 @@ class OrderControllerTrustedTenantContextTest {
                                         variantId,
                                         2)));
 
+        var headers =
+                new HttpHeaders();
+
+        headers.add(
+                OrderIdempotencyKeyHeader.NAME,
+                "trusted-tenant-context-test");
+
         controller.create(
                 new TrustedTenantContext(
                         trustedTenantId),
+                headers,
                 request);
 
         assertThat(capturedCommand)
@@ -106,12 +115,14 @@ class OrderControllerTrustedTenantContextTest {
                 OrderController.class.getDeclaredMethod(
                         "create",
                         TrustedTenantContext.class,
+                        HttpHeaders.class,
                         CreateOrderRequest.class);
 
         assertThat(
                 createMethod.getParameterTypes())
                 .containsExactly(
                         TrustedTenantContext.class,
+                        HttpHeaders.class,
                         CreateOrderRequest.class);
     }
 }

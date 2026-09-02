@@ -148,6 +148,9 @@ class SecurityRealJwtOrdersHttpEndToEndTest {
 
         mockMvc.perform(
                         post("/orders")
+                .header(
+                        "Idempotency-Key",
+                        "existing-orders-contract-test-key")
                                 .header(
                                         HttpHeaders.AUTHORIZATION,
                                         bearer(
@@ -229,6 +232,9 @@ class SecurityRealJwtOrdersHttpEndToEndTest {
         var response =
                 mockMvc.perform(
                                 post("/orders")
+                .header(
+                        "Idempotency-Key",
+                        "existing-orders-contract-test-key")
                                         .header(
                                                 HttpHeaders.AUTHORIZATION,
                                                 bearer(
@@ -287,6 +293,9 @@ class SecurityRealJwtOrdersHttpEndToEndTest {
 
         mockMvc.perform(
                         post("/orders")
+                .header(
+                        "Idempotency-Key",
+                        "existing-orders-contract-test-key")
                                 .header(
                                         HttpHeaders.AUTHORIZATION,
                                         bearer(
@@ -321,6 +330,9 @@ class SecurityRealJwtOrdersHttpEndToEndTest {
 
         mockMvc.perform(
                         post("/orders")
+                .header(
+                        "Idempotency-Key",
+                        "existing-orders-contract-test-key")
                                 .header(
                                         HttpHeaders.AUTHORIZATION,
                                         bearer(
@@ -405,6 +417,9 @@ class SecurityRealJwtOrdersHttpEndToEndTest {
 
         mockMvc.perform(
                         post("/orders")
+                .header(
+                        "Idempotency-Key",
+                        "existing-orders-contract-test-key")
                                 .header(
                                         HttpHeaders.AUTHORIZATION,
                                         bearer(
@@ -423,6 +438,9 @@ class SecurityRealJwtOrdersHttpEndToEndTest {
 
         mockMvc.perform(
                         post("/orders")
+                .header(
+                        "Idempotency-Key",
+                        "existing-orders-contract-test-key")
                                 .header(
                                         HttpHeaders.AUTHORIZATION,
                                         bearer(

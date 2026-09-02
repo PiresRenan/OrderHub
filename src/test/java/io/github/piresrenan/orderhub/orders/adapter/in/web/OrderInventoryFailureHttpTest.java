@@ -171,6 +171,9 @@ class OrderInventoryFailureHttpTest {
                         UUID.randomUUID());
 
         return post("/orders")
+                .header(
+                        "Idempotency-Key",
+                        "existing-orders-contract-test-key")
                 .principal(
                         new AuthenticatedUserAuthenticationToken(
                                 principal))

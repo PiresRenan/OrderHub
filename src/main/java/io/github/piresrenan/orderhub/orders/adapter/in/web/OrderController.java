@@ -1,11 +1,13 @@
 package io.github.piresrenan.orderhub.orders.adapter.in.web;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -62,7 +64,11 @@ public final class OrderController {
             produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<OrderResponse> create(
             TrustedTenantContext tenantContext,
+            @RequestHeader HttpHeaders headers,
             @Valid @RequestBody CreateOrderRequest request) {
+
+        OrderIdempotencyKeyHeader.requireValid(
+                headers);
 
         if (request.items().size() > maxItems) {
             throw new OrderRequestTooLargeException();

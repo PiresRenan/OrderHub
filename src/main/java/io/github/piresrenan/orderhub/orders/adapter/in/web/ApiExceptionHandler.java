@@ -34,6 +34,31 @@ public final class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         private static final String PROBLEM_BASE = "urn:orderhub:problem:";
 
         /**
+         * Converts a missing or syntactically invalid create-Order idempotency key
+         * into a stable RFC 9457 response without reflecting the supplied header.
+         *
+         * @return privacy-safe 400 response for an invalid Idempotency-Key contract
+         */
+        @ExceptionHandler(OrderIdempotencyKeyInvalidException.class)
+        protected ResponseEntity<Object> handleOrderIdempotencyKeyInvalid() {
+
+                var status =
+                                HttpStatus.BAD_REQUEST;
+
+                var problem =
+                                problem(
+                                                status,
+                                                "idempotency-key-invalid",
+                                                "Invalid idempotency key",
+                                                "The request idempotency key is missing or invalid.",
+                                                "IDEMPOTENCY_KEY_INVALID");
+
+                return ResponseEntity
+                                .status(status)
+                                .body(problem);
+        }
+
+        /**
          * Converts an Orders-specific technical resource-limit violation into a stable
          * RFC 9457 response without exposing request contents or configured thresholds.
          *

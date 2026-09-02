@@ -230,6 +230,9 @@ class OrderHttpResourceLimitsTest {
         private static MockHttpServletRequestBuilder authenticatedPost() {
 
                 return post("/orders")
+                .header(
+                        "Idempotency-Key",
+                        "existing-orders-contract-test-key")
                                 .principal(
                                                 new AuthenticatedUserAuthenticationToken(
                                                                 new AuthenticatedUserPrincipal(

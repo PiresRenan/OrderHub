@@ -132,6 +132,9 @@ class CreateOrderDatabaseFailureIntegrationTest {
 
         mockMvc.perform(
                         post("/orders")
+                .header(
+                        "Idempotency-Key",
+                        "existing-orders-contract-test-key")
                                 .with(
                                         authentication(
                                                 requestAuthentication))

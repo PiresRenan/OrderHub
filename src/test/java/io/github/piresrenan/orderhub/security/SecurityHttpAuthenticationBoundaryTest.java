@@ -224,6 +224,9 @@ class SecurityHttpAuthenticationBoundaryTest {
 
         mockMvc.perform(
                         post("/orders")
+                .header(
+                        "Idempotency-Key",
+                        "existing-orders-contract-test-key")
                                 .header(
                                         HttpHeaders.AUTHORIZATION,
                                         "Bearer " + ACCESS_TOKEN)
