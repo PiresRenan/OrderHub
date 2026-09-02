@@ -21,6 +21,7 @@ import io.github.piresrenan.orderhub.inventory.application.port.in.CommitOrderIn
 import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryAllocationOutcome;
 import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryCommitmentRejectedException;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderIdempotencyKeyDigest;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderIdGenerator;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderRepository;
 import io.github.piresrenan.orderhub.orders.application.port.out.TransactionExecutor;
@@ -65,7 +66,7 @@ class CreateOrderServiceTest {
                 UUID.randomUUID();
 
         var service =
-                new CreateOrderService(
+                CreateOrderServiceTestFactory.create(
                         repository,
                         () -> orderId,
                         transaction,
@@ -80,7 +81,8 @@ class CreateOrderServiceTest {
                                 List.of(
                                         new CreateOrderCommand.Item(
                                                 variantId,
-                                                2))));
+                                                2)),
+                                CreateOrderIdempotencyKeyDigest.of(new byte[32])));
 
         assertThat(result.order().id())
                 .isEqualTo(
@@ -144,7 +146,7 @@ class CreateOrderServiceTest {
                 UUID.randomUUID();
 
         var service =
-                new CreateOrderService(
+                CreateOrderServiceTestFactory.create(
                         new RecordingOrderRepository(
                                 transaction::isActive,
                                 new ArrayList<>()),
@@ -163,7 +165,8 @@ class CreateOrderServiceTest {
                                         2),
                                 new CreateOrderCommand.Item(
                                         variantId,
-                                        3))));
+                                        3)),
+                        CreateOrderIdempotencyKeyDigest.of(new byte[32])));
 
         assertThat(catalog.command.variantIds())
                 .containsExactly(
@@ -201,7 +204,7 @@ class CreateOrderServiceTest {
                 new RecordingTransactionExecutor();
 
         var service =
-                new CreateOrderService(
+                CreateOrderServiceTestFactory.create(
                         new RecordingOrderRepository(
                                 transaction::isActive,
                                 new ArrayList<>()),
@@ -222,7 +225,8 @@ class CreateOrderServiceTest {
                                 List.of(
                                         new CreateOrderCommand.Item(
                                                 UUID.randomUUID(),
-                                                1))));
+                                                1)),
+                                CreateOrderIdempotencyKeyDigest.of(new byte[32])));
 
         assertThat(calls)
                 .hasValue(1);
@@ -254,7 +258,7 @@ class CreateOrderServiceTest {
                         new ArrayList<>());
 
         var service =
-                new CreateOrderService(
+                CreateOrderServiceTestFactory.create(
                         repository,
                         UUID::randomUUID,
                         transaction,
@@ -266,7 +270,8 @@ class CreateOrderServiceTest {
                         new CreateOrderCommand(
                                 UUID.randomUUID(),
                                 UUID.randomUUID(),
-                                List.of())))
+                                List.of(),
+                                CreateOrderIdempotencyKeyDigest.of(new byte[32]))))
                 .isInstanceOf(
                         IllegalArgumentException.class)
                 .hasMessage(
@@ -316,7 +321,7 @@ class CreateOrderServiceTest {
                 rejection;
 
         var service =
-                new CreateOrderService(
+                CreateOrderServiceTestFactory.create(
                         repository,
                         UUID::randomUUID,
                         transaction,
@@ -331,7 +336,8 @@ class CreateOrderServiceTest {
                                 List.of(
                                         new CreateOrderCommand.Item(
                                                 UUID.randomUUID(),
-                                                1)))))
+                                                1)),
+                                CreateOrderIdempotencyKeyDigest.of(new byte[32]))))
                 .isSameAs(
                         rejection);
 
@@ -381,7 +387,7 @@ class CreateOrderServiceTest {
                 rejection;
 
         var service =
-                new CreateOrderService(
+                CreateOrderServiceTestFactory.create(
                         repository,
                         UUID::randomUUID,
                         transaction,
@@ -396,7 +402,8 @@ class CreateOrderServiceTest {
                                 List.of(
                                         new CreateOrderCommand.Item(
                                                 UUID.randomUUID(),
-                                                1)))))
+                                                1)),
+                                CreateOrderIdempotencyKeyDigest.of(new byte[32]))))
                 .isSameAs(
                         rejection);
 

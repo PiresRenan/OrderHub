@@ -54,7 +54,7 @@ be proven before adding asynchronous distribution.
 
 ## OH-011 — Tenant-scoped catalog, inventory and atomic order commitment
 
-Status: ACTIVE
+Status: COMPLETED — merged into `pre-release` at `93c004f82e11e61885ffc969b6a8d1eb9e901a24` on 2026-09-01
 
 Introduce first-class `catalog` and `inventory` modules.
 
@@ -93,6 +93,41 @@ Temporary reservation/TTL, warehouse sourcing, stock transfer, complete PIM,
 full pricing, administrative APIs and order cancellation remain separate
 problems.
 
+## OH-012 — Durable order request idempotency and recovery
+
+Status: TESTED — implementation and required review validation complete; merge pending
+
+OH-011 made Order persistence, Catalog orderability validation and Inventory
+commitment one atomic business transaction. The next exposed reliability gap is
+an ambiguous client outcome after that transaction commits.
+
+`POST /orders` therefore gains durable request idempotency before automatic
+retries, transactional outbox or external integrations are introduced.
+
+Direction:
+
+- require one client-supplied `Idempotency-Key` for Order creation;
+- scope key identity by trusted Tenant and versioned operation;
+- persist only a cryptographic digest of the raw key;
+- compare a canonical business-command fingerprint rather than raw JSON bytes;
+- preserve current Order item sequence/multiplicity semantics in the fingerprint;
+- coordinate duplicate requests using PostgreSQL uniqueness/transaction semantics;
+- commit the successful idempotency outcome atomically with Order and Inventory;
+- replay a completed successful result without repeating business effects;
+- reject a completed key reused for a different fingerprint;
+- bound only idempotency acquisition lock waiting through a dedicated externally
+  configured PostgreSQL `lock_timeout`, restoring the prior value before
+  Catalog/Inventory work;
+- retain completed records without automatic expiry in the initial implementation;
+- never expose raw idempotency keys or fingerprints through logs, metrics or
+  Problem Details.
+
+The latest IETF HTTPAPI `Idempotency-Key` Internet-Draft is treated only as design
+precedent. Revision 07 expired on 2026-04-18 and is not an active RFC; OrderHub
+therefore owns and documents its concrete public contract explicitly.
+
+OH-012 does not introduce Redis, brokers, distributed mutex products, broad
+automatic retries, outbox publication or authorization administration.
 ## Authorization foundation — planned after a concrete privileged surface exists
 
 Inventory and Catalog administration create the first concrete requirement for
@@ -219,21 +254,6 @@ Direction:
 - later evolution may introduce just-in-time privileged activation, expiry,
   approval and periodic access review when the operational complexity warrants
   it.
-
-## Durable request idempotency and recovery — planned
-
-After the complete Order + Inventory unit of business consistency exists,
-implement durable idempotency for external order creation.
-
-The contract must distinguish:
-
-- same tenant + idempotency key + same request -> deterministic replay;
-- same key + different request -> conflict;
-- unknown client outcome after commit -> safe recovery without duplicate Order or
-  duplicate Inventory commitment.
-
-Order cancellation/release and recovery will build on durable InventoryCommitment
-state and must be idempotent so the same stock cannot be released twice.
 
 ## Transactional outbox — planned
 

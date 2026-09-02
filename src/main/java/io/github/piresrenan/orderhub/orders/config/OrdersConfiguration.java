@@ -1,7 +1,9 @@
 package io.github.piresrenan.orderhub.orders.config;
 
+import java.time.Duration;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -12,11 +14,14 @@ import org.springframework.transaction.support.TransactionTemplate;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.ValidateOrderableVariantsUseCase;
 import io.github.piresrenan.orderhub.inventory.application.port.in.CommitOrderInventoryUseCase;
+import io.github.piresrenan.orderhub.orders.adapter.out.observability.micrometer.MicrometerObservedCreateOrderIdempotencyRepository;
 import io.github.piresrenan.orderhub.orders.adapter.out.observability.micrometer.MicrometerObservedCreateOrderUseCase;
 import io.github.piresrenan.orderhub.orders.adapter.out.observability.micrometer.MicrometerObservedTransactionExecutor;
+import io.github.piresrenan.orderhub.orders.adapter.out.persistence.postgresql.PostgreSqlCreateOrderIdempotencyRepository;
 import io.github.piresrenan.orderhub.orders.adapter.out.persistence.postgresql.PostgreSqlOrderRepository;
 import io.github.piresrenan.orderhub.orders.adapter.out.transaction.spring.SpringTransactionExecutor;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
+import io.github.piresrenan.orderhub.orders.application.port.out.CreateOrderIdempotencyRepository;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderIdGenerator;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderRepository;
 import io.github.piresrenan.orderhub.orders.application.port.out.TransactionExecutor;
@@ -33,6 +38,33 @@ public class OrdersConfiguration {
 
         return new PostgreSqlOrderRepository(
                 jdbcTemplate);
+    }
+
+    /**
+     * Creates the PostgreSQL authority used only inside the application-owned
+     * create-Order transaction.
+     *
+     * <p>
+     * The acquisition timeout is deliberately distinct from the total Order
+     * transaction timeout so later Catalog/Inventory lock waits are not
+     * misclassified as idempotency contention.
+     * </p>
+     */
+    @Bean
+    CreateOrderIdempotencyRepository createOrderIdempotencyRepository(
+            JdbcTemplate jdbcTemplate,
+            @Value("${orderhub.orders.idempotency.acquisition-timeout}")
+            Duration acquisitionTimeout,
+            MeterRegistry meterRegistry) {
+
+        var postgreSqlRepository =
+                new PostgreSqlCreateOrderIdempotencyRepository(
+                        jdbcTemplate,
+                        acquisitionTimeout);
+
+        return new MicrometerObservedCreateOrderIdempotencyRepository(
+                postgreSqlRepository,
+                meterRegistry);
     }
 
     /**
@@ -78,6 +110,7 @@ public class OrdersConfiguration {
             TransactionExecutor transactionExecutor,
             ValidateOrderableVariantsUseCase catalog,
             CommitOrderInventoryUseCase inventory,
+            CreateOrderIdempotencyRepository idempotency,
             MeterRegistry meterRegistry) {
 
         var createOrderService =
@@ -86,7 +119,8 @@ public class OrdersConfiguration {
                         orderIdGenerator,
                         transactionExecutor,
                         catalog,
-                        inventory);
+                        inventory,
+                        idempotency);
 
         return new MicrometerObservedCreateOrderUseCase(
                 createOrderService,

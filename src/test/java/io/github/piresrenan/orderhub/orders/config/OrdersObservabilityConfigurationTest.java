@@ -14,6 +14,7 @@ import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.Va
 import io.github.piresrenan.orderhub.inventory.application.port.in.CommitOrderInventoryUseCase;
 import io.github.piresrenan.orderhub.orders.adapter.out.observability.micrometer.MicrometerObservedCreateOrderUseCase;
 import io.github.piresrenan.orderhub.orders.adapter.out.observability.micrometer.MicrometerObservedTransactionExecutor;
+import io.github.piresrenan.orderhub.orders.application.port.out.CreateOrderIdempotencyRepository;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderIdGenerator;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderRepository;
 
@@ -53,6 +54,8 @@ class OrdersObservabilityConfigurationTest {
                                 ValidateOrderableVariantsUseCase.class),
                         mock(
                                 CommitOrderInventoryUseCase.class),
+                        mock(
+                                CreateOrderIdempotencyRepository.class),
                         registry);
 
         assertThat(createOrder)

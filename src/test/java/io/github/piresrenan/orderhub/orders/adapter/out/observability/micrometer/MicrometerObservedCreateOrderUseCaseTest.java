@@ -18,10 +18,13 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.CatalogOrderabilityRejectedException;
 import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryCommitmentRejectedException;
 import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryOperationException;
+import io.github.piresrenan.orderhub.orders.application.idempotency.CreateOrderIdempotencyKeyReusedException;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderAllocationOutcome;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderIdempotencyKeyDigest;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderResult;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
+import io.github.piresrenan.orderhub.orders.application.port.out.CreateOrderIdempotencyInProgressException;
 import io.github.piresrenan.orderhub.orders.application.port.out.TransactionExecutionException;
 import io.github.piresrenan.orderhub.orders.domain.model.Order;
 import io.github.piresrenan.orderhub.orders.domain.model.OrderItem;
@@ -81,6 +84,66 @@ class MicrometerObservedCreateOrderUseCaseTest {
                 metricValue(outcome));
 
         assertNoBusinessIdentityTags(
+                registry);
+    }
+
+    @Test
+    void doesNotClassifyIdempotencyKeyReuseAsCreateFailure() {
+
+        var registry =
+                new SimpleMeterRegistry();
+
+        var failure =
+                new CreateOrderIdempotencyKeyReusedException();
+
+        CreateOrderUseCase delegate =
+                command -> {
+                    throw failure;
+                };
+
+        var observed =
+                new MicrometerObservedCreateOrderUseCase(
+                        delegate,
+                        registry);
+
+        assertThatThrownBy(() ->
+                observed.create(
+                        command()))
+                .isSameAs(
+                        failure);
+
+        assertNoCreateFailureMeter(
+                registry);
+    }
+
+    @Test
+    void doesNotClassifyIdempotencyInProgressAsCreateFailure() {
+
+        var registry =
+                new SimpleMeterRegistry();
+
+        var failure =
+                new CreateOrderIdempotencyInProgressException(
+                        new IllegalStateException(
+                                "synthetic expected idempotency contention"));
+
+        CreateOrderUseCase delegate =
+                command -> {
+                    throw failure;
+                };
+
+        var observed =
+                new MicrometerObservedCreateOrderUseCase(
+                        delegate,
+                        registry);
+
+        assertThatThrownBy(() ->
+                observed.create(
+                        command()))
+                .isSameAs(
+                        failure);
+
+        assertNoCreateFailureMeter(
                 registry);
     }
 
@@ -238,6 +301,22 @@ class MicrometerObservedCreateOrderUseCaseTest {
                 "technical_failure");
     }
 
+    private static void assertNoCreateFailureMeter(
+            SimpleMeterRegistry registry) {
+
+        assertThat(
+                registry.getMeters()
+                        .stream()
+                        .filter(meter ->
+                                FAILURE_METRIC.equals(
+                                        meter.getId()
+                                                .getName()))
+                        .toList())
+                .as(
+                        "Expected idempotency control flow must not be classified as create failure")
+                .isEmpty();
+    }
+
     private static void assertFailureReason(
             SimpleMeterRegistry registry,
             RuntimeException failure,
@@ -339,7 +418,8 @@ class MicrometerObservedCreateOrderUseCaseTest {
                 List.of(
                         new CreateOrderCommand.Item(
                                 VARIANT_ID,
-                                1)));
+                                1)),
+                CreateOrderIdempotencyKeyDigest.of(new byte[32]));
     }
 
     private static CreateOrderResult result(

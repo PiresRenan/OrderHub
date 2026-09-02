@@ -119,6 +119,7 @@ class OrderHubMultiReplicaInventoryAcceptanceTest {
                 startReplica(
                         "A",
                         CUSTOMER_A,
+                        "multi-replica:" + CUSTOMER_A,
                         gateDirectory,
                         logA);
 
@@ -126,6 +127,7 @@ class OrderHubMultiReplicaInventoryAcceptanceTest {
                 startReplica(
                         "B",
                         CUSTOMER_B,
+                        "multi-replica:" + CUSTOMER_B,
                         gateDirectory,
                         logB);
 
@@ -248,9 +250,164 @@ class OrderHubMultiReplicaInventoryAcceptanceTest {
         }
     }
 
+    @Test
+    void twoIndependentOrderHubProcessesShareOneIdempotentRequestWithoutDuplicateEffects()
+            throws Exception {
+
+        var fixtureDataSource =
+                new DriverManagerDataSource(
+                        POSTGRES.getJdbcUrl(),
+                        POSTGRES.getUsername(),
+                        POSTGRES.getPassword());
+
+        Flyway.configure()
+                .dataSource(
+                        fixtureDataSource)
+                .locations(
+                        "classpath:db/migration")
+                .load()
+                .migrate();
+
+        var jdbcTemplate =
+                new JdbcTemplate(
+                        fixtureDataSource);
+
+        resetBusinessState(
+                jdbcTemplate);
+
+        seedLastUnit(
+                jdbcTemplate);
+
+        var gateDirectory =
+                temporaryDirectory.resolve(
+                        "idempotency-replica-gate");
+
+        Files.createDirectories(
+                gateDirectory);
+
+        var logA =
+                temporaryDirectory.resolve(
+                        "idempotency-replica-a.log");
+
+        var logB =
+                temporaryDirectory.resolve(
+                        "idempotency-replica-b.log");
+
+        var sharedMarker =
+                "multi-replica-shared-idempotency-request";
+
+        /*
+         * Same Tenant, Customer, Variant, quantity and key marker:
+         * same durable key identity and same canonical fingerprint.
+         */
+        var replicaA =
+                startReplica(
+                        "A",
+                        CUSTOMER_A,
+                        sharedMarker,
+                        gateDirectory,
+                        logA);
+
+        var replicaB =
+                startReplica(
+                        "B",
+                        CUSTOMER_A,
+                        sharedMarker,
+                        gateDirectory,
+                        logB);
+
+        try {
+
+            awaitReplicaReady(
+                    replicaA,
+                    gateDirectory.resolve(
+                            "ready-A"),
+                    logA);
+
+            awaitReplicaReady(
+                    replicaB,
+                    gateDirectory.resolve(
+                            "ready-B"),
+                    logB);
+
+            Files.createFile(
+                    gateDirectory.resolve(
+                            "start"));
+
+            assertProcessCompleted(
+                    replicaA,
+                    logA);
+
+            assertProcessCompleted(
+                    replicaB,
+                    logB);
+
+            var resultA =
+                    Files.readString(
+                            gateDirectory.resolve(
+                                    "result-A"),
+                            StandardCharsets.UTF_8);
+
+            var resultB =
+                    Files.readString(
+                            gateDirectory.resolve(
+                                    "result-B"),
+                            StandardCharsets.UTF_8);
+
+            /*
+             * One JVM executes the business transaction and the other replays.
+             * Both callers therefore receive success.
+             */
+            assertThat(resultA)
+                    .isEqualTo(
+                            "SUCCESS");
+
+            assertThat(resultB)
+                    .isEqualTo(
+                            "SUCCESS");
+
+            assertDurableSingleCommit(
+                    jdbcTemplate);
+
+            assertThat(
+                    scalar(
+                            jdbcTemplate,
+                            """
+                            SELECT COUNT(*)
+                            FROM orders.order_request_idempotency
+                            WHERE tenant_id = ?
+                              AND state = 'COMPLETED'
+                            """,
+                            TENANT_ID))
+                    .isEqualTo(
+                            1);
+
+            assertThat(
+                    scalar(
+                            jdbcTemplate,
+                            """
+                            SELECT COUNT(*)
+                            FROM orders.order_request_idempotency
+                            WHERE tenant_id = ?
+                              AND state = 'PROCESSING'
+                            """,
+                            TENANT_ID))
+                    .isZero();
+
+        } finally {
+
+            destroyIfAlive(
+                    replicaA);
+
+            destroyIfAlive(
+                    replicaB);
+        }
+    }
+
     private Process startReplica(
             String replicaName,
             UUID customerId,
+            String idempotencyMarker,
             Path gateDirectory,
             Path logPath)
             throws Exception {
@@ -296,7 +453,8 @@ class OrderHubMultiReplicaInventoryAcceptanceTest {
                         TENANT_ID.toString(),
                         customerId.toString(),
                         VARIANT_ID.toString(),
-                        gateDirectory.toAbsolutePath().toString());
+                        gateDirectory.toAbsolutePath().toString(),
+                        idempotencyMarker);
 
         processBuilder
                 .redirectErrorStream(true)
@@ -381,6 +539,7 @@ class OrderHubMultiReplicaInventoryAcceptanceTest {
                     catalog.categories,
                     catalog.category_hierarchy_guards,
                     catalog.products,
+                    orders.order_request_idempotency,
                     orders.order_items,
                     orders.orders
                 """);

@@ -25,6 +25,9 @@ import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.Ca
 import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.CatalogOrderabilityTechnicalException;
 import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryCommitmentRejectedException;
 import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryOperationException;
+import io.github.piresrenan.orderhub.orders.application.idempotency.CreateOrderIdempotencyKeyReusedException;
+import io.github.piresrenan.orderhub.orders.application.port.out.CreateOrderIdempotencyInProgressException;
+import io.github.piresrenan.orderhub.orders.application.port.out.CreateOrderIdempotencyPersistenceException;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderPersistenceException;
 import io.github.piresrenan.orderhub.orders.application.port.out.TransactionExecutionException;
 
@@ -32,6 +35,77 @@ import io.github.piresrenan.orderhub.orders.application.port.out.TransactionExec
 public final class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
         private static final String PROBLEM_BASE = "urn:orderhub:problem:";
+
+        /**
+         * Converts a missing or syntactically invalid create-Order idempotency key
+         * into a stable RFC 9457 response without reflecting the supplied header.
+         *
+         * @return privacy-safe 400 response for an invalid Idempotency-Key contract
+         */
+        @ExceptionHandler(OrderIdempotencyKeyInvalidException.class)
+        protected ResponseEntity<Object> handleOrderIdempotencyKeyInvalid() {
+
+                var status =
+                                HttpStatus.BAD_REQUEST;
+
+                var problem =
+                                problem(
+                                                status,
+                                                "idempotency-key-invalid",
+                                                "Invalid idempotency key",
+                                                "The request idempotency key is missing or invalid.",
+                                                "IDEMPOTENCY_KEY_INVALID");
+
+                return ResponseEntity
+                                .status(status)
+                                .body(problem);
+        }
+
+        /**
+         * Rejects reuse of one durable idempotency identity for different
+         * canonical create-Order request content.
+         */
+        @ExceptionHandler(CreateOrderIdempotencyKeyReusedException.class)
+        protected ResponseEntity<Object> handleCreateOrderIdempotencyKeyReused() {
+
+                var status =
+                                HttpStatus.UNPROCESSABLE_ENTITY;
+
+                var problem =
+                                problem(
+                                                status,
+                                                "idempotency-key-reused",
+                                                "Idempotency key reused",
+                                                "The request idempotency key cannot be reused for different request content.",
+                                                "IDEMPOTENCY_KEY_REUSED");
+
+                return ResponseEntity
+                                .status(status)
+                                .body(problem);
+        }
+
+        /**
+         * Reports that bounded durable idempotency acquisition could not finish
+         * while another transaction still owned the conflicting identity.
+         */
+        @ExceptionHandler(CreateOrderIdempotencyInProgressException.class)
+        protected ResponseEntity<Object> handleCreateOrderIdempotencyInProgress() {
+
+                var status =
+                                HttpStatus.CONFLICT;
+
+                var problem =
+                                problem(
+                                                status,
+                                                "idempotency-request-in-progress",
+                                                "Idempotent request in progress",
+                                                "A request with this idempotency key is still being processed.",
+                                                "IDEMPOTENCY_REQUEST_IN_PROGRESS");
+
+                return ResponseEntity
+                                .status(status)
+                                .body(problem);
+        }
 
         /**
          * Converts an Orders-specific technical resource-limit violation into a stable
@@ -108,6 +182,7 @@ public final class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                                 .body(problem);
         }
         @ExceptionHandler({
+                        CreateOrderIdempotencyPersistenceException.class,
                         OrderPersistenceException.class,
                         TransactionExecutionException.class,
                         InventoryOperationException.class,
