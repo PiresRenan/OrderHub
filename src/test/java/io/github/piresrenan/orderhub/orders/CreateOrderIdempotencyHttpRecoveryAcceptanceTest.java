@@ -418,10 +418,97 @@ class CreateOrderIdempotencyHttpRecoveryAcceptanceTest {
         assertIdempotencyMetricHasOnlyBoundedOutcomeTags();
     }
 
+    @Test
+    void transportFormattingAndJsonPropertyOrderDoNotChangeBusinessFingerprint()
+            throws Exception {
+
+        seedActiveCatalogAndInventory(
+                10);
+
+        var token =
+                validToken();
+
+        var key =
+                "http-canonical-json-key";
+
+        performCreateBody(
+                token,
+                key,
+                body(
+                        2))
+                .andExpect(
+                        status().isCreated());
+
+        var orderId =
+                singleOrderId();
+
+        var semanticallyIdenticalBody =
+                """
+                {
+                    "items" : [
+                        {
+                            "quantity" : 2,
+                            "variantId" : "%s"
+                        }
+                    ],
+                    "customerId" : "%s"
+                }
+                """.formatted(
+                        VARIANT_ID,
+                        CUSTOMER_ID);
+
+        performCreateBody(
+                token,
+                key,
+                semanticallyIdenticalBody)
+                .andExpect(
+                        status().isCreated())
+                .andExpect(
+                        jsonPath("$.id")
+                                .value(
+                                        orderId.toString()));
+
+        assertThat(orderCount())
+                .isEqualTo(
+                        1);
+
+        assertThat(commitmentCount())
+                .isEqualTo(
+                        1);
+
+        assertThat(committedQuantity())
+                .isEqualTo(
+                        2);
+
+        assertThat(completedIdempotencyCount())
+                .isEqualTo(
+                        1);
+
+        assertThat(processingIdempotencyCount())
+                .isZero();
+
+        assertCounter(
+                "replay",
+                1.0d);
+    }
+
     private org.springframework.test.web.servlet.ResultActions performCreate(
             String token,
             String idempotencyKey,
             int quantity)
+            throws Exception {
+
+        return performCreateBody(
+                token,
+                idempotencyKey,
+                body(
+                        quantity));
+    }
+
+    private org.springframework.test.web.servlet.ResultActions performCreateBody(
+            String token,
+            String idempotencyKey,
+            String requestBody)
             throws Exception {
 
         return mockMvc.perform(
@@ -439,8 +526,7 @@ class CreateOrderIdempotencyHttpRecoveryAcceptanceTest {
                         .contentType(
                                 MediaType.APPLICATION_JSON)
                         .content(
-                                body(
-                                        quantity)));
+                                requestBody));
     }
 
     private void seedActiveCatalogAndInventory(

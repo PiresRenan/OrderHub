@@ -37,9 +37,11 @@ public final class OrderHubReplicaWorker {
             String[] args)
             throws Exception {
 
-        if (args.length != 8) {
+        if (args.length != 8
+                && args.length != 9) {
+
             throw new IllegalArgumentException(
-                    "Expected 8 replica-worker arguments");
+                    "Expected 8 or 9 replica-worker arguments");
         }
 
         var replicaName =
@@ -65,6 +67,12 @@ public final class OrderHubReplicaWorker {
 
         var gateDirectory =
                 Path.of(args[7]);
+
+        var idempotencyMarker =
+                args.length == 9
+                        ? args[8]
+                        : "multi-replica:"
+                                + customerId;
 
         var readyPath =
                 gateDirectory.resolve(
@@ -93,7 +101,8 @@ public final class OrderHubReplicaWorker {
                                 "spring.jmx.enabled=false",
                                 "spring.main.banner-mode=off",
                                 "logging.level.root=WARN",
-                                "orderhub.orders.transaction.timeout=5s",
+                                "orderhub.orders.transaction.timeout=10s",
+                                "orderhub.orders.idempotency.acquisition-timeout=5s",
                                 "orderhub.security.jwt.issuer="
                                         + "https://issuer.orderhub.test",
                                 "orderhub.security.jwt.audience="
@@ -146,8 +155,7 @@ public final class OrderHubReplicaWorker {
                                                 variantId,
                                                 1)),
                                 TestCreateOrderIdempotencyKeyDigests.from(
-                                        "multi-replica:"
-                                                + customerId)));
+                                        idempotencyMarker)));
 
                 Files.writeString(
                         resultPath,
