@@ -424,6 +424,31 @@ catalog and constrained by an applicable PermissionEnvelope.
 
 Tenant custom roles cannot create new executable permissions.
 
+Role code resolution must remain unambiguous across the global system namespace
+and Tenant-owned custom definitions.
+
+V12 therefore reserves every stable role code in exactly one durable namespace:
+`SYSTEM` or `TENANT_CUSTOM`.
+
+`SYSTEM` covers non-custom OrderHub definitions. `TENANT_CUSTOM` covers
+Tenant-owned definitions.
+
+The same `TENANT_CUSTOM` code may be used independently by different Tenants.
+A code reserved by one namespace cannot later shadow or be reinterpreted as the
+other namespace.
+
+The reservation survives deletion of an individual RoleDefinition. Stable role
+codes therefore cannot silently change authorization meaning over time.
+
+OH-013 also exposes a read-only durable RoleDefinition repository. The
+repository resolves the definition visible in one Tenant scope and reconstructs
+its atomic permissions from `role_permissions`.
+
+For persisted OH-013 definitions, the persisted permission membership is also
+the definition's current PermissionEnvelope. A wider editable custom-role
+envelope is not invented before the deferred custom-role administration
+lifecycle exists.
+
 ## Role assignment
 
 A RoleAssignment is scoped authorization state.

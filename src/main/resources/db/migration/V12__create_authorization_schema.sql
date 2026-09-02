@@ -38,6 +38,24 @@ VALUES
 
     ('AUDIT_VIEW', 'STAFF');
 
+CREATE TABLE access_control.role_code_registry (
+    code TEXT NOT NULL,
+    role_namespace TEXT NOT NULL,
+
+    CONSTRAINT pk_authorization_role_code_registry
+        PRIMARY KEY (code),
+
+    CONSTRAINT ck_authorization_role_code_registry_code
+        CHECK (code ~ '^[A-Z][A-Z0-9_]{2,63}$'),
+
+    CONSTRAINT ck_authorization_role_code_registry_namespace
+        CHECK (
+            role_namespace IN (
+                'SYSTEM',
+                'TENANT_CUSTOM'
+            )
+        )
+);
 CREATE TABLE access_control.role_definitions (
     role_id UUID PRIMARY KEY,
     tenant_id UUID,
@@ -99,6 +117,62 @@ CREATE UNIQUE INDEX uq_authorization_tenant_role_code
     )
     WHERE tenant_id IS NOT NULL;
 
+CREATE FUNCTION access_control.reserve_role_code_namespace()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    requested_namespace TEXT;
+    reserved_namespace TEXT;
+BEGIN
+    requested_namespace :=
+        CASE
+            WHEN NEW.mutability = 'TENANT_CUSTOM'
+                THEN 'TENANT_CUSTOM'
+            ELSE 'SYSTEM'
+        END;
+
+    INSERT INTO access_control.role_code_registry (
+        code,
+        role_namespace
+    )
+    VALUES (
+        NEW.code,
+        requested_namespace
+    )
+    ON CONFLICT (code)
+    DO NOTHING
+    RETURNING role_namespace
+    INTO reserved_namespace;
+
+    IF reserved_namespace IS NULL THEN
+        SELECT registry.role_namespace
+        INTO reserved_namespace
+        FROM access_control.role_code_registry registry
+        WHERE registry.code = NEW.code;
+    END IF;
+
+    IF reserved_namespace IS DISTINCT FROM requested_namespace THEN
+        RAISE unique_violation
+            USING
+                MESSAGE =
+                    'Role code is already reserved by another authorization namespace',
+                CONSTRAINT =
+                    'pk_authorization_role_code_registry';
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_authorization_role_code_namespace
+BEFORE INSERT OR UPDATE OF
+    code,
+    tenant_id,
+    mutability
+ON access_control.role_definitions
+FOR EACH ROW
+EXECUTE FUNCTION access_control.reserve_role_code_namespace();
 CREATE TABLE access_control.role_permissions (
     role_id UUID NOT NULL,
     permission_code TEXT NOT NULL,

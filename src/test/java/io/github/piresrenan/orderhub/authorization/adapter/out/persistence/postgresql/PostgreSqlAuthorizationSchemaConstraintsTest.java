@@ -135,6 +135,86 @@ class PostgreSqlAuthorizationSchemaConstraintsTest {
     }
 
     @Test
+    void tenantCustomRoleCannotShadowSystemRoleCode() {
+
+        var code =
+                "SYSTEM_NAMESPACE_TEST_ROLE";
+
+        insertSystemRole(
+                code);
+
+        assertThatThrownBy(() ->
+                jdbcTemplate.update(
+                        """
+                        INSERT INTO access_control.role_definitions (
+                            role_id,
+                            tenant_id,
+                            code,
+                            persona,
+                            authority_band,
+                            mutability
+                        )
+                        VALUES (?, ?, ?, 'STAFF', 'OPERATIONAL', 'TENANT_CUSTOM')
+                        """,
+                        UUID.randomUUID(),
+                        UUID.randomUUID(),
+                        code))
+                .isInstanceOf(
+                        DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void tenantCustomRoleCodeMayBeReusedAcrossDifferentTenants() {
+
+        var code =
+                "SHARED_CUSTOM_WAREHOUSE_ROLE";
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO access_control.role_definitions (
+                    role_id,
+                    tenant_id,
+                    code,
+                    persona,
+                    authority_band,
+                    mutability
+                )
+                VALUES (?, ?, ?, 'STAFF', 'OPERATIONAL', 'TENANT_CUSTOM')
+                """,
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                code);
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO access_control.role_definitions (
+                    role_id,
+                    tenant_id,
+                    code,
+                    persona,
+                    authority_band,
+                    mutability
+                )
+                VALUES (?, ?, ?, 'STAFF', 'OPERATIONAL', 'TENANT_CUSTOM')
+                """,
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                code);
+
+        assertThat(
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM access_control.role_definitions
+                        WHERE code = ?
+                          AND tenant_id IS NOT NULL
+                        """,
+                        Integer.class,
+                        code))
+                .isEqualTo(
+                        2);
+    }
+    @Test
     void authorizationForeignKeysNeverTargetUsersOrTenantsSchemas() {
 
         var referencedSchemas =
