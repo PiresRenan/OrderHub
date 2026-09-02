@@ -56,6 +56,7 @@ public final class OrderController {
      * contract into the application command.
      *
      * @param tenantContext trusted Tenant context established by Security
+     * @param headers request headers containing the validated idempotency identity
      * @param request validated HTTP payload
      * @return created Order and its independent Inventory allocation outcome
      */
@@ -67,8 +68,9 @@ public final class OrderController {
             @RequestHeader HttpHeaders headers,
             @Valid @RequestBody CreateOrderRequest request) {
 
-        OrderIdempotencyKeyHeader.requireValid(
-                headers);
+        var idempotencyKeyDigest =
+                OrderIdempotencyKeyHeader.requireValid(
+                        headers);
 
         if (request.items().size() > maxItems) {
             throw new OrderRequestTooLargeException();
@@ -87,7 +89,8 @@ public final class OrderController {
                 new CreateOrderCommand(
                         tenantContext.tenantId(),
                         request.customerId(),
-                        items);
+                        items,
+                        idempotencyKeyDigest);
 
         var result =
                 createOrderUseCase.create(

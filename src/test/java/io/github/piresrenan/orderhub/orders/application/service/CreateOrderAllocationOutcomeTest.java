@@ -14,6 +14,7 @@ import io.github.piresrenan.orderhub.inventory.application.port.in.CommitOrderIn
 import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryAllocationOutcome;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderAllocationOutcome;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderIdempotencyKeyDigest;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderResult;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderRepository;
 import io.github.piresrenan.orderhub.orders.application.port.out.TransactionExecutor;
@@ -77,7 +78,8 @@ class CreateOrderAllocationOutcomeTest {
                                 List.of(
                                         new CreateOrderCommand.Item(
                                                 variantId,
-                                                2))));
+                                                2)),
+                                CreateOrderIdempotencyKeyDigest.of(new byte[32])));
 
         assertThat(result.order().id())
                 .isEqualTo(orderId);

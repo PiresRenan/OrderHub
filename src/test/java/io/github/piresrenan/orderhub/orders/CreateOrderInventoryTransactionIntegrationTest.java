@@ -18,6 +18,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryCommitmentRejectedException;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderIdempotencyKeyDigest;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderAllocationOutcome;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
 import io.github.piresrenan.orderhub.orders.domain.model.OrderStatus;
@@ -547,7 +548,8 @@ class CreateOrderInventoryTransactionIntegrationTest {
         return new CreateOrderCommand(
                 TENANT_ID,
                 customerId,
-                items);
+                items,
+                CreateOrderIdempotencyKeyDigest.of(new byte[32]));
     }
 
     private static CreateOrderCommand.Item item(

@@ -24,6 +24,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderIdempotencyKeyDigest;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
 import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
 
@@ -698,7 +699,8 @@ class CreateOrderCatalogLifecycleConcurrencyAcceptanceTest {
                 List.of(
                         new CreateOrderCommand.Item(
                                 VARIANT_ID,
-                                1)));
+                                1)),
+                CreateOrderIdempotencyKeyDigest.of(new byte[32]));
     }
 
     private long orderCount() {

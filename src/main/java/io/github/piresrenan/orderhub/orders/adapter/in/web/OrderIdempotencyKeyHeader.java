@@ -1,16 +1,21 @@
 package io.github.piresrenan.orderhub.orders.adapter.in.web;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.List;
 
 import org.springframework.http.HttpHeaders;
 
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderIdempotencyKeyDigest;
+
 /**
- * Validates the transport-level Idempotency-Key contract for create-Order.
+ * Owns the transport-level Idempotency-Key contract for create-Order.
  *
  * <p>
- * This type intentionally remains inside the HTTP adapter. It validates only
- * header representation rules and does not define durable idempotency identity,
- * hashing, fingerprinting or persistence semantics.
+ * The raw header value remains confined to this HTTP adapter. Once syntax is
+ * accepted, it is immediately translated into a SHA-256 digest identity before
+ * crossing into the application boundary.
  * </p>
  */
 final class OrderIdempotencyKeyHeader {
@@ -25,14 +30,15 @@ final class OrderIdempotencyKeyHeader {
     }
 
     /**
-     * Requires exactly one syntactically valid Idempotency-Key header value.
+     * Requires exactly one syntactically valid Idempotency-Key and converts it
+     * into the application-safe cryptographic identity.
      *
      * @param headers HTTP request headers
-     * @return validated opaque header value
+     * @return SHA-256 identity of the accepted opaque key
      * @throws OrderIdempotencyKeyInvalidException when the header contract is
      *         violated
      */
-    static String requireValid(
+    static CreateOrderIdempotencyKeyDigest requireValid(
             HttpHeaders headers) {
 
         List<String> values =
@@ -51,7 +57,9 @@ final class OrderIdempotencyKeyHeader {
             throw new OrderIdempotencyKeyInvalidException();
         }
 
-        return value;
+        return CreateOrderIdempotencyKeyDigest.of(
+                sha256(
+                        value));
     }
 
     private static boolean isValid(
@@ -71,13 +79,6 @@ final class OrderIdempotencyKeyHeader {
             var character =
                     value.charAt(index);
 
-            /*
-             * ADR-0010 accepts visible ASCII only.
-             *
-             * 0x21 through 0x7E excludes spaces, tabs and control characters.
-             * Comma is additionally rejected so one field value cannot become an
-             * ambiguous representation of multiple logical keys.
-             */
             if (character < 0x21
                     || character > 0x7E
                     || character == ',') {
@@ -87,5 +88,25 @@ final class OrderIdempotencyKeyHeader {
         }
 
         return true;
+    }
+
+    private static byte[] sha256(
+            String value) {
+
+        try {
+
+            return MessageDigest
+                    .getInstance(
+                            "SHA-256")
+                    .digest(
+                            value.getBytes(
+                                    StandardCharsets.UTF_8));
+
+        } catch (NoSuchAlgorithmException exception) {
+
+            throw new IllegalStateException(
+                    "SHA-256 digest algorithm is unavailable",
+                    exception);
+        }
     }
 }

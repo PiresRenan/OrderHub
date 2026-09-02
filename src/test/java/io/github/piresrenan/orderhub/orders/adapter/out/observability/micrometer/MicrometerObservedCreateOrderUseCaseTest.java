@@ -20,6 +20,7 @@ import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryComm
 import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryOperationException;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderAllocationOutcome;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderIdempotencyKeyDigest;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderResult;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
 import io.github.piresrenan.orderhub.orders.application.port.out.TransactionExecutionException;
@@ -339,7 +340,8 @@ class MicrometerObservedCreateOrderUseCaseTest {
                 List.of(
                         new CreateOrderCommand.Item(
                                 VARIANT_ID,
-                                1)));
+                                1)),
+                CreateOrderIdempotencyKeyDigest.of(new byte[32]));
     }
 
     private static CreateOrderResult result(

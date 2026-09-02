@@ -23,6 +23,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryOperationException;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderIdempotencyKeyDigest;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderPersistenceException;
 import io.github.piresrenan.orderhub.orders.application.port.out.TransactionExecutionException;
@@ -887,7 +888,8 @@ class CreateOrderInventoryConcurrencyAcceptanceTest {
         return new CreateOrderCommand(
                 TENANT_ID,
                 customerId,
-                items);
+                items,
+                CreateOrderIdempotencyKeyDigest.of(new byte[32]));
     }
 
     private static CreateOrderCommand.Item item(

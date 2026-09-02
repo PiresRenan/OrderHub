@@ -17,6 +17,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 
 import io.github.piresrenan.orderhub.OrderHubApplication;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderIdempotencyKeyDigest;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
 
 /**
@@ -143,7 +144,8 @@ public final class OrderHubReplicaWorker {
                                 List.of(
                                         new CreateOrderCommand.Item(
                                                 variantId,
-                                                1))));
+                                                1)),
+                                CreateOrderIdempotencyKeyDigest.of(new byte[32])));
 
                 Files.writeString(
                         resultPath,
