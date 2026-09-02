@@ -2,8 +2,11 @@ package io.github.piresrenan.orderhub.authorization.domain.service;
 
 import java.util.Collection;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Map;
 
+import io.github.piresrenan.orderhub.authorization.domain.constraint.AuthorizationConstraint;
+import io.github.piresrenan.orderhub.authorization.domain.constraint.AuthorizationConstraintContext;
 import io.github.piresrenan.orderhub.authorization.domain.model.AuthorizationDecision;
 import io.github.piresrenan.orderhub.authorization.domain.model.AuthorizationPersona;
 import io.github.piresrenan.orderhub.authorization.domain.model.PermissionCode;
@@ -14,12 +17,8 @@ import io.github.piresrenan.orderhub.authorization.domain.model.TenantAuthorizat
 import io.github.piresrenan.orderhub.authorization.domain.model.UserPermissionOverride;
 
 /**
- * Enforces subject and Tenant isolation before resolving effective permissions.
- *
- * <p>
- * Only RoleAssignments and UserPermissionOverrides belonging to the exact
- * requested User and Tenant participate in the decision.
- * </p>
+ * Enforces subject, Tenant and policy isolation before resolving effective
+ * permissions.
  */
 public final class ScopedAuthorizationEvaluator {
 
@@ -50,6 +49,23 @@ public final class ScopedAuthorizationEvaluator {
             PermissionEnvelope actorEnvelope,
             Collection<UserPermissionOverride> userOverrides) {
 
+        return evaluate(
+                request,
+                assignments,
+                roleDefinitions,
+                actorEnvelope,
+                userOverrides,
+                List.of());
+    }
+
+    public AuthorizationDecision evaluate(
+            TenantAuthorizationRequest request,
+            Collection<RoleAssignment> assignments,
+            Map<String, RoleDefinition> roleDefinitions,
+            PermissionEnvelope actorEnvelope,
+            Collection<UserPermissionOverride> userOverrides,
+            Collection<AuthorizationConstraint> constraints) {
+
         if (request == null) {
             throw new IllegalArgumentException(
                     "Authorization request is required");
@@ -75,20 +91,17 @@ public final class ScopedAuthorizationEvaluator {
                     "User permission overrides are required");
         }
 
-        /*
-         * The STAFF RBAC path must never accidentally authorize a Customer.
-         * Customer ownership/relationship policy is introduced separately.
-         */
+        if (constraints == null) {
+            throw new IllegalArgumentException(
+                    "Authorization constraints are required");
+        }
+
         if (request.persona()
                 != AuthorizationPersona.STAFF) {
 
             return AuthorizationDecision.DENY;
         }
 
-        /*
-         * Invalid/corrupt policy collections fail closed instead of silently
-         * skipping malformed authorization state.
-         */
         if (assignments.stream()
                 .anyMatch(assignment ->
                         assignment == null)
@@ -99,8 +112,37 @@ public final class ScopedAuthorizationEvaluator {
                         .stream()
                         .anyMatch(entry ->
                                 entry.getKey() == null
-                                        || entry.getValue() == null)) {
+                                        || entry.getValue() == null)
+                || constraints.stream()
+                        .anyMatch(constraint ->
+                                constraint == null)) {
 
+            return AuthorizationDecision.DENY;
+        }
+
+        var constraintContext =
+                new AuthorizationConstraintContext(
+                        request,
+                        assignments,
+                        roleDefinitions);
+
+        try {
+            for (var constraint : constraints) {
+
+                if (constraint.evaluate(
+                        constraintContext)
+                        != AuthorizationDecision.ALLOW) {
+
+                    return AuthorizationDecision.DENY;
+                }
+            }
+
+        } catch (RuntimeException exception) {
+
+            /*
+             * Authorization constraint evaluation is restrictive policy.
+             * Unavailable or inconsistent policy must never fail open.
+             */
             return AuthorizationDecision.DENY;
         }
 
@@ -122,10 +164,6 @@ public final class ScopedAuthorizationEvaluator {
                     roleDefinitions.get(
                             assignment.roleCode());
 
-            /*
-             * A role assignment referring to missing/inconsistent role state is
-             * an authorization-policy inconsistency and therefore fails closed.
-             */
             if (role == null
                     || !assignment.roleCode()
                             .equals(

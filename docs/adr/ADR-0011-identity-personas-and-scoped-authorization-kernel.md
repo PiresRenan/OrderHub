@@ -531,6 +531,27 @@ The kernel must be able to reject:
   grantor envelope;
 - cross-Tenant role assignment used as authority in another Tenant.
 
+## Trusted actor context
+
+Authentication continues to resolve external JWT identity into only the stable
+internal OrderHub User identifier.
+
+For authorization-capable servlet surfaces, Security may additionally project a
+`TrustedActorContext` containing:
+
+- internal `userId`;
+- trusted internal `tenantId`.
+
+The context is created only after the existing exact User/Tenant membership
+boundary accepts the caller-requested Tenant selector.
+
+Raw JWT Tenant claims, provider roles, scopes and authorities are not copied into
+this context and do not become business authorization inputs.
+
+`TrustedTenantContext` remains valid for existing boundaries that need only
+already-proven Tenant authority. Adding `TrustedActorContext` therefore does not
+weaken or retroactively broaden those contracts.
+
 ## Separation of duties
 
 Authorization must represent constraints independently from RoleDefinition.
@@ -543,8 +564,20 @@ Examples of later high-impact constraints include incompatible combinations of:
 - privileged administration and independent audit responsibilities;
 - other domain-specific duties when those workflows exist.
 
-OH-013 establishes the constraint model/fail-closed policy. It does not invent
-business SoD rules for workflows OrderHub does not yet have.
+OH-013 establishes a framework-neutral AuthorizationConstraint contract and the
+first StaticSeparationOfDutyConstraint implementation.
+
+Static SoD is modeled as a set of mutually exclusive RoleAssignment codes for
+the same internal User, persona and Tenant scope. A matching conflict can only
+reduce an otherwise eligible decision to DENY; a constraint never creates a
+permission grant.
+
+Constraint evaluation itself is fail-closed. Missing, malformed or failing
+constraint state cannot result in ALLOW.
+
+OH-013 does not configure invented business conflicts for workflows OrderHub
+does not yet have. Dynamic/session/history-based SoD remains a later extension
+when a concrete workflow supplies the required execution context.
 
 ## Authorization decision semantics
 

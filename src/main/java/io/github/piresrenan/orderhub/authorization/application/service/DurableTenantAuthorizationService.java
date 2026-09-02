@@ -1,12 +1,15 @@
 package io.github.piresrenan.orderhub.authorization.application.service;
 
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 
 import io.github.piresrenan.orderhub.authorization.application.port.in.AuthorizeTenantActionUseCase;
 import io.github.piresrenan.orderhub.authorization.application.port.out.AuthorizationPersistenceException;
 import io.github.piresrenan.orderhub.authorization.application.port.out.RoleAssignmentRepository;
 import io.github.piresrenan.orderhub.authorization.application.port.out.RoleDefinitionRepository;
 import io.github.piresrenan.orderhub.authorization.application.port.out.UserPermissionOverrideRepository;
+import io.github.piresrenan.orderhub.authorization.domain.constraint.AuthorizationConstraint;
 import io.github.piresrenan.orderhub.authorization.domain.model.AuthorizationDecision;
 import io.github.piresrenan.orderhub.authorization.domain.model.AuthorizationPersona;
 import io.github.piresrenan.orderhub.authorization.domain.model.PermissionEnvelope;
@@ -15,13 +18,8 @@ import io.github.piresrenan.orderhub.authorization.domain.model.TenantAuthorizat
 import io.github.piresrenan.orderhub.authorization.domain.service.ScopedAuthorizationEvaluator;
 
 /**
- * Composes durable authorization policy state before evaluating one decision.
- *
- * <p>
- * Any missing, inconsistent or unavailable persisted authorization state fails
- * closed. Customer relationship authorization is deliberately excluded from
- * this STAFF RBAC path.
- * </p>
+ * Composes durable authorization state and restrictive policy before evaluating
+ * one Tenant-scoped STAFF decision.
  */
 public final class DurableTenantAuthorizationService
         implements AuthorizeTenantActionUseCase {
@@ -31,6 +29,8 @@ public final class DurableTenantAuthorizationService
     private final RoleDefinitionRepository roleDefinitionRepository;
 
     private final UserPermissionOverrideRepository permissionOverrideRepository;
+
+    private final List<AuthorizationConstraint> constraints;
 
     private final ScopedAuthorizationEvaluator authorizationEvaluator;
 
@@ -43,6 +43,20 @@ public final class DurableTenantAuthorizationService
                 roleAssignmentRepository,
                 roleDefinitionRepository,
                 permissionOverrideRepository,
+                List.of());
+    }
+
+    public DurableTenantAuthorizationService(
+            RoleAssignmentRepository roleAssignmentRepository,
+            RoleDefinitionRepository roleDefinitionRepository,
+            UserPermissionOverrideRepository permissionOverrideRepository,
+            Collection<AuthorizationConstraint> constraints) {
+
+        this(
+                roleAssignmentRepository,
+                roleDefinitionRepository,
+                permissionOverrideRepository,
+                constraints,
                 new ScopedAuthorizationEvaluator());
     }
 
@@ -50,6 +64,7 @@ public final class DurableTenantAuthorizationService
             RoleAssignmentRepository roleAssignmentRepository,
             RoleDefinitionRepository roleDefinitionRepository,
             UserPermissionOverrideRepository permissionOverrideRepository,
+            Collection<AuthorizationConstraint> constraints,
             ScopedAuthorizationEvaluator authorizationEvaluator) {
 
         if (roleAssignmentRepository == null) {
@@ -67,6 +82,15 @@ public final class DurableTenantAuthorizationService
                     "Permission override repository is required");
         }
 
+        if (constraints == null
+                || constraints.stream()
+                        .anyMatch(constraint ->
+                                constraint == null)) {
+
+            throw new IllegalArgumentException(
+                    "Authorization constraints are required");
+        }
+
         if (authorizationEvaluator == null) {
             throw new IllegalArgumentException(
                     "Scoped authorization evaluator is required");
@@ -80,6 +104,10 @@ public final class DurableTenantAuthorizationService
 
         this.permissionOverrideRepository =
                 permissionOverrideRepository;
+
+        this.constraints =
+                List.copyOf(
+                        constraints);
 
         this.authorizationEvaluator =
                 authorizationEvaluator;
@@ -100,10 +128,6 @@ public final class DurableTenantAuthorizationService
                     "Actor permission envelope is required");
         }
 
-        /*
-         * Customer resource ownership/relationship policy is a separate path.
-         * Never load STAFF authorization state for a Customer request.
-         */
         if (request.persona()
                 != AuthorizationPersona.STAFF) {
 
@@ -158,11 +182,6 @@ public final class DurableTenantAuthorizationService
                     return AuthorizationDecision.DENY;
                 }
 
-                /*
-                 * Duplicate visible definitions for one stable code are a
-                 * policy inconsistency even if they happen to carry identical
-                 * permissions.
-                 */
                 if (definitions.putIfAbsent(
                         definition.code(),
                         definition) != null) {
@@ -193,7 +212,8 @@ public final class DurableTenantAuthorizationService
                     assignments,
                     definitions,
                     actorEnvelope,
-                    overrides);
+                    overrides,
+                    constraints);
 
         } catch (AuthorizationPersistenceException exception) {
 
