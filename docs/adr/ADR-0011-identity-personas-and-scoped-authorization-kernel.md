@@ -424,6 +424,8 @@ catalog and constrained by an applicable PermissionEnvelope.
 
 Tenant custom roles cannot create new executable permissions.
 
+OH-013 enforces ordinary role-definition mutation through a framework-neutral `TenantCustomRoleMutationPolicy`. Only `TENANT_CUSTOM` definitions may enter that path. Stable role code, persona and authority band cannot be rewritten, the persisted definition envelope cannot be widened, and replacement state must remain inside the acting administrator's explicit delegation envelope.
+
 Role code resolution must remain unambiguous across the global system namespace
 and Tenant-owned custom definitions.
 
@@ -530,6 +532,8 @@ The kernel must be able to reject:
 - assignment of a custom role containing permissions outside the target or
   grantor envelope;
 - cross-Tenant role assignment used as authority in another Tenant.
+
+OH-013 enforces this boundary through `RoleDelegationPolicy`. Ordinary assignment requires `TENANT_ROLES_ASSIGN`. Self-assignment, `TENANT_PROTECTED` roles and `TENANT_GOVERNANCE` roles additionally require `TENANT_PRIVILEGED_ROLES_ASSIGN`. `SYSTEM_LOCKED` roles are not assignable through the ordinary Tenant delegation path. The proposed assignment must remain in the actor's trusted Tenant scope, within the actor authority band, inside the actor delegation envelope and inside the target permission envelope.
 
 ## Trusted actor context
 
