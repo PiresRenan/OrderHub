@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 
 import io.github.piresrenan.orderhub.authorization.application.port.in.AuthorizeTenantActionUseCase;
+import io.github.piresrenan.orderhub.authorization.application.port.out.AuthorizationDecisionReadTransaction;
 import io.github.piresrenan.orderhub.authorization.application.port.out.AuthorizationPersistenceException;
 import io.github.piresrenan.orderhub.authorization.application.port.out.RoleAssignmentRepository;
 import io.github.piresrenan.orderhub.authorization.application.port.out.RoleDefinitionRepository;
@@ -20,6 +21,12 @@ import io.github.piresrenan.orderhub.authorization.domain.service.ScopedAuthoriz
 /**
  * Composes durable authorization state and restrictive policy before evaluating
  * one Tenant-scoped STAFF decision.
+ *
+ * <p>
+ * Durable construction requires an explicit coherent read transaction so one
+ * decision cannot combine role, assignment or override state belonging to
+ * different PostgreSQL snapshots.
+ * </p>
  */
 public final class DurableTenantAuthorizationService
         implements AuthorizeTenantActionUseCase {
@@ -32,9 +39,15 @@ public final class DurableTenantAuthorizationService
 
     private final List<AuthorizationConstraint> constraints;
 
+    private final AuthorizationDecisionReadTransaction readTransaction;
+
     private final ScopedAuthorizationEvaluator authorizationEvaluator;
 
-    public DurableTenantAuthorizationService(
+    /*
+     * Package-private synthetic constructor retained for focused unit tests.
+     * External production composition cannot select this non-transactional path.
+     */
+    DurableTenantAuthorizationService(
             RoleAssignmentRepository roleAssignmentRepository,
             RoleDefinitionRepository roleDefinitionRepository,
             UserPermissionOverrideRepository permissionOverrideRepository) {
@@ -43,10 +56,18 @@ public final class DurableTenantAuthorizationService
                 roleAssignmentRepository,
                 roleDefinitionRepository,
                 permissionOverrideRepository,
-                List.of());
+                List.of(),
+                decision ->
+                        decision.get(),
+                new ScopedAuthorizationEvaluator());
     }
 
-    public DurableTenantAuthorizationService(
+    /*
+     * Package-private synthetic constructor retained for focused constraint
+     * tests. Production composition must use one of the public constructors
+     * requiring AuthorizationDecisionReadTransaction.
+     */
+    DurableTenantAuthorizationService(
             RoleAssignmentRepository roleAssignmentRepository,
             RoleDefinitionRepository roleDefinitionRepository,
             UserPermissionOverrideRepository permissionOverrideRepository,
@@ -57,6 +78,39 @@ public final class DurableTenantAuthorizationService
                 roleDefinitionRepository,
                 permissionOverrideRepository,
                 constraints,
+                decision ->
+                        decision.get(),
+                new ScopedAuthorizationEvaluator());
+    }
+
+    public DurableTenantAuthorizationService(
+            RoleAssignmentRepository roleAssignmentRepository,
+            RoleDefinitionRepository roleDefinitionRepository,
+            UserPermissionOverrideRepository permissionOverrideRepository,
+            AuthorizationDecisionReadTransaction readTransaction) {
+
+        this(
+                roleAssignmentRepository,
+                roleDefinitionRepository,
+                permissionOverrideRepository,
+                List.of(),
+                readTransaction,
+                new ScopedAuthorizationEvaluator());
+    }
+
+    public DurableTenantAuthorizationService(
+            RoleAssignmentRepository roleAssignmentRepository,
+            RoleDefinitionRepository roleDefinitionRepository,
+            UserPermissionOverrideRepository permissionOverrideRepository,
+            Collection<AuthorizationConstraint> constraints,
+            AuthorizationDecisionReadTransaction readTransaction) {
+
+        this(
+                roleAssignmentRepository,
+                roleDefinitionRepository,
+                permissionOverrideRepository,
+                constraints,
+                readTransaction,
                 new ScopedAuthorizationEvaluator());
     }
 
@@ -65,6 +119,7 @@ public final class DurableTenantAuthorizationService
             RoleDefinitionRepository roleDefinitionRepository,
             UserPermissionOverrideRepository permissionOverrideRepository,
             Collection<AuthorizationConstraint> constraints,
+            AuthorizationDecisionReadTransaction readTransaction,
             ScopedAuthorizationEvaluator authorizationEvaluator) {
 
         if (roleAssignmentRepository == null) {
@@ -91,6 +146,11 @@ public final class DurableTenantAuthorizationService
                     "Authorization constraints are required");
         }
 
+        if (readTransaction == null) {
+            throw new IllegalArgumentException(
+                    "Authorization read transaction is required");
+        }
+
         if (authorizationEvaluator == null) {
             throw new IllegalArgumentException(
                     "Scoped authorization evaluator is required");
@@ -108,6 +168,9 @@ public final class DurableTenantAuthorizationService
         this.constraints =
                 List.copyOf(
                         constraints);
+
+        this.readTransaction =
+                readTransaction;
 
         this.authorizationEvaluator =
                 authorizationEvaluator;
@@ -135,89 +198,100 @@ public final class DurableTenantAuthorizationService
         }
 
         try {
-            var assignments =
-                    roleAssignmentRepository
-                            .findByUserIdAndScope(
-                                    request.userId(),
-                                    request.scope());
-
-            if (assignments == null
-                    || assignments.stream()
-                            .anyMatch(assignment ->
-                                    assignment == null
-                                            || !assignment.appliesTo(
-                                                    request.userId(),
-                                                    request.persona(),
-                                                    request.scope()))) {
-
-                return AuthorizationDecision.DENY;
-            }
-
-            var definitions =
-                    new HashMap<String, RoleDefinition>();
-
-            for (var assignment : assignments) {
-
-                var candidate =
-                        roleDefinitionRepository
-                                .findByCodeAndScope(
-                                        assignment.roleCode(),
-                                        request.scope());
-
-                if (candidate == null
-                        || candidate.isEmpty()) {
-
-                    return AuthorizationDecision.DENY;
-                }
-
-                var definition =
-                        candidate.orElseThrow();
-
-                if (!assignment.roleCode()
-                        .equals(
-                                definition.code())
-                        || definition.persona()
-                                != request.persona()) {
-
-                    return AuthorizationDecision.DENY;
-                }
-
-                if (definitions.putIfAbsent(
-                        definition.code(),
-                        definition) != null) {
-
-                    return AuthorizationDecision.DENY;
-                }
-            }
-
-            var overrides =
-                    permissionOverrideRepository
-                            .findByUserIdAndScope(
-                                    request.userId(),
-                                    request.scope());
-
-            if (overrides == null
-                    || overrides.stream()
-                            .anyMatch(override ->
-                                    override == null
-                                            || !override.appliesTo(
-                                                    request.userId(),
-                                                    request.scope()))) {
-
-                return AuthorizationDecision.DENY;
-            }
-
-            return authorizationEvaluator.evaluate(
-                    request,
-                    assignments,
-                    definitions,
-                    actorEnvelope,
-                    overrides,
-                    constraints);
+            return readTransaction.execute(
+                    () ->
+                            authorizeWithinSnapshot(
+                                    request,
+                                    actorEnvelope));
 
         } catch (AuthorizationPersistenceException exception) {
 
             return AuthorizationDecision.DENY;
         }
+    }
+
+    private AuthorizationDecision authorizeWithinSnapshot(
+            TenantAuthorizationRequest request,
+            PermissionEnvelope actorEnvelope) {
+
+        var assignments =
+                roleAssignmentRepository
+                        .findByUserIdAndScope(
+                                request.userId(),
+                                request.scope());
+
+        if (assignments == null
+                || assignments.stream()
+                        .anyMatch(assignment ->
+                                assignment == null
+                                        || !assignment.appliesTo(
+                                                request.userId(),
+                                                request.persona(),
+                                                request.scope()))) {
+
+            return AuthorizationDecision.DENY;
+        }
+
+        var definitions =
+                new HashMap<String, RoleDefinition>();
+
+        for (var assignment : assignments) {
+
+            var candidate =
+                    roleDefinitionRepository
+                            .findByCodeAndScope(
+                                    assignment.roleCode(),
+                                    request.scope());
+
+            if (candidate == null
+                    || candidate.isEmpty()) {
+
+                return AuthorizationDecision.DENY;
+            }
+
+            var definition =
+                    candidate.orElseThrow();
+
+            if (!assignment.roleCode()
+                    .equals(
+                            definition.code())
+                    || definition.persona()
+                            != request.persona()) {
+
+                return AuthorizationDecision.DENY;
+            }
+
+            if (definitions.putIfAbsent(
+                    definition.code(),
+                    definition) != null) {
+
+                return AuthorizationDecision.DENY;
+            }
+        }
+
+        var overrides =
+                permissionOverrideRepository
+                        .findByUserIdAndScope(
+                                request.userId(),
+                                request.scope());
+
+        if (overrides == null
+                || overrides.stream()
+                        .anyMatch(override ->
+                                override == null
+                                        || !override.appliesTo(
+                                                request.userId(),
+                                                request.scope()))) {
+
+            return AuthorizationDecision.DENY;
+        }
+
+        return authorizationEvaluator.evaluate(
+                request,
+                assignments,
+                definitions,
+                actorEnvelope,
+                overrides,
+                constraints);
     }
 }

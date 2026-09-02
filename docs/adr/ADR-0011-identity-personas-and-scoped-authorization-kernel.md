@@ -604,6 +604,20 @@ Unknown permission, missing required state, invalid scope, policy inconsistency 
 constraint failure returns DENY.
 
 The evaluator must not fail open because authorization state is unavailable.
+Durable STAFF authorization must also observe one coherent privilege-state
+snapshot. RoleAssignments, RoleDefinitions/role permissions and direct overrides
+participating in one decision cannot be independently observed from different
+committed database moments.
+
+The PostgreSQL authorization adapter therefore executes the complete durable
+decision-read sequence under a read-only `REPEATABLE READ` transaction. This is
+a consistency boundary, not a locking strategy: competing administrative writes
+remain free to commit, while the in-flight authorization decision continues
+against its original coherent snapshot.
+
+Adversarial PostgreSQL evidence covers both a competing assignment/role-permission
+change that would otherwise create an impossible transient ALLOW and concurrent
+SYSTEM versus TENANT_CUSTOM role-code reservation.
 
 Customer/resource authorization will extend the contextual relationship inputs in
 later slices without granting customer access through Staff roles.
