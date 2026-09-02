@@ -217,6 +217,44 @@ CREATE TABLE access_control.role_assignments (
         )
 );
 
+CREATE FUNCTION access_control.enforce_role_assignment_scope()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    role_tenant_id UUID;
+BEGIN
+    SELECT role.tenant_id
+    INTO role_tenant_id
+    FROM access_control.role_definitions role
+    WHERE role.role_id = NEW.role_id;
+
+    IF NOT FOUND THEN
+        RETURN NEW;
+    END IF;
+
+    IF role_tenant_id IS NOT NULL
+            AND role_tenant_id <> NEW.tenant_id THEN
+
+        RAISE check_violation
+            USING
+                MESSAGE =
+                    'Tenant-owned role assignment must use the role owning Tenant scope',
+                CONSTRAINT =
+                    'ck_authorization_role_assignment_scope';
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_authorization_role_assignment_scope
+BEFORE INSERT OR UPDATE OF
+    tenant_id,
+    role_id
+ON access_control.role_assignments
+FOR EACH ROW
+EXECUTE FUNCTION access_control.enforce_role_assignment_scope();
 CREATE INDEX idx_authorization_role_assignments_subject_scope
     ON access_control.role_assignments (
         tenant_id,

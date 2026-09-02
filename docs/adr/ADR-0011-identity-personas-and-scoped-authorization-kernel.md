@@ -466,6 +466,11 @@ roleDefinition
 
 Initial assignments are Tenant-scoped.
 
+V12 additionally rejects a durable assignment when its `tenant_id` does not
+match the owning Tenant of a `TENANT_CUSTOM` RoleDefinition. Global system role
+definitions remain usable from validated Tenant scopes, while a Tenant-owned role
+cannot be referenced by an assignment persisted for another Tenant.
+
 RoleAssignment must not be embedded inside User or TenantMembership.
 
 The same User may have unrelated RoleAssignments in different Tenants.
@@ -664,8 +669,13 @@ The persistence model must support durable representation of at least:
 - RoleDefinition and its protection/mutability class where persistence is needed;
 - role-to-permission membership;
 - scoped RoleAssignment;
-- bounded permission overrides when the model reaches persistence;
-- authorization constraints introduced by the kernel.
+- bounded permission overrides when the model reaches persistence.
+
+OH-013 deliberately does not persist authorization-constraint configuration.
+The slice establishes the framework-neutral constraint contract and executable
+static SoD behavior, but no business conflict-management lifecycle exists yet.
+Durable constraint configuration belongs to the later slice that introduces
+concrete conflict administration and its audit lifecycle.
 
 Database constraints must reject structurally invalid values and duplicate
 assignments/definitions where a durable uniqueness invariant exists.

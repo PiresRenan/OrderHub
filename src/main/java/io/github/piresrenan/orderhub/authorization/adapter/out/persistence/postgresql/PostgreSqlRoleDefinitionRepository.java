@@ -125,7 +125,10 @@ public final class PostgreSqlRoleDefinitionRepository
                             PermissionEnvelope.of(
                                     permissions)));
 
-        } catch (DataAccessException exception) {
+        } catch (
+                DataAccessException
+                | IllegalArgumentException exception) {
+
             throw new AuthorizationPersistenceException(
                     exception);
         }

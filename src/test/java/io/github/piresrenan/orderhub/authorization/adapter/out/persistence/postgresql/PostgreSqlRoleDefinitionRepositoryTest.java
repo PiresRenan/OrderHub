@@ -1,6 +1,7 @@
 package io.github.piresrenan.orderhub.authorization.adapter.out.persistence.postgresql;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.UUID;
 
@@ -15,6 +16,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
+import io.github.piresrenan.orderhub.authorization.application.port.out.AuthorizationPersistenceException;
 import io.github.piresrenan.orderhub.authorization.application.port.out.RoleDefinitionRepository;
 import io.github.piresrenan.orderhub.authorization.domain.model.AuthorityBand;
 import io.github.piresrenan.orderhub.authorization.domain.model.AuthorizationPersona;
@@ -133,6 +135,56 @@ class PostgreSqlRoleDefinitionRepositoryTest {
                         PermissionCode.INVENTORY_POLICY_MANAGE);
     }
 
+    @Test
+    void unknownPersistedPermissionIsTranslatedAsAuthorizationPersistenceFailure() {
+
+        var roleId =
+                insertSystemRole(
+                        "FUTURE_PERMISSION_ROLE",
+                        "OPERATIONAL",
+                        "BUILTIN_FUNCTIONAL");
+
+        var unknownPermission =
+                "FUTURE_PERMISSION_"
+                        + UUID.randomUUID()
+                                .toString()
+                                .replace(
+                                        "-",
+                                        "")
+                                .substring(
+                                        0,
+                                        16)
+                                .toUpperCase();
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO access_control.permissions (
+                    code,
+                    persona
+                )
+                VALUES (?, 'STAFF')
+                """,
+                unknownPermission);
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO access_control.role_permissions (
+                    role_id,
+                    permission_code
+                )
+                VALUES (?, ?)
+                """,
+                roleId,
+                unknownPermission);
+
+        assertThatThrownBy(() ->
+                repository.findByCodeAndScope(
+                        "FUTURE_PERMISSION_ROLE",
+                        new TenantAuthorizationScope(
+                                UUID.randomUUID())))
+                .isInstanceOf(
+                        AuthorizationPersistenceException.class);
+    }
     private static UUID insertSystemRole(
             String code,
             String authorityBand,

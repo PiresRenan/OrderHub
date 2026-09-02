@@ -215,6 +215,43 @@ class PostgreSqlAuthorizationSchemaConstraintsTest {
                         2);
     }
     @Test
+    void databaseRejectsTenantCustomRoleAssignmentOutsideOwningTenant() {
+
+        var owningTenantId =
+                UUID.randomUUID();
+
+        var foreignTenantId =
+                UUID.randomUUID();
+
+        var roleId =
+                UUID.randomUUID();
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO access_control.role_definitions (
+                    role_id,
+                    tenant_id,
+                    code,
+                    persona,
+                    authority_band,
+                    mutability
+                )
+                VALUES (?, ?, ?, 'STAFF', 'OPERATIONAL', 'TENANT_CUSTOM')
+                """,
+                roleId,
+                owningTenantId,
+                "CUSTOM_SCOPE_BOUND_ASSIGNMENT_ROLE");
+
+        assertThatThrownBy(() ->
+                insertAssignment(
+                        UUID.randomUUID(),
+                        UUID.randomUUID(),
+                        foreignTenantId,
+                        roleId))
+                .isInstanceOf(
+                        DataIntegrityViolationException.class);
+    }
+    @Test
     void authorizationForeignKeysNeverTargetUsersOrTenantsSchemas() {
 
         var referencedSchemas =
