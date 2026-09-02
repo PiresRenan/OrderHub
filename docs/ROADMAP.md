@@ -95,7 +95,7 @@ problems.
 
 ## OH-012 — Durable order request idempotency and recovery
 
-Status: IMPLEMENTED — local verification complete; PR/remote validation pending
+Status: TESTED — implementation and required review validation complete; merge pending
 
 OH-011 made Order persistence, Catalog orderability validation and Inventory
 commitment one atomic business transaction. The next exposed reliability gap is

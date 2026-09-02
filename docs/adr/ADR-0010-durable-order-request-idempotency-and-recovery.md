@@ -1,6 +1,6 @@
 # ADR-0010 — Durable Order Request Idempotency and Recovery
 
-Status: DESIGNED
+Status: TESTED
 
 ## Context
 
@@ -791,17 +791,15 @@ V1-V10 remain immutable.
 
 ## Implementation evidence — 2026-09-02
 
-OH-012 was implemented incrementally from the OH-011 `pre-release` merge base.
+OH-012 was implemented incrementally from the OH-011 `pre-release` merge base:
 
-Final functional checkpoint before adversarial hardening:
+`93c004f82e11e61885ffc969b6a8d1eb9e901a24`
 
-`dd3a17053d88fd645b7b91a309d3e00227e2694e`
+The final reviewed implementation checkpoint is:
 
-Final local adversarial-hardening checkpoint:
+`75d6bec98da2d66e2cfe65f4b438d7aebdda280c`
 
-`cef34379ed7bc5a5f3c50a246fc0f3549b2f3e29`
-
-Local executable evidence includes:
+Executable evidence includes:
 
 - exactly one required `Idempotency-Key` at the HTTP boundary;
 - SHA-256 raw-key identity propagation without raw-key persistence;
@@ -822,16 +820,64 @@ Local executable evidence includes:
   PostgreSQL;
 - transport JSON whitespace/property ordering excluded from fingerprint identity;
 - bounded idempotency metrics with no business/idempotency identity labels;
+- replay traffic excluded from new Order/Inventory creation throughput metrics;
+- expected 409/422 idempotency control outcomes excluded from generic
+  create-failure metrics;
+- actual idempotency persistence/infrastructure failures remain represented as
+  technical failures;
 - no Redis, broker, distributed mutex or JVM-local correctness lock.
 
-Final local suite:
+The final local implementation suite is:
 
-`714 tests, 0 failures, 0 errors, 0 skipped`
+`717 tests, 0 failures, 0 errors, 0 skipped`
 
-`git diff --check` is clean.
+`git diff --check` was clean.
 
-ADR status intentionally remains `DESIGNED` because pull-request checks and
-independent final review are still pending.
+### Codex review remediation
+
+The first Codex review identified that durable replay traffic incorrectly
+incremented the pre-existing successful Order creation/allocation metric.
+
+That issue was corrected by introducing explicit successful-execution semantics:
+
+- `FIRST_EXECUTION`;
+- `REPLAY`.
+
+`orderhub.orders.create.allocation` now counts only `FIRST_EXECUTION`, while
+durable replay is represented by
+`orderhub.orders.idempotency{outcome=replay}`.
+
+A subsequent Codex review identified that expected fingerprint conflicts were
+being classified by the outer observer as generic technical create failures.
+
+That issue and its symmetric bounded in-progress case were corrected so:
+
+- HTTP 422 / key reuse remains represented by
+  `orderhub.orders.idempotency{outcome=fingerprint_conflict}`;
+- HTTP 409 / bounded in-progress contention remains represented by
+  `orderhub.orders.idempotency{outcome=in_progress_conflict}`;
+- neither increments `orderhub.orders.create.failure`;
+- real persistence/infrastructure failures continue through the bounded
+  technical-failure classification.
+
+Both corrections have unit and authenticated HTTP/PostgreSQL executable
+regression coverage.
+
+### Remote validation
+
+Required remote validation passed on the final implementation checkpoint
+`75d6bec98da2d66e2cfe65f4b438d7aebdda280c`:
+
+- Branch Policy — GREEN;
+- CI — GREEN;
+- Platform CI — GREEN;
+- both prior Codex review threads — resolved after verified remediation;
+- fresh full Codex re-review — no remaining major issue reported.
+
+ADR-0010 is therefore promoted from `DESIGNED` to `TESTED`.
+
+This promotion is documentation-only. The resulting pull-request HEAD must still
+pass the required repository checks and one final Codex review before merge.
 ## Verification plan
 
 ADR-0010 remains `DESIGNED` until every required item below has executable
@@ -839,92 +885,91 @@ evidence.
 
 ### HTTP contract
 
-- [ ] missing `Idempotency-Key` is rejected with stable privacy-safe 400;
-- [ ] malformed/oversized key is rejected with stable privacy-safe 400;
-- [ ] raw key is never echoed in Problem Details;
-- [ ] first successful request returns 201;
-- [ ] same key/same fingerprint successful retry returns the original 201 result;
-- [ ] same key/different fingerprint returns stable 422;
-- [ ] bounded same-key ownership contention maps specifically to stable 409;
-- [ ] unrelated Catalog/Inventory technical lock failures are not mislabeled as
+- [x] missing `Idempotency-Key` is rejected with stable privacy-safe 400;
+- [x] malformed/oversized key is rejected with stable privacy-safe 400;
+- [x] raw key is never echoed in Problem Details;
+- [x] first successful request returns 201;
+- [x] same key/same fingerprint successful retry returns the original 201 result;
+- [x] same key/different fingerprint returns stable 422;
+- [x] bounded same-key ownership contention maps specifically to stable 409;
+- [x] unrelated Catalog/Inventory technical lock failures are not mislabeled as
       idempotency in-progress conflicts.
 
 ### Fingerprint
 
-- [ ] JSON whitespace/property order cannot change the fingerprint after parsing;
-- [ ] Tenant changes the durable identity;
-- [ ] Customer changes the fingerprint;
-- [ ] Variant identity changes the fingerprint;
-- [ ] quantity changes the fingerprint;
-- [ ] item list order changes the fingerprint under the current contract;
-- [ ] duplicate-line multiplicity changes the fingerprint;
-- [ ] fingerprint encoding is deterministic across repeated JVM executions;
-- [ ] SHA-256 digest length is database constrained.
+- [x] JSON whitespace/property order cannot change the fingerprint after parsing;
+- [x] Tenant changes the durable identity;
+- [x] Customer changes the fingerprint;
+- [x] Variant identity changes the fingerprint;
+- [x] quantity changes the fingerprint;
+- [x] item list order changes the fingerprint under the current contract;
+- [x] duplicate-line multiplicity changes the fingerprint;
+- [x] fingerprint encoding is deterministic across repeated JVM executions;
+- [x] SHA-256 digest length is database constrained.
 
 ### Atomicity
 
-- [ ] successful Order + Inventory + idempotency completion use one physical
+- [x] successful Order + Inventory + idempotency completion use one physical
       transaction;
-- [ ] Order persistence failure leaves no idempotency completion;
-- [ ] Catalog rejection leaves no idempotency completion;
-- [ ] Inventory rejection leaves no idempotency completion;
-- [ ] Inventory technical failure leaves no idempotency completion;
-- [ ] idempotency completion persistence failure rolls back Order and Inventory;
-- [ ] no committed PROCESSING row can survive rollback/crash simulation.
+- [x] Order persistence failure leaves no idempotency completion;
+- [x] Catalog rejection leaves no idempotency completion;
+- [x] Inventory rejection leaves no idempotency completion;
+- [x] Inventory technical failure leaves no idempotency completion;
+- [x] idempotency completion persistence failure rolls back Order and Inventory;
+- [x] no committed PROCESSING row can survive rollback/crash simulation.
 
 ### Concurrency
 
-- [ ] same Tenant/same key/same request across two connections produces exactly
+- [x] same Tenant/same key/same request across two connections produces exactly
       one business execution;
-- [ ] concurrent loser replays after the owner commits when completion occurs
+- [x] concurrent loser replays after the owner commits when completion occurs
       within the bounded wait;
-- [ ] same Tenant/same key/different request cannot produce two Orders;
-- [ ] owner rollback allows one waiting contender to become first executor;
-- [ ] same raw key in different Tenants remains independent;
-- [ ] deliberate same-key blocking terminates within the finite timeout;
-- [ ] correctness holds across two independent OrderHub JVM replicas.
+- [x] same Tenant/same key/different request cannot produce two Orders;
+- [x] owner rollback allows one waiting contender to become first executor;
+- [x] same raw key in different Tenants remains independent;
+- [x] deliberate same-key blocking terminates within the finite timeout;
+- [x] correctness holds across two independent OrderHub JVM replicas.
 
 ### Recovery
 
-- [ ] committed Order followed by simulated lost HTTP response can be recovered by
+- [x] committed Order followed by simulated lost HTTP response can be recovered by
       retry without another Order;
-- [ ] recovered retry creates no additional InventoryCommitment;
-- [ ] replay survives application restart because PostgreSQL is source of truth;
-- [ ] replay result preserves original Order ID, creation status and allocation
+- [x] recovered retry creates no additional InventoryCommitment;
+- [x] replay survives application restart because PostgreSQL is source of truth;
+- [x] replay result preserves original Order ID, creation status and allocation
       outcome.
 
 ### Persistence and architecture
 
-- [ ] V1-V10 remain byte-for-byte unchanged;
-- [ ] V11 builds idempotency persistence from an empty real PostgreSQL database;
-- [ ] database uniqueness enforces Tenant + operation + key digest;
-- [ ] database constraints reject malformed digest/state combinations;
-- [ ] raw key is absent from durable schema;
-- [ ] no Redis/broker/distributed lock is introduced;
-- [ ] no JVM-local correctness lock is introduced;
-- [ ] no new root module is introduced without a demonstrated requirement;
-- [ ] Spring Modulith verification remains green.
+- [x] V1-V10 remain byte-for-byte unchanged;
+- [x] V11 builds idempotency persistence from an empty real PostgreSQL database;
+- [x] database uniqueness enforces Tenant + operation + key digest;
+- [x] database constraints reject malformed digest/state combinations;
+- [x] raw key is absent from durable schema;
+- [x] no Redis/broker/distributed lock is introduced;
+- [x] no JVM-local correctness lock is introduced;
+- [x] no new root module is introduced without a demonstrated requirement;
+- [x] Spring Modulith verification remains green.
 
 ### Privacy / observability
 
-- [ ] raw key and fingerprint are absent from logs;
-- [ ] raw key and fingerprint are absent from metric labels;
-- [ ] only bounded idempotency outcome values exist;
-- [ ] cross-Tenant replay cannot disclose another Tenant's result;
-- [ ] technical failures remain sanitized.
+- [x] raw key and fingerprint are absent from logs;
+- [x] raw key and fingerprint are absent from metric labels;
+- [x] only bounded idempotency outcome values exist;
+- [x] cross-Tenant replay cannot disclose another Tenant's result;
+- [x] technical failures remain sanitized.
 
 ### Regression / governance
 
-- [ ] existing Orders/Catalog/Inventory/Tenants/Users/Security behavior remains
+- [x] existing Orders/Catalog/Inventory/Tenants/Users/Security behavior remains
       green;
-- [ ] `git diff --check` passes;
-- [ ] `.\mvnw.cmd clean verify` passes;
-- [ ] multi-replica acceptance remains green;
-- [ ] independent final review reports no unresolved correctness blocker;
-- [ ] `branch-policy`, `ci-build` and `platform-validation` pass on final PR HEAD.
+- [x] `git diff --check` passes;
+- [x] `.\mvnw.cmd clean verify` passes;
+- [x] multi-replica acceptance remains green;
+- [x] independent final review reports no unresolved correctness blocker;
+- [x] `branch-policy`, `ci-build` and `platform-validation` pass on final PR HEAD.
 
-Only after the full verification evidence exists may ADR-0010 be promoted from
-`DESIGNED` to `TESTED`.
+The full verification evidence now exists; ADR-0010 is `TESTED`.
 
 ## Explicitly deferred
 
