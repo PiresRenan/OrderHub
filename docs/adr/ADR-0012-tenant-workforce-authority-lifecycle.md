@@ -293,6 +293,43 @@ boundaries.
 PostgreSQL constraints must reject structurally invalid workforce state whenever
 the invariant is relationally enforceable.
 
+### Initial PostgreSQL workforce foundation
+
+`V13` materializes the initial workforce state as exactly:
+
+- `workforce.staff_profiles`;
+- `workforce.departments`;
+- `workforce.job_positions`;
+- `workforce.job_position_permissions`;
+- `workforce.staff_placements`;
+- `workforce.reporting_relationships`.
+
+Staff, Department and JobPosition retain opaque Tenant ownership. Composite
+Tenant/identity uniqueness allows placement and reporting foreign keys to prove
+that referenced workforce records belong to the same Tenant.
+
+`job_position_permissions` persists membership of the position's maximum
+PermissionEnvelope by permission code. It deliberately does not create a foreign
+key into `access_control.permissions`; cross-module permission-vocabulary
+validation remains an application/module boundary.
+
+The V13 foundation rejects relationally enforceable invalid state including:
+
+- unsupported Staff lifecycle status;
+- duplicate User/Staff relationship inside the same Tenant;
+- duplicate Department or JobPosition code inside one Tenant;
+- unsupported AuthorityBand values;
+- malformed persisted permission codes;
+- cross-Tenant Staff placement references;
+- self-reporting relationships;
+- cross-Tenant reporting references.
+
+Reporting-cycle arbitration, inactive-supervisor lifecycle handling,
+last-governance concurrency and append-oriented audit persistence are not
+implemented by this foundation migration. Reporting-cycle rejection remains an
+explicit domain/application policy until its persistence/concurrency boundary is
+implemented and measured separately.
+
 ### Audit evidence
 
 Privilege-significant workforce changes require append-oriented audit evidence.
