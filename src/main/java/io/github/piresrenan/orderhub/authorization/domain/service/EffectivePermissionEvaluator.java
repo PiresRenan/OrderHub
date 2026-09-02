@@ -11,12 +11,12 @@ import io.github.piresrenan.orderhub.authorization.domain.model.PermissionOverri
 import io.github.piresrenan.orderhub.authorization.domain.model.RoleDefinition;
 
 /**
- * Deterministically resolves one permission against role state, bounded direct
- * overrides and the actor's effective permission envelope.
+ * Deterministically resolves one effective permission.
  *
  * <p>
- * This evaluator deliberately grants nothing based only on organizational
- * authority rank. Effective permissions remain explicit.
+ * Organizational rank never manufactures a permission. The result depends on
+ * explicit role permissions, bounded account overrides and the effective
+ * permission envelope.
  * </p>
  */
 public final class EffectivePermissionEvaluator {
@@ -32,6 +32,39 @@ public final class EffectivePermissionEvaluator {
                     "Role definition is required");
         }
 
+        return evaluate(
+                role.persona(),
+                role.permissions(),
+                actorEnvelope,
+                overrides,
+                requestedPermission);
+    }
+
+    public AuthorizationDecision evaluate(
+            AuthorizationPersona persona,
+            Collection<PermissionCode> rolePermissions,
+            PermissionEnvelope actorEnvelope,
+            Collection<PermissionOverride> overrides,
+            PermissionCode requestedPermission) {
+
+        if (persona == null) {
+            throw new IllegalArgumentException(
+                    "Authorization persona is required");
+        }
+
+        if (rolePermissions == null) {
+            throw new IllegalArgumentException(
+                    "Role permissions are required");
+        }
+
+        if (rolePermissions.stream()
+                .anyMatch(permission ->
+                        permission == null)) {
+
+            throw new IllegalArgumentException(
+                    "Role permissions cannot contain null");
+        }
+
         if (actorEnvelope == null) {
             throw new IllegalArgumentException(
                     "Actor permission envelope is required");
@@ -42,16 +75,24 @@ public final class EffectivePermissionEvaluator {
                     "Permission overrides are required");
         }
 
+        if (overrides.stream()
+                .anyMatch(override ->
+                        override == null)) {
+
+            throw new IllegalArgumentException(
+                    "Permission overrides cannot contain null");
+        }
+
         if (requestedPermission == null) {
             throw new IllegalArgumentException(
                     "Requested permission is required");
         }
 
-        if (role.persona()
+        if (persona
                 != AuthorizationPersona.STAFF
                 || !requestedPermission
                         .supports(
-                                role.persona())) {
+                                persona)) {
 
             return AuthorizationDecision.DENY;
         }
@@ -69,8 +110,8 @@ public final class EffectivePermissionEvaluator {
         }
 
         /*
-         * The actor envelope is authoritative even if persisted/configured role
-         * or override state is broader than expected.
+         * The current organizational envelope is authoritative even if
+         * persisted/configured authorization state is broader.
          */
         if (!actorEnvelope
                 .allows(
@@ -79,9 +120,8 @@ public final class EffectivePermissionEvaluator {
             return AuthorizationDecision.DENY;
         }
 
-        if (role.permissions()
-                .contains(
-                        requestedPermission)) {
+        if (rolePermissions.contains(
+                requestedPermission)) {
 
             return AuthorizationDecision.ALLOW;
         }
