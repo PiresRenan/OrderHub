@@ -176,6 +176,44 @@ because those authorization records still exist.
 
 This composition rule is a correctness boundary; destructive cleanup of stale
 roles/overrides is not required to make demotion effective.
+### Application authority composition
+
+Workforce authority is exposed through a framework-neutral application boundary
+rather than by exposing workforce persistence to authorization.
+
+The current composition is:
+
+```text
+authorization candidate PermissionEnvelope
++ current EffectiveWorkforceAuthority PermissionEnvelope
+-> bounded effective PermissionEnvelope
+```
+
+`BoundedWorkforceAuthorizationService` performs only this restrictive
+intersection. It does not load RoleAssignments, RoleDefinitions or permission
+overrides and therefore does not duplicate authorization persistence ownership.
+
+Privileged position mutation represents actor and target Staff identities
+separately.
+
+The workforce-side privileged mutation policy fails closed when:
+
+- actor or target does not match the explicit request identity;
+- actor or target belongs to another Tenant;
+- actor is inactive;
+- target is inactive;
+- the upstream privileged authorization decision did not allow the operation;
+- actor and target are the same Staff relationship.
+
+Rejecting self-directed privileged position mutation is intentionally stronger
+than rejecting only a literal PROMOTION: a lateral JobPosition change can
+alter the PermissionEnvelope without changing AuthorityBand and must not become
+a self-escalation path.
+
+The concrete authorization permission/use case for workforce administration is
+not invented in this batch. The application boundary consumes an explicit
+already-resolved privileged authorization outcome until a concrete executable
+permission contract is introduced.
 ### Reporting relationships
 
 Supervisor/reporting relationships are organizational graph edges.
