@@ -359,6 +359,86 @@ correctness boundary.
 V14 does not implement last-governance arbitration or append-oriented audit
 persistence. Those remain separate high-assurance boundaries.
 
+### PostgreSQL Tenant-governance viability arbitration
+
+V15 defines the workforce-side viable Tenant-governance relationship as:
+
+```text
+ACTIVE StaffProfile
++ current Tenant StaffPlacement
++ JobPosition AuthorityBand.TENANT_GOVERNANCE
+```
+
+This represents organizational governance viability only. It is not a
+RoleAssignment, does not grant an executable permission and does not make
+workforce responsible for authorization persistence.
+
+Mutations capable of reducing this viable-governance population acquire the same
+transaction-scoped PostgreSQL advisory lock derived from the Tenant scope.
+
+The protected mutation paths are:
+
+- ACTIVE Staff transition to INACTIVE;
+- StaffPlacement deletion;
+- StaffPlacement movement away from a TENANT_GOVERNANCE position;
+- JobPosition AuthorityBand downgrade away from TENANT_GOVERNANCE.
+
+After acquiring the Tenant lock, PostgreSQL re-evaluates committed workforce
+state and rejects a mutation when it would leave no other ACTIVE Staff placed in
+TENANT_GOVERNANCE.
+
+The invariant deliberately does not require every Tenant to contain governance
+state during bootstrap. It protects an existing viable governance population
+from being reduced to zero by the concrete authority-removal mutation paths.
+
+Concurrent demotions, deactivation/placement deletion and JobPosition authority
+downgrades therefore cannot each independently observe another soon-to-disappear
+governance relationship and both commit.
+
+V15 does not inspect RoleAssignments, RoleDefinitions or authorization tables.
+Executable authorization and delegation remain owned by authorization.
+
+### Privileged workforce delegation composition
+
+A privileged position mutation remains subject to the existing fail-closed
+actor/target/Tenant/upstream-authorization checks before organizational
+delegation is evaluated.
+
+The application boundary then requires:
+
+```text
+actor current workforce AuthorityBand
+    >= requested after AuthorityBand
+```
+
+and:
+
+```text
+actor authorization-resolved delegation PermissionEnvelope
+    contains requested after PermissionEnvelope
+```
+
+Both conditions are independent.
+
+The actor's current effective workforce PermissionEnvelope is not treated as the
+delegation envelope. Effective business permissions and authority to delegate
+permissions remain separate concepts, preserving the OH-013 delegation model.
+
+EffectiveWorkforceAuthority supplied to this composition is expected to have
+been resolved for the exact actor Staff relationship. The delegation envelope
+and upstream privileged authorization result are likewise trusted,
+already-resolved authorization inputs.
+
+The workforce application service does not query RoleAssignments,
+RoleDefinitions, permission overrides or authorization persistence and does not
+duplicate their ownership.
+
+A missing workforce AuthorityBand, insufficient actor AuthorityBand, delegation
+envelope overflow or any denial from the underlying privileged mutation policy
+fails closed.
+
+Append-oriented audit persistence remains a separate high-assurance boundary.
+
 ### Audit evidence
 
 Privilege-significant workforce changes require append-oriented audit evidence.
