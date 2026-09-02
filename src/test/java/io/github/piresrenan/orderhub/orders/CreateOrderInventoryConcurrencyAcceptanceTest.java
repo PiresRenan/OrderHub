@@ -24,6 +24,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryOperationException;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderIdempotencyKeyDigest;
+import io.github.piresrenan.orderhub.orders.support.TestCreateOrderIdempotencyKeyDigests;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderPersistenceException;
 import io.github.piresrenan.orderhub.orders.application.port.out.TransactionExecutionException;
@@ -94,6 +95,7 @@ class CreateOrderInventoryConcurrencyAcceptanceTest {
                     catalog.categories,
                     catalog.category_hierarchy_guards,
                     catalog.products,
+                    orders.order_request_idempotency,
                     orders.order_items,
                     orders.orders
                 """);
@@ -889,7 +891,9 @@ class CreateOrderInventoryConcurrencyAcceptanceTest {
                 TENANT_ID,
                 customerId,
                 items,
-                CreateOrderIdempotencyKeyDigest.of(new byte[32]));
+                TestCreateOrderIdempotencyKeyDigests.from(
+                        "inventory-concurrency:"
+                                + customerId));
     }
 
     private static CreateOrderCommand.Item item(

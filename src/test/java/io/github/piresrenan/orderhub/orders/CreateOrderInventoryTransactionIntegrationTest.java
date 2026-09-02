@@ -19,6 +19,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryCommitmentRejectedException;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderIdempotencyKeyDigest;
+import io.github.piresrenan.orderhub.orders.support.TestCreateOrderIdempotencyKeyDigests;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderAllocationOutcome;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
 import io.github.piresrenan.orderhub.orders.domain.model.OrderStatus;
@@ -66,6 +67,7 @@ class CreateOrderInventoryTransactionIntegrationTest {
                     catalog.categories,
                     catalog.category_hierarchy_guards,
                     catalog.products,
+                    orders.order_request_idempotency,
                     orders.order_items,
                     orders.orders
                 """);
@@ -549,7 +551,9 @@ class CreateOrderInventoryTransactionIntegrationTest {
                 TENANT_ID,
                 customerId,
                 items,
-                CreateOrderIdempotencyKeyDigest.of(new byte[32]));
+                TestCreateOrderIdempotencyKeyDigests.from(
+                        "inventory-transaction:"
+                                + customerId));
     }
 
     private static CreateOrderCommand.Item item(

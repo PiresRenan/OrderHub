@@ -381,6 +381,7 @@ class OrderHubMultiReplicaInventoryAcceptanceTest {
                     catalog.categories,
                     catalog.category_hierarchy_guards,
                     catalog.products,
+                    orders.order_request_idempotency,
                     orders.order_items,
                     orders.orders
                 """);

@@ -61,7 +61,7 @@ class CreateOrderAllocationOutcomeTest {
                 UUID.randomUUID();
 
         var service =
-                new CreateOrderService(
+                CreateOrderServiceTestFactory.create(
                         new EchoOrderRepository(),
                         () -> orderId,
                         new DirectTransactionExecutor(),

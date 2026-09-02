@@ -145,7 +145,9 @@ public final class OrderHubReplicaWorker {
                                         new CreateOrderCommand.Item(
                                                 variantId,
                                                 1)),
-                                CreateOrderIdempotencyKeyDigest.of(new byte[32])));
+                                TestCreateOrderIdempotencyKeyDigests.from(
+                                        "multi-replica:"
+                                                + customerId)));
 
                 Files.writeString(
                         resultPath,

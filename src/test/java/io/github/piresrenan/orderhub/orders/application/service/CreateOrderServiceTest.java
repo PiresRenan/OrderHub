@@ -66,7 +66,7 @@ class CreateOrderServiceTest {
                 UUID.randomUUID();
 
         var service =
-                new CreateOrderService(
+                CreateOrderServiceTestFactory.create(
                         repository,
                         () -> orderId,
                         transaction,
@@ -146,7 +146,7 @@ class CreateOrderServiceTest {
                 UUID.randomUUID();
 
         var service =
-                new CreateOrderService(
+                CreateOrderServiceTestFactory.create(
                         new RecordingOrderRepository(
                                 transaction::isActive,
                                 new ArrayList<>()),
@@ -204,7 +204,7 @@ class CreateOrderServiceTest {
                 new RecordingTransactionExecutor();
 
         var service =
-                new CreateOrderService(
+                CreateOrderServiceTestFactory.create(
                         new RecordingOrderRepository(
                                 transaction::isActive,
                                 new ArrayList<>()),
@@ -258,7 +258,7 @@ class CreateOrderServiceTest {
                         new ArrayList<>());
 
         var service =
-                new CreateOrderService(
+                CreateOrderServiceTestFactory.create(
                         repository,
                         UUID::randomUUID,
                         transaction,
@@ -321,7 +321,7 @@ class CreateOrderServiceTest {
                 rejection;
 
         var service =
-                new CreateOrderService(
+                CreateOrderServiceTestFactory.create(
                         repository,
                         UUID::randomUUID,
                         transaction,
@@ -387,7 +387,7 @@ class CreateOrderServiceTest {
                 rejection;
 
         var service =
-                new CreateOrderService(
+                CreateOrderServiceTestFactory.create(
                         repository,
                         UUID::randomUUID,
                         transaction,

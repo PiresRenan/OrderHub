@@ -9,8 +9,10 @@ import org.springframework.context.annotation.Import;
 
 import io.github.piresrenan.orderhub.orders.adapter.out.observability.micrometer.MicrometerObservedCreateOrderUseCase;
 import io.github.piresrenan.orderhub.orders.adapter.out.observability.micrometer.MicrometerObservedTransactionExecutor;
+import io.github.piresrenan.orderhub.orders.adapter.out.persistence.postgresql.PostgreSqlCreateOrderIdempotencyRepository;
 import io.github.piresrenan.orderhub.orders.adapter.out.persistence.postgresql.PostgreSqlOrderRepository;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
+import io.github.piresrenan.orderhub.orders.application.port.out.CreateOrderIdempotencyRepository;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderIdGenerator;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderRepository;
 import io.github.piresrenan.orderhub.orders.application.port.out.TransactionExecutor;
@@ -30,6 +32,9 @@ class OrdersConfigurationTest {
     private OrderRepository orderRepository;
 
     @Autowired
+    private CreateOrderIdempotencyRepository idempotencyRepository;
+
+    @Autowired
     private TransactionExecutor transactionExecutor;
 
     @Test
@@ -42,6 +47,10 @@ class OrdersConfigurationTest {
         assertThat(orderRepository)
                 .isInstanceOf(
                         PostgreSqlOrderRepository.class);
+
+        assertThat(idempotencyRepository)
+                .isInstanceOf(
+                        PostgreSqlCreateOrderIdempotencyRepository.class);
 
         assertThat(orderIdGenerator)
                 .isNotNull();

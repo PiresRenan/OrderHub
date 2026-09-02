@@ -18,6 +18,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderIdempotencyKeyDigest;
+import io.github.piresrenan.orderhub.orders.support.TestCreateOrderIdempotencyKeyDigests;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
 import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
 
@@ -79,6 +80,7 @@ class CreateOrderCatalogSellabilityAcceptanceTest {
                     inventory.inventory_commitments,
                     inventory.inventory_positions,
                     inventory.tenant_policies,
+                    orders.order_request_idempotency,
                     orders.order_items,
                     orders.orders
                 """);
@@ -365,7 +367,11 @@ class CreateOrderCatalogSellabilityAcceptanceTest {
                         new CreateOrderCommand.Item(
                                 variantId,
                                 1)),
-                CreateOrderIdempotencyKeyDigest.of(new byte[32]));
+                TestCreateOrderIdempotencyKeyDigests.from(
+                        "catalog-sellability:"
+                                + tenantId
+                                + ":"
+                                + variantId));
     }
 
     private long orderCount(
