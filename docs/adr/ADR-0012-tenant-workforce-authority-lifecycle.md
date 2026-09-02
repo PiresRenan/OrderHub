@@ -143,6 +143,39 @@ Authorization must not depend on workforce persistence or workforce entities.
 Later authorization orchestration receives the effective workforce ceiling
 through an application boundary rather than querying workforce tables directly.
 
+### Staff placement and effective workforce authority
+
+`StaffPlacement` is a Tenant-scoped organizational relationship that binds one
+StaffProfile to one Department and one JobPosition.
+
+Placement remains separate from Staff identity so organizational movement does
+not rewrite User identity or the durable identity of the Staff relationship.
+
+A valid placement requires StaffProfile, Department and JobPosition to share the
+same Tenant.
+
+`WorkforceAuthorityResolver` derives the current workforce ceiling from:
+
+```text
+StaffProfile lifecycle state
++ exact StaffPlacement
++ exact JobPosition
+-> EffectiveWorkforceAuthority
+```
+
+For ACTIVE Staff, the result carries the JobPosition AuthorityBand and its exact
+PermissionEnvelope.
+
+For INACTIVE Staff, the result contains no AuthorityBand and an empty
+PermissionEnvelope even when historical placement data still exists.
+
+`WorkforcePermissionCeiling` intersects candidate authorization permissions with
+the current workforce PermissionEnvelope. Therefore durable RoleAssignments or
+ALLOW overrides that became stale after a demotion cannot remain effective merely
+because those authorization records still exist.
+
+This composition rule is a correctness boundary; destructive cleanup of stale
+roles/overrides is not required to make demotion effective.
 ### Reporting relationships
 
 Supervisor/reporting relationships are organizational graph edges.
