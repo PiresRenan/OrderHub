@@ -1,6 +1,6 @@
 # ADR-0011 — Identity Personas and Scoped Authorization Kernel
 
-Status: DESIGNED
+Status: TESTED
 
 ## Context
 
@@ -934,12 +934,32 @@ Trade-offs:
 These trade-offs are accepted because the simpler alternatives violate concrete
 multi-Tenant, hierarchy, customization and persona requirements.
 
-## Verification plan
+## Verification evidence
 
-ADR-0011 remains `DESIGNED` until executable evidence proves the implemented
-OH-013 slice.
+ADR-0011 is `TESTED` against the reviewed OH-013 implementation checkpoint
+`a4b4f64d371292889bf0515202b6d831ca474cf5` in PR #27.
 
-Required evidence includes:
+That exact implementation checkpoint satisfied the acceptance gates before this
+ADR status promotion:
+
+- local repository verification completed with 797 tests, 0 failures, 0 errors
+  and 0 skipped;
+- `git diff --check` was clean;
+- Branch Policy completed successfully;
+- CI completed successfully;
+- Platform CI completed successfully;
+- Codex completed its review with a `+1` reaction and produced no review
+  comments, inline findings or unresolved irregularities;
+- the PR base remained
+  `pre-release@40e0283c498ee4e575629cf15326ea1f5937cd73`;
+- accepted migrations V1 through V11 remained unchanged.
+
+The documentation-only commit that promotes this ADR from `DESIGNED` to `TESTED`
+is intentionally not treated as the reviewed implementation checkpoint. Its new
+HEAD remains subject to fresh Branch Policy, CI, Platform CI and Codex review
+before merge.
+
+Executable evidence satisfied by the reviewed implementation checkpoint includes:
 
 - `authorization` is a distinct Spring Modulith module;
 - module dependencies remain acyclic;
@@ -973,9 +993,12 @@ Required evidence includes:
   details;
 - `git diff --check` passes;
 - full `mvnw clean verify` passes;
-- required pull-request workflows pass on the final candidate HEAD;
-- final independent/Codex review has no unresolved irregularity before ADR
-  promotion or merge.
+- required pull-request workflows passed on reviewed implementation checkpoint
+  `a4b4f64d371292889bf0515202b6d831ca474cf5`;
+- Codex review of that implementation checkpoint produced no unresolved
+  irregularity;
+- the subsequent documentation-only ADR promotion HEAD remains independently
+  subject to fresh workflow and Codex merge gates.
 
 ## Explicitly deferred
 
