@@ -17,6 +17,7 @@ import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.Ca
 import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryCommitmentRejectedException;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderAllocationOutcome;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderExecutionKind;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderResult;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
 
@@ -71,8 +72,12 @@ public final class MicrometerObservedCreateOrderUseCase
                     delegate.create(
                             command);
 
-            recordAllocationOutcome(
-                    result.allocationOutcome());
+            if (result.executionKind()
+                    == CreateOrderExecutionKind.FIRST_EXECUTION) {
+
+                recordAllocationOutcome(
+                        result.allocationOutcome());
+            }
 
             return result;
 
@@ -92,7 +97,7 @@ public final class MicrometerObservedCreateOrderUseCase
         Counter.builder(
                         ALLOCATION_METRIC)
                 .description(
-                        "Successful Order creation by Inventory allocation outcome")
+                        "Successful new Order creation by Inventory allocation outcome")
                 .tag(
                         OUTCOME_TAG,
                         allocationOutcomeTag(

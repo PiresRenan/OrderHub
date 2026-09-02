@@ -648,6 +648,23 @@ Never label metrics with:
 Existing request/correlation tracing remains responsible for individual
 diagnostics.
 
+The existing successful creation metric:
+
+`orderhub.orders.create.allocation{outcome=...}`
+
+counts only `FIRST_EXECUTION` results that actually executed Order creation and
+Inventory allocation.
+
+A durable `REPLAY` is still a successful HTTP response, but it must not increment
+that creation/allocation metric because no new Order or Inventory effect occurred.
+
+Replay request volume is represented independently by:
+
+`orderhub.orders.idempotency{outcome=replay}`
+
+This separation prevents client retry volume from inflating Order creation and
+Inventory allocation throughput dashboards.
+
 ### 18. No automatic retry framework
 
 OH-012 enables clients to retry safely.

@@ -68,6 +68,9 @@ class CreateOrderIdempotencyHttpRecoveryAcceptanceTest {
     private static final String METRIC =
             "orderhub.orders.idempotency";
 
+    private static final String CREATE_ALLOCATION_METRIC =
+            "orderhub.orders.create.allocation";
+
     private static final UUID USER_ID =
             UUID.fromString(
                     "10000000-0000-0000-0000-000000000010");
@@ -110,7 +113,7 @@ class CreateOrderIdempotencyHttpRecoveryAcceptanceTest {
     @BeforeEach
     void resetState() {
 
-        removeIdempotencyMeters();
+        removeOrderObservationMeters();
 
         jdbcTemplate.update(
                 """
@@ -244,6 +247,14 @@ class CreateOrderIdempotencyHttpRecoveryAcceptanceTest {
 
         assertCounter(
                 "replay",
+                1.0d);
+
+        /*
+         * One request executed Order/Inventory work and one request replayed.
+         * Retry traffic must therefore not inflate creation throughput.
+         */
+        assertCreateAllocationCounter(
+                "fully_allocated",
                 1.0d);
 
         assertIdempotencyMetricHasOnlyBoundedOutcomeTags();
@@ -721,6 +732,31 @@ class CreateOrderIdempotencyHttpRecoveryAcceptanceTest {
                         expectedCount);
     }
 
+    private void assertCreateAllocationCounter(
+            String outcome,
+            double expectedCount) {
+
+        var counter =
+                meterRegistry
+                        .find(
+                                CREATE_ALLOCATION_METRIC)
+                        .tag(
+                                "outcome",
+                                outcome)
+                        .counter();
+
+        assertThat(counter)
+                .as(
+                        "%s{outcome=%s}",
+                        CREATE_ALLOCATION_METRIC,
+                        outcome)
+                .isNotNull();
+
+        assertThat(counter.count())
+                .isEqualTo(
+                        expectedCount);
+    }
+
     private void assertIdempotencyMetricHasOnlyBoundedOutcomeTags() {
 
         var meters =
@@ -768,7 +804,7 @@ class CreateOrderIdempotencyHttpRecoveryAcceptanceTest {
         }
     }
 
-    private void removeIdempotencyMeters() {
+    private void removeOrderObservationMeters() {
 
         var meters =
                 List.copyOf(
@@ -777,9 +813,12 @@ class CreateOrderIdempotencyHttpRecoveryAcceptanceTest {
         for (var meter :
                 meters) {
 
-            if (METRIC.equals(
+            var name =
                     meter.getId()
-                            .getName())) {
+                            .getName();
+
+            if (METRIC.equals(name)
+                    || CREATE_ALLOCATION_METRIC.equals(name)) {
 
                 meterRegistry.remove(
                         meter);

@@ -12,6 +12,7 @@ import io.github.piresrenan.orderhub.orders.application.idempotency.CreateOrderI
 import io.github.piresrenan.orderhub.orders.application.idempotency.CreateOrderRequestFingerprint;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderAllocationOutcome;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderExecutionKind;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderResult;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
 import io.github.piresrenan.orderhub.orders.application.port.out.CreateOrderIdempotencyAcquisition;
@@ -220,7 +221,8 @@ public final class CreateOrderService
 
         return new CreateOrderResult(
                 persistedOrder,
-                allocationOutcome);
+                allocationOutcome,
+                CreateOrderExecutionKind.FIRST_EXECUTION);
     }
 
     private static CreateOrderResult replay(
@@ -244,7 +246,8 @@ public final class CreateOrderService
 
         return new CreateOrderResult(
                 order,
-                completion.allocationOutcome());
+                completion.allocationOutcome(),
+                CreateOrderExecutionKind.REPLAY);
     }
 
     private static List<OrderItem> prepareItems(
