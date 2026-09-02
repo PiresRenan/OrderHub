@@ -471,6 +471,11 @@ match the owning Tenant of a `TENANT_CUSTOM` RoleDefinition. Global system role
 definitions remain usable from validated Tenant scopes, while a Tenant-owned role
 cannot be referenced by an assignment persisted for another Tenant.
 
+RoleDefinition Tenant ownership is immutable after creation. A custom role cannot
+be moved from one Tenant to another while preserving a stable `role_id`, which
+prevents existing assignments from becoming cross-Tenant authorization state
+after they have already passed insertion-time validation.
+
 RoleAssignment must not be embedded inside User or TenantMembership.
 
 The same User may have unrelated RoleAssignments in different Tenants.
@@ -615,10 +620,14 @@ participating in one decision cannot be independently observed from different
 committed database moments.
 
 The PostgreSQL authorization adapter therefore executes the complete durable
-decision-read sequence under a read-only `REPEATABLE READ` transaction. This is
-a consistency boundary, not a locking strategy: competing administrative writes
-remain free to commit, while the in-flight authorization decision continues
-against its original coherent snapshot.
+decision-read sequence under an independent read-only `REPEATABLE READ`
+transaction. The independent physical transaction prevents an enclosing
+`READ_COMMITTED` business transaction from silently downgrading authorization
+snapshot isolation.
+
+This is a consistency boundary, not a locking strategy: competing administrative
+writes remain free to commit, while the in-flight authorization decision
+continues against its original coherent snapshot.
 
 Adversarial PostgreSQL evidence covers both a competing assignment/role-permission
 change that would otherwise create an impossible transient ALLOW and concurrent

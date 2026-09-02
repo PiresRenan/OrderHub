@@ -19,6 +19,8 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.jdbc.support.JdbcTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
@@ -285,6 +287,179 @@ class PostgreSqlAuthorizationConcurrencyTest {
                         1);
     }
 
+    @Test
+    void outerReadCommittedTransactionCannotDowngradeAuthorizationSnapshot()
+            throws Exception {
+
+        var userId =
+                UUID.randomUUID();
+
+        var tenantId =
+                UUID.randomUUID();
+
+        var scope =
+                new TenantAuthorizationScope(
+                        tenantId);
+
+        var roleId =
+                UUID.randomUUID();
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO access_control.role_definitions (
+                    role_id,
+                    tenant_id,
+                    code,
+                    persona,
+                    authority_band,
+                    mutability
+                )
+                VALUES (
+                    ?,
+                    NULL,
+                    'NESTED_CONCURRENCY_PROBE_ROLE',
+                    'STAFF',
+                    'OPERATIONAL',
+                    'BUILTIN_FUNCTIONAL'
+                )
+                """,
+                roleId);
+
+        var durableAssignments =
+                new PostgreSqlRoleAssignmentRepository(
+                        jdbcTemplate);
+
+        durableAssignments.save(
+                new RoleAssignment(
+                        userId,
+                        AuthorizationPersona.STAFF,
+                        scope,
+                        "NESTED_CONCURRENCY_PROBE_ROLE"));
+
+        var assignmentObserved =
+                new CountDownLatch(
+                        1);
+
+        var mutationCommitted =
+                new CountDownLatch(
+                        1);
+
+        RoleAssignmentRepository latchingAssignments =
+                new RoleAssignmentRepository() {
+
+                    @Override
+                    public void save(
+                            RoleAssignment assignment) {
+
+                        durableAssignments.save(
+                                assignment);
+                    }
+
+                    @Override
+                    public List<RoleAssignment> findByUserIdAndScope(
+                            UUID requestedUserId,
+                            TenantAuthorizationScope requestedScope) {
+
+                        var result =
+                                durableAssignments
+                                        .findByUserIdAndScope(
+                                                requestedUserId,
+                                                requestedScope);
+
+                        assignmentObserved.countDown();
+
+                        await(
+                                mutationCommitted);
+
+                        return result;
+                    }
+                };
+
+        var transactionManager =
+                new JdbcTransactionManager(
+                        dataSource);
+
+        var authorizationTransaction =
+                new PostgreSqlAuthorizationDecisionReadTransaction(
+                        transactionManager);
+
+        var service =
+                new DurableTenantAuthorizationService(
+                        latchingAssignments,
+                        new PostgreSqlRoleDefinitionRepository(
+                                jdbcTemplate),
+                        new PostgreSqlUserPermissionOverrideRepository(
+                                jdbcTemplate),
+                        authorizationTransaction,
+                        observation -> {
+                        });
+
+        var request =
+                new TenantAuthorizationRequest(
+                        userId,
+                        AuthorizationPersona.STAFF,
+                        scope,
+                        PermissionCode.INVENTORY_ADJUST);
+
+        var outerTransaction =
+                new TransactionTemplate(
+                        transactionManager);
+
+        outerTransaction.setPropagationBehavior(
+                TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+
+        outerTransaction.setIsolationLevel(
+                TransactionDefinition.ISOLATION_READ_COMMITTED);
+
+        var decision =
+                CompletableFuture.supplyAsync(
+                        () ->
+                                outerTransaction.execute(
+                                        status ->
+                                                service.authorize(
+                                                        request,
+                                                        PermissionEnvelope.of(
+                                                                Set.of(
+                                                                        PermissionCode.INVENTORY_ADJUST)))));
+
+        assertThat(
+                assignmentObserved.await(
+                        5,
+                        TimeUnit.SECONDS))
+                .as(
+                        "authorization must complete its first durable read before the competing mutation")
+                .isTrue();
+
+        jdbcTemplate.update(
+                """
+                DELETE FROM access_control.role_assignments
+                WHERE user_id = ?
+                  AND tenant_id = ?
+                """,
+                userId,
+                tenantId);
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO access_control.role_permissions (
+                    role_id,
+                    permission_code
+                )
+                VALUES (?, 'INVENTORY_ADJUST')
+                """,
+                roleId);
+
+        mutationCommitted.countDown();
+
+        assertThat(
+                decision.get(
+                        5,
+                        TimeUnit.SECONDS))
+                .as(
+                        "an outer READ COMMITTED transaction must not downgrade the authorization snapshot")
+                .isEqualTo(
+                        AuthorizationDecision.DENY);
+    }
     @Test
     void concurrentSystemAndTenantCustomRoleCodeReservationHasOnlyOneWinner()
             throws Exception {

@@ -19,6 +19,12 @@ import io.github.piresrenan.orderhub.authorization.domain.model.AuthorizationDec
  * REPEATABLE READ ensures every durable policy statement participating in one
  * decision observes one consistent PostgreSQL snapshot instead of independently
  * observing different committed privilege states.
+ *
+ * <p>
+ * The boundary uses an independent physical transaction so an enclosing
+ * READ_COMMITTED business transaction cannot silently downgrade the authorization
+ * snapshot isolation.
+ * </p>
  * </p>
  */
 public final class PostgreSqlAuthorizationDecisionReadTransaction
@@ -38,7 +44,7 @@ public final class PostgreSqlAuthorizationDecisionReadTransaction
                         transactionManager);
 
         transactionTemplate.setPropagationBehavior(
-                TransactionDefinition.PROPAGATION_REQUIRED);
+                TransactionDefinition.PROPAGATION_REQUIRES_NEW);
 
         transactionTemplate.setIsolationLevel(
                 TransactionDefinition.ISOLATION_REPEATABLE_READ);

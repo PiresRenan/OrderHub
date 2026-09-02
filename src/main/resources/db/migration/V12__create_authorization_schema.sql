@@ -173,6 +173,30 @@ BEFORE INSERT OR UPDATE OF
 ON access_control.role_definitions
 FOR EACH ROW
 EXECUTE FUNCTION access_control.reserve_role_code_namespace();
+CREATE FUNCTION access_control.enforce_role_definition_scope_immutability()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF OLD.tenant_id IS DISTINCT FROM NEW.tenant_id THEN
+
+        RAISE check_violation
+            USING
+                MESSAGE =
+                    'Role definition Tenant ownership is immutable',
+                CONSTRAINT =
+                    'ck_authorization_role_definition_scope_immutable';
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_authorization_role_definition_scope_immutability
+BEFORE UPDATE OF tenant_id
+ON access_control.role_definitions
+FOR EACH ROW
+EXECUTE FUNCTION access_control.enforce_role_definition_scope_immutability();
 CREATE TABLE access_control.role_permissions (
     role_id UUID NOT NULL,
     permission_code TEXT NOT NULL,
