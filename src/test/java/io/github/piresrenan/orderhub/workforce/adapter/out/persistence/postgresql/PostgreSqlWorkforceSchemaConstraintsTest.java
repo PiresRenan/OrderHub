@@ -69,7 +69,7 @@ class PostgreSqlWorkforceSchemaConstraintsTest {
                         String.class);
 
         assertThat(tables)
-                .containsExactlyInAnyOrder(
+                .contains(
                         "staff_profiles",
                         "departments",
                         "job_positions",

@@ -279,10 +279,11 @@ Concurrency-sensitive privileged invariants use PostgreSQL, not JVM-local locks.
 
 OH-014 starts with `V13`.
 
-`V1` through `V12` are accepted and immutable.
+`V1` through `V15` are accepted and immutable.
 
-The initial workforce schema will persist only concrete workforce state needed
-by this slice.
+The workforce schema persists only concrete workforce state needed by this
+slice. `V16` adds append-oriented audit evidence for privilege-significant
+workforce changes without changing the accepted V13-V15 relational model.
 
 There will be no cross-schema foreign keys from workforce tables into `users`,
 `tenants` or `access_control`.
@@ -437,7 +438,10 @@ A missing workforce AuthorityBand, insufficient actor AuthorityBand, delegation
 envelope overflow or any denial from the underlying privileged mutation policy
 fails closed.
 
-Append-oriented audit persistence remains a separate high-assurance boundary.
+Append-oriented audit persistence is materialized by V16 and remains owned by
+workforce. The Java application boundary uses a workforce-owned append-only
+repository and transaction contract rather than importing the Orders transaction
+port.
 
 ### Audit evidence
 
@@ -457,6 +461,38 @@ such as:
 Audit storage must not duplicate unnecessary PII, JWTs or request payloads.
 
 Audit correctness follows the business mutation transaction.
+
+`V16` materializes `workforce.audit_events` with fixed, bounded operational
+columns for internal actor/affected Staff identifiers, Tenant scope, action,
+outcome/reason, correlation identifier and before/after workforce state. Audit
+rows deliberately have no foreign keys to mutable workforce rows so historical
+evidence does not disappear or become invalid when current organizational state
+changes.
+
+The database rejects UPDATE and DELETE of audit evidence. The application
+persistence boundary exposes only `WorkforceAuditRepository.append(...)`.
+
+`PostgreSqlWorkforceAuditRepository` owns no transaction boundary. It participates
+in the transaction established by the calling application and translates
+adapter-specific persistence failures at the workforce boundary.
+
+`AuditedWorkforceMutationService` coordinates:
+
+```text
+workforce mutation
+-> audit append
+```
+
+inside one invocation of `WorkforceTransactionExecutor`. The Spring adapter
+materializes that workforce-owned contract with `TransactionOperations`; it does
+not import the Orders transaction port.
+
+The resulting semantics are:
+
+- successful mutation and audit evidence commit together;
+- audit persistence failure rolls back the business mutation;
+- mutation failure prevents the audit append and rolls back prior mutation work;
+- audit is not independently committed merely to preserve an attempted action.
 
 `REQUIRES_NEW` is not introduced merely to make an attempted mutation survive a
 rollback, because that could create a durable record implying an organizational
@@ -501,8 +537,12 @@ Required evidence includes:
 - privileged/self-escalating mutations fail closed;
 - applicable last-governance invariants are concurrency-safe;
 - workforce audit evidence is append-oriented and privacy-safe;
-- `V13` reconstructs the workforce schema from an empty PostgreSQL database;
-- `V1` through `V12` remain unchanged;
+- audit UPDATE/DELETE is rejected and persisted evidence uses bounded columns;
+- workforce mutation and audit evidence commit or roll back together;
+- no independent REQUIRES_NEW audit transaction exists;
+- `V13` reconstructs the workforce foundation from an empty PostgreSQL database;
+- `V16` reconstructs append-oriented audit storage through the full Flyway chain;
+- `V1` through `V15` remain unchanged;
 - PostgreSQL constraints reject structurally invalid workforce state;
 - `git diff --check` passes;
 - full `mvnw clean verify` passes;
