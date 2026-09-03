@@ -105,6 +105,38 @@ class ReportingStructurePolicyTest {
     }
 
     @Test
+    void rejectsDuplicateReportingRelationship() {
+
+        var tenantId =
+                UUID.randomUUID();
+
+        var supervisor =
+                staff(
+                        tenantId);
+
+        var subordinate =
+                staff(
+                        tenantId);
+
+        var existingRelationship =
+                new ReportingRelationship(
+                        tenantId,
+                        supervisor.staffId(),
+                        subordinate.staffId());
+
+        assertThatThrownBy(() ->
+                policy.establish(
+                        supervisor,
+                        subordinate,
+                        List.of(
+                                existingRelationship)))
+                .isInstanceOf(
+                        IllegalArgumentException.class)
+                .hasMessageContaining(
+                        "already exists");
+    }
+
+    @Test
     void rejectsReportingCycle() {
 
         var tenantId =

@@ -60,6 +60,13 @@ public final class ReportingStructurePolicy {
                         supervisor.staffId(),
                         subordinate.staffId());
 
+        if (existingRelationships.contains(
+                candidate)) {
+
+            throw new IllegalArgumentException(
+                    "Reporting relationship already exists");
+        }
+
         if (createsCycle(
                 candidate,
                 existingRelationships)) {
