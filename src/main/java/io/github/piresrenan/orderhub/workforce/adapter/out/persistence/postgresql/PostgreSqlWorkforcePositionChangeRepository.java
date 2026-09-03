@@ -20,10 +20,10 @@ import io.github.piresrenan.orderhub.workforce.domain.model.StaffStatus;
  * PostgreSQL authority for resolving and changing current Staff position.
  *
  * <p>
- * Reads lock the concrete Staff, placement and JobPosition rows required by the
- * authorization decision. Position mutation also compares the expected current
- * position so stale concurrent decisions fail instead of silently overwriting a
- * newer placement.
+ * Reads lock the concrete Staff, placement, JobPosition and existing position
+ * permission rows required by the authorization decision. Position mutation also
+ * compares the expected current position so stale concurrent decisions fail
+ * instead of silently overwriting a newer placement.
  * </p>
  */
 public final class PostgreSqlWorkforcePositionChangeRepository
@@ -319,6 +319,7 @@ public final class PostgreSqlWorkforcePositionChangeRepository
                                 WHERE tenant_id = ?
                                   AND position_id = ?
                                 ORDER BY permission_code
+                                FOR UPDATE
                                 """,
                                 String.class,
                                 tenantId,
