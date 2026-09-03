@@ -80,6 +80,31 @@ class ReportingStructurePolicyTest {
     }
 
     @Test
+    void rejectsInactiveSupervisor() {
+
+        var tenantId =
+                UUID.randomUUID();
+
+        var supervisor =
+                new StaffProfile(
+                        UUID.randomUUID(),
+                        UUID.randomUUID(),
+                        tenantId,
+                        StaffStatus.INACTIVE);
+
+        assertThatThrownBy(() ->
+                policy.establish(
+                        supervisor,
+                        staff(
+                                tenantId),
+                        List.of()))
+                .isInstanceOf(
+                        IllegalArgumentException.class)
+                .hasMessageContaining(
+                        "ACTIVE");
+    }
+
+    @Test
     void rejectsReportingCycle() {
 
         var tenantId =

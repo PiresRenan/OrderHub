@@ -48,6 +48,12 @@ public final class ReportingStructurePolicy {
                     "Reporting relationship cannot cross Tenant scope");
         }
 
+        if (!supervisor.isActive()) {
+
+            throw new IllegalArgumentException(
+                    "Reporting supervisor must be ACTIVE");
+        }
+
         var candidate =
                 new ReportingRelationship(
                         supervisor.tenantId(),
