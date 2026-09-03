@@ -265,13 +265,45 @@ StaffProfile merely to revoke authority.
 Ordinary Staff maintenance and organizational-authority changes are distinct
 operations.
 
-The later mutation boundary must reject:
+The concrete privileged position-change boundary does not accept caller-supplied
+before/after AuthorityBand, JobPosition or PositionChange facts.
 
-- self-promotion;
+`PrivilegedPositionChangeExecutionService` resolves, inside one workforce
+transaction:
+
+```text
+actor StaffProfile
++ target StaffProfile
++ actor placement / JobPosition
++ target current placement / JobPosition
++ requested target JobPosition
++ persisted JobPosition PermissionEnvelopes
+-> authoritative PositionChange
+```
+
+`PostgreSqlWorkforcePositionChangeRepository.loadForUpdate(...)` obtains
+PostgreSQL row locks while resolving those facts. The subsequent placement update
+also requires the expected current position, so stale concurrent state cannot be
+silently overwritten.
+
+The concrete mutation boundary rejects or fails closed for:
+
+- self-promotion/self-directed privileged position mutation;
 - delegation beyond the actor's authority boundary;
 - unauthorized Tenant-governance elevation;
-- removal/demotion of the final viable Tenant-governance administrator when the
-  concrete mutation path is introduced.
+- missing or cross-Tenant Staff/position facts;
+- a same-position request that would otherwise create a false APPLIED change;
+- removal/demotion of the final viable Tenant-governance administrator through
+  the V15-protected mutation paths.
+
+A same-position request is a committed denial, not an organizational mutation.
+It emits bounded PRIVILEGED_MUTATION / DENIED / POSITION_UNCHANGED evidence
+without changing StaffPlacement.
+
+Competing equivalent position changes serialize on PostgreSQL-authoritative
+state. After the first transaction commits, the competing execution re-resolves
+the placement and treats the now-identical requested position as
+POSITION_UNCHANGED.
 
 Concurrency-sensitive privileged invariants use PostgreSQL, not JVM-local locks.
 
@@ -425,10 +457,15 @@ The actor's current effective workforce PermissionEnvelope is not treated as the
 delegation envelope. Effective business permissions and authority to delegate
 permissions remain separate concepts, preserving the OH-013 delegation model.
 
-EffectiveWorkforceAuthority supplied to this composition is expected to have
-been resolved for the exact actor Staff relationship. The delegation envelope
-and upstream privileged authorization result are likewise trusted,
-already-resolved authorization inputs.
+For the concrete privileged position-change path,
+EffectiveWorkforceAuthority is constructed from the actor Staff lifecycle and
+actor JobPosition resolved from PostgreSQL inside the transaction. The caller
+does not supply an AuthorityBand, JobPosition, PermissionEnvelope for the target
+position or a PositionChange snapshot.
+
+The actor delegation envelope and upstream privileged authorization result remain
+trusted, already-resolved authorization inputs owned by the authorization
+integration boundary.
 
 The workforce application service does not query RoleAssignments,
 RoleDefinitions, permission overrides or authorization persistence and does not
@@ -489,10 +526,23 @@ not import the Orders transaction port.
 
 The resulting semantics are:
 
-- successful mutation and audit evidence commit together;
+- successful mutation and APPLIED audit evidence commit together;
 - audit persistence failure rolls back the business mutation;
 - mutation failure prevents the audit append and rolls back prior mutation work;
+- a policy/no-op denial that performs no business mutation may commit bounded
+  DENIED evidence in the same normal transaction;
 - audit is not independently committed merely to preserve an attempted action.
+
+`PrivilegedPositionChangeExecutionService` applies those semantics to the
+concrete position-change path. An authorized position mutation appends
+POSITION_CHANGED or POSITION_AUTHORITY_CHANGED / APPLIED according to the
+persisted before/after AuthorityBand. A rejected privileged request appends
+PRIVILEGED_MUTATION / DENIED with a bounded reason code while leaving the
+placement unchanged.
+
+This distinction is intentional: a committed denial records that a privileged
+attempt was rejected; a mutation that actually fails and rolls back cannot leave
+durable evidence implying that the organizational change committed.
 
 `REQUIRES_NEW` is not introduced merely to make an attempted mutation survive a
 rollback, because that could create a durable record implying an organizational
@@ -535,6 +585,11 @@ Required evidence includes:
 - promotion/demotion is explicit and bounded;
 - stale roles/ALLOW overrides cannot bypass a contracted workforce envelope;
 - privileged/self-escalating mutations fail closed;
+- privileged position changes derive Staff/placement/position authority facts
+  from PostgreSQL rather than caller-supplied before/after authority claims;
+- same-position requests cannot produce false APPLIED position-change evidence;
+- competing equivalent privileged position changes re-evaluate the latest
+  PostgreSQL-authoritative placement after lock serialization;
 - applicable last-governance invariants are concurrency-safe;
 - workforce audit evidence is append-oriented and privacy-safe;
 - audit UPDATE/DELETE is rejected and persisted evidence uses bounded columns;
