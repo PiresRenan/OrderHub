@@ -1,5 +1,7 @@
 package io.github.piresrenan.orderhub.authorization.domain.model;
 
+import org.springframework.modulith.NamedInterface;
+
 import java.util.Collection;
 import java.util.Set;
 
@@ -11,6 +13,7 @@ import java.util.Set;
  * direct permissions cannot silently promote an actor.
  * </p>
  */
+@NamedInterface("policy-model")
 public final class PermissionEnvelope {
 
     private final Set<PermissionCode> permissions;
