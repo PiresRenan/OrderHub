@@ -1,6 +1,6 @@
 # ADR-0012 — Tenant Workforce Authority Lifecycle
 
-Status: DESIGNED
+Status: TESTED
 
 ## Context
 
@@ -564,12 +564,35 @@ OH-014 does not introduce:
 
 Those require separate concrete purposes and privacy analysis.
 
-## Verification plan
+## Verification evidence
 
-ADR-0012 remains DESIGNED until executable OH-014 evidence demonstrates the
-implemented slice.
+ADR-0012 is `TESTED` against the reviewed OH-014 implementation checkpoint
+`24f14ff56ae5ca9dde165891e292ef379c2a41d6` in PR #29.
 
-Required evidence includes:
+That exact implementation checkpoint satisfied the acceptance gates before this
+ADR status promotion:
+
+- local `mvnw clean verify` completed successfully with 863 tests, 0 failures,
+  0 errors and 0 skipped across 153 fresh test suites;
+- `git diff --check` was clean;
+- Branch Policy completed successfully against the exact implementation
+  checkpoint;
+- CI completed successfully against the exact implementation checkpoint;
+- Platform CI completed successfully against the exact implementation
+  checkpoint;
+- Codex completed its final re-review of the exact implementation checkpoint
+  with no major issues and no unresolved review irregularity;
+- the PR base remained
+  `pre-release@7344c5e1b573f3d79846719cd93aa951716c0f17`;
+- accepted migrations V1 through V16 remained byte-identical throughout the
+  final local verification.
+
+The documentation-only commit that promotes this ADR from `DESIGNED` to `TESTED`
+is intentionally not treated as the reviewed implementation checkpoint. Its new
+HEAD remains subject to fresh Branch Policy, CI, Platform CI and Codex review,
+plus final repository verification, before merge.
+
+Executable evidence satisfied by the reviewed implementation checkpoint includes:
 
 - `workforce` is a distinct Spring Modulith module;
 - module dependencies remain acyclic;
@@ -579,7 +602,9 @@ Required evidence includes:
 - JobPosition is separate from RoleDefinition;
 - AuthorityBand does not imply permissions;
 - position PermissionEnvelope remains an explicit upper bound;
-- reporting relationships reject self-links, cross-Tenant links and cycles;
+- reporting relationships reject self-links, duplicate edges, cross-Tenant links
+  and cycles;
+- reporting relationship creation rejects an inactive supervisor;
 - reporting relationships grant no permissions;
 - inactive Staff resolves to no effective workforce authority;
 - promotion/demotion is explicit and bounded;
@@ -587,6 +612,8 @@ Required evidence includes:
 - privileged/self-escalating mutations fail closed;
 - privileged position changes derive Staff/placement/position authority facts
   from PostgreSQL rather than caller-supplied before/after authority claims;
+- JobPosition permission rows used for privileged authority evaluation are
+  stabilized through PostgreSQL locking;
 - same-position requests cannot produce false APPLIED position-change evidence;
 - competing equivalent privileged position changes re-evaluate the latest
   PostgreSQL-authoritative placement after lock serialization;
@@ -597,12 +624,18 @@ Required evidence includes:
 - no independent REQUIRES_NEW audit transaction exists;
 - `V13` reconstructs the workforce foundation from an empty PostgreSQL database;
 - `V16` reconstructs append-oriented audit storage through the full Flyway chain;
-- `V1` through `V15` remain unchanged;
+- accepted migrations V1 through V16 reconstruct successfully through the final
+  candidate;
 - PostgreSQL constraints reject structurally invalid workforce state;
-- `git diff --check` passes;
-- full `mvnw clean verify` passes;
-- required pull-request workflows pass;
-- final Codex review has no unresolved irregularity before ADR promotion/merge.
+- `git diff --check` passed;
+- full `mvnw clean verify` passed with 863 tests, 0 failures, 0 errors and
+  0 skipped;
+- required pull-request workflows passed on reviewed implementation checkpoint
+  `24f14ff56ae5ca9dde165891e292ef379c2a41d6`;
+- final Codex review of that implementation checkpoint produced no unresolved
+  irregularity;
+- the subsequent documentation-only ADR promotion HEAD remains independently
+  subject to fresh workflow, Codex and final merge gates.
 
 ## Explicitly deferred
 
