@@ -3,6 +3,8 @@ package io.github.piresrenan.orderhub.authorization.domain.relationship;
 import java.util.Set;
 import java.util.UUID;
 
+import org.springframework.modulith.NamedInterface;
+
 import io.github.piresrenan.orderhub.authorization.domain.model.AuthorizationPersona;
 import io.github.piresrenan.orderhub.authorization.domain.model.TenantAuthorizationScope;
 
@@ -15,6 +17,7 @@ import io.github.piresrenan.orderhub.authorization.domain.model.TenantAuthorizat
  * invoking authorization.
  * </p>
  */
+@NamedInterface("customer-owned-resource")
 public record RelationshipAuthorizationContext(
         UUID actorUserId,
         AuthorizationPersona persona,

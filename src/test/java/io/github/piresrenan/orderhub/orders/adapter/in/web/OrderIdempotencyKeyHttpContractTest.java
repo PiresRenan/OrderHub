@@ -30,7 +30,8 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderAllocationOutcome;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderResult;
-import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateCustomerOrderUseCase;
+import io.github.piresrenan.orderhub.orders.application.port.in.ViewCustomerOrderUseCase;
 import io.github.piresrenan.orderhub.orders.domain.model.Order;
 import io.github.piresrenan.orderhub.orders.domain.model.OrderItem;
 import io.github.piresrenan.orderhub.security.adapter.in.authentication.AuthenticatedUserAuthenticationToken;
@@ -55,7 +56,10 @@ class OrderIdempotencyKeyHttpContractTest {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private CreateOrderUseCase createOrderUseCase;
+    private CreateCustomerOrderUseCase createCustomerOrderUseCase;
+
+    @MockitoBean
+    private ViewCustomerOrderUseCase viewCustomerOrderUseCase;
 
     @MockitoBean
     private ResolveTrustedTenantContextUseCase trustedTenants;
@@ -84,13 +88,14 @@ class OrderIdempotencyKeyHttpContractTest {
          * missing/invalid Idempotency-Key currently reaches Orders and therefore
          * produces 201 instead of the required 400.
          */
-        when(createOrderUseCase.create(
+        when(createCustomerOrderUseCase.create(
+                any(UUID.class),
                 any(CreateOrderCommand.class)))
                 .thenAnswer(invocation -> {
 
                     var command =
                             invocation.getArgument(
-                                    0,
+                                    1,
                                     CreateOrderCommand.class);
 
                     var orderItems =
@@ -149,7 +154,7 @@ class OrderIdempotencyKeyHttpContractTest {
                                         "The request idempotency key is missing or invalid."));
 
         verifyNoInteractions(
-                createOrderUseCase);
+                createCustomerOrderUseCase);
     }
 
     @ParameterizedTest(name = "{0}")
@@ -188,7 +193,7 @@ class OrderIdempotencyKeyHttpContractTest {
                                         "IDEMPOTENCY_KEY_INVALID"));
 
         verifyNoInteractions(
-                createOrderUseCase);
+                createCustomerOrderUseCase);
     }
 
     @Test
@@ -219,7 +224,7 @@ class OrderIdempotencyKeyHttpContractTest {
                                         "IDEMPOTENCY_KEY_INVALID"));
 
         verifyNoInteractions(
-                createOrderUseCase);
+                createCustomerOrderUseCase);
     }
 
     @Test
@@ -260,7 +265,7 @@ class OrderIdempotencyKeyHttpContractTest {
                                                 privateMarker))));
 
         verifyNoInteractions(
-                createOrderUseCase);
+                createCustomerOrderUseCase);
     }
 
     private static Stream<Arguments> invalidKeys() {

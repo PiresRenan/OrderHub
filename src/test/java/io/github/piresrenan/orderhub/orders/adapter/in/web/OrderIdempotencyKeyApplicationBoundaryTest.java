@@ -15,10 +15,10 @@ import org.springframework.http.HttpHeaders;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderAllocationOutcome;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderResult;
-import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateCustomerOrderUseCase;
 import io.github.piresrenan.orderhub.orders.domain.model.Order;
 import io.github.piresrenan.orderhub.orders.domain.model.OrderItem;
-import io.github.piresrenan.orderhub.security.application.model.TrustedTenantContext;
+import io.github.piresrenan.orderhub.security.application.model.TrustedActorContext;
 
 class OrderIdempotencyKeyApplicationBoundaryTest {
 
@@ -56,8 +56,8 @@ class OrderIdempotencyKeyApplicationBoundaryTest {
         var capturedCommand =
                 new AtomicReference<CreateOrderCommand>();
 
-        CreateOrderUseCase createOrder =
-                command -> {
+        CreateCustomerOrderUseCase createOrder =
+                (actorUserId, command) -> {
 
                     capturedCommand.set(
                             command);
@@ -81,6 +81,10 @@ class OrderIdempotencyKeyApplicationBoundaryTest {
         var controller =
                 new OrderController(
                         createOrder,
+                        (unusedViewActorUserId, unusedViewTenantId, unusedViewOrderId) -> {
+                            throw new AssertionError(
+                                    "Create-path fixture must not invoke Order view");
+                        },
                         10);
 
         var headers =
@@ -99,7 +103,8 @@ class OrderIdempotencyKeyApplicationBoundaryTest {
                                         2)));
 
         controller.create(
-                new TrustedTenantContext(
+                new TrustedActorContext(
+                        UUID.randomUUID(),
                         tenantId),
                 headers,
                 request);

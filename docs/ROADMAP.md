@@ -237,7 +237,8 @@ Privacy/data posture:
 
 ### OH-014 — Tenant workforce administration
 
-Status: IN PROGRESS — issue #28; depends on completed OH-013.
+Status: COMPLETED — merged into `pre-release` at
+`12a7e5353b13894a6b8bffe10bb9d9b34cd4b699` on 2026-09-03 via PR #29.
 
 Build the Staff persona into a complete Tenant workforce model rather than adding
 job attributes to User.
@@ -269,7 +270,7 @@ authority ceiling; permission customization operates only inside the ceiling.
 
 ### OH-015 — Customer account and self-service
 
-Status: PLANNED — depends on the OH-013 authorization kernel.
+Status: IN PROGRESS — issue #30; depends on completed OH-013/OH-014.
 
 Introduce `customers` as a first-class commercial/self-service domain rather
 than treating a consumer as another Staff role.
@@ -296,8 +297,12 @@ the same internal User.
 
 ### OH-016 — Privacy-safe operational analytics foundation
 
-Status: PLANNED — begins only after concrete Staff/Customer operational facts
-exist.
+Status: IN PROGRESS — issue #31; developed in parallel from the integrated OH-014
+baseline without consuming unmerged OH-015 work.
+
+The first concrete producer is the append-oriented workforce operational evidence
+already integrated by OH-014. Customer-specific analytical facts remain deferred
+until OH-015 is integrated.
 
 Prepare OrderHub for serious operational, workforce and customer analytics
 without converting the transactional database into an indiscriminate personal-

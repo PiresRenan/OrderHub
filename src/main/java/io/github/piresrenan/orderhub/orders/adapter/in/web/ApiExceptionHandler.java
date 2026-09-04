@@ -23,9 +23,12 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 
 import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.CatalogOrderabilityRejectedException;
 import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.CatalogOrderabilityTechnicalException;
+import io.github.piresrenan.orderhub.customers.application.port.in.CustomerAccountBindingTechnicalException;
 import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryCommitmentRejectedException;
 import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryOperationException;
 import io.github.piresrenan.orderhub.orders.application.idempotency.CreateOrderIdempotencyKeyReusedException;
+import io.github.piresrenan.orderhub.orders.application.port.in.CustomerOrderAccessDeniedException;
+import io.github.piresrenan.orderhub.orders.application.port.in.CustomerOrderUnavailableException;
 import io.github.piresrenan.orderhub.orders.application.port.out.CreateOrderIdempotencyInProgressException;
 import io.github.piresrenan.orderhub.orders.application.port.out.CreateOrderIdempotencyPersistenceException;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderPersistenceException;
@@ -101,6 +104,49 @@ public final class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                                                 "Idempotent request in progress",
                                                 "A request with this idempotency key is still being processed.",
                                                 "IDEMPOTENCY_REQUEST_IN_PROGRESS");
+
+                return ResponseEntity
+                                .status(status)
+                                .body(problem);
+        }
+
+        /**
+         * Converts Customer self-service authorization denial into a stable
+         * privacy-safe response without exposing Customer, Tenant, User, binding
+         * or relationship evidence.
+         */
+        @ExceptionHandler(CustomerOrderAccessDeniedException.class)
+        protected ResponseEntity<Object> handleCustomerOrderAccessDenied() {
+
+                var status = HttpStatus.FORBIDDEN;
+
+                var problem = problem(
+                                status,
+                                "customer-order-access-denied",
+                                "Customer order access denied",
+                                "The requested customer order operation is not permitted.",
+                                "CUSTOMER_ORDER_ACCESS_DENIED");
+
+                return ResponseEntity
+                                .status(status)
+                                .body(problem);
+        }
+        /**
+         * Converts an unavailable Customer Order read into a privacy-safe
+         * not-found response without revealing whether the Order is absent or
+         * inaccessible to the authenticated Customer.
+         */
+        @ExceptionHandler(CustomerOrderUnavailableException.class)
+        protected ResponseEntity<Object> handleCustomerOrderUnavailable() {
+
+                var status = HttpStatus.NOT_FOUND;
+
+                var problem = problem(
+                                status,
+                                "order-not-found",
+                                "Order not found",
+                                "The requested order could not be found.",
+                                "ORDER_NOT_FOUND");
 
                 return ResponseEntity
                                 .status(status)
@@ -186,7 +232,8 @@ public final class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                         OrderPersistenceException.class,
                         TransactionExecutionException.class,
                         InventoryOperationException.class,
-                        CatalogOrderabilityTechnicalException.class
+                        CatalogOrderabilityTechnicalException.class,
+                        CustomerAccountBindingTechnicalException.class
         })
         protected ResponseEntity<Object> handleInternalTechnicalFailure() {
 
