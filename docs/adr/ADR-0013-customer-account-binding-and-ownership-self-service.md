@@ -1,6 +1,6 @@
 # ADR-0013 — Customer Account Binding and Ownership-Based Self-Service
 
-Status: DESIGNED
+Status: TESTED
 
 ## Context
 
@@ -346,12 +346,35 @@ link/unlink/relink operations do not exist.
 If those operations become executable later, their races with in-flight
 self-service require dedicated PostgreSQL/concurrency evidence.
 
-## Verification plan
+## Verification evidence
 
-ADR-0013 remains DESIGNED until executable OH-015 evidence demonstrates the
-implemented slice.
+ADR-0013 is `TESTED` against the reviewed OH-015 implementation checkpoint
+`7a2b0b664c252b2c514c3faf41d048a6fc686085` in PR #32.
 
-Required evidence includes:
+That exact implementation checkpoint satisfied the acceptance gates before this
+ADR status promotion:
+
+- local `mvnw clean verify` completed successfully with 904 tests, 0 failures,
+  0 errors and 0 skipped;
+- `git diff --check` was clean;
+- Branch Policy completed successfully against the exact implementation
+  checkpoint;
+- CI completed successfully against the exact implementation checkpoint;
+- Platform CI completed successfully against the exact implementation
+  checkpoint;
+- Codex completed its final review of the exact implementation checkpoint with
+  no major issues and no unresolved review irregularity;
+- the PR base remained
+  `pre-release@12a7e5353b13894a6b8bffe10bb9d9b34cd4b699`;
+- accepted migrations V1 through V16 remained byte-identical, while V17 and V18
+  remained byte-stable throughout final local candidate assurance.
+
+The documentation-only commit that promotes this ADR from `DESIGNED` to `TESTED`
+is intentionally not treated as the reviewed implementation checkpoint. Its new
+HEAD remains subject to fresh Branch Policy, CI, Platform CI and Codex review,
+plus final repository verification, before merge.
+
+Executable evidence satisfied by the reviewed implementation checkpoint includes:
 
 - customers is a distinct Spring Modulith module;
 - module dependencies remain acyclic;
@@ -383,12 +406,16 @@ Required evidence includes:
 - no Customers-to-Users cross-schema foreign key is introduced;
 - no Orders-to-Customers cross-schema foreign key is introduced;
 - Customer persistence contains no unnecessary PII;
-- git diff --check passes;
-- full mvnw clean verify passes;
-- required pull-request workflows pass on the exact implementation candidate;
-- final Codex review has no unresolved irregularity;
-- ADR-0013 is promoted to TESTED only against reviewed executable evidence;
-- the documentation-only promotion HEAD independently passes final gates.
+- `git diff --check` passed;
+- full `mvnw clean verify` passed with 904 tests, 0 failures, 0 errors and
+  0 skipped;
+- required pull-request workflows passed on reviewed implementation checkpoint
+  `7a2b0b664c252b2c514c3faf41d048a6fc686085`;
+- final Codex review of that implementation checkpoint produced no unresolved
+  irregularity;
+- ADR-0013 was promoted to TESTED only after reviewed executable evidence;
+- the subsequent documentation-only ADR promotion HEAD remains independently
+  subject to fresh workflow, Codex and final merge gates.
 
 ## Explicitly deferred
 
