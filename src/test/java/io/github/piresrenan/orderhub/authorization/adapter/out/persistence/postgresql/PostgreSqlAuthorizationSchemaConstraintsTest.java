@@ -85,6 +85,25 @@ class PostgreSqlAuthorizationSchemaConstraintsTest {
     }
 
     @Test
+    void seedsCustomerOrderPermissionsWithCustomerPersona() {
+
+        var persistedCustomerPermissions =
+                jdbcTemplate.queryForList(
+                        """
+                        SELECT code
+                        FROM access_control.permissions
+                        WHERE persona = 'CUSTOMER'
+                        ORDER BY code
+                        """,
+                        String.class);
+
+        assertThat(persistedCustomerPermissions)
+                .containsExactly(
+                        "CUSTOMER_ORDERS_CREATE",
+                        "CUSTOMER_ORDERS_VIEW");
+    }
+
+    @Test
     void databaseRejectsDuplicateRoleAssignment() {
 
         var roleId =
