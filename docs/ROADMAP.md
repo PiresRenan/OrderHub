@@ -270,7 +270,13 @@ authority ceiling; permission customization operates only inside the ceiling.
 
 ### OH-015 — Customer account and self-service
 
-Status: IN PROGRESS — issue #30; depends on completed OH-013/OH-014.
+Status: COMPLETED — merged into `pre-release` at
+`db7004a0df6035fa4c4fb886b4e383f4ae967f89` on 2026-09-04 via PR #32;
+issue #30 closed as completed.
+
+The completed OH-015 slice is defined by issue #30 and ADR-0013 `TESTED`.
+Broader Customer capabilities listed as roadmap direction remain future work unless
+admitted by a separately governed slice.
 
 Introduce `customers` as a first-class commercial/self-service domain rather
 than treating a consumer as another Staff role.
@@ -297,12 +303,16 @@ the same internal User.
 
 ### OH-016 — Privacy-safe operational analytics foundation
 
-Status: IN PROGRESS — issue #31; developed in parallel from the integrated OH-014
-baseline without consuming unmerged OH-015 work.
+Status: IN PROGRESS — issue #31; initially developed in parallel from the
+integrated OH-014 baseline and synchronized on 2026-09-04 with post-OH-015
+`pre-release@db7004a0df6035fa4c4fb886b4e383f4ae967f89` through merge checkpoint
+`5b15baac4f0bdfc65253889eb705b7b9ac987c2f`.
 
-The first concrete producer is the append-oriented workforce operational evidence
-already integrated by OH-014. Customer-specific analytical facts remain deferred
-until OH-015 is integrated.
+The first concrete producer remains the append-oriented workforce operational
+evidence already integrated by OH-014. OH-015 Customer semantics are now present
+in the baseline, but synchronization does not silently expand OH-016 scope:
+Customer-specific analytical facts remain outside the current executable slice
+unless admitted by an explicit governed scope change.
 
 Prepare OrderHub for serious operational, workforce and customer analytics
 without converting the transactional database into an indiscriminate personal-
