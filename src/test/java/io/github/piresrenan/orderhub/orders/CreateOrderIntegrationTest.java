@@ -83,6 +83,11 @@ class CreateOrderIntegrationTest {
                 UUID.fromString(
                         "33333333-3333-3333-3333-333333333333");
 
+        seedCustomerAccountBinding(
+                tenantId,
+                customerId,
+                authenticatedUserId);
+
         seedActiveCatalogVariant(
                 tenantId,
                 variantId);
@@ -243,6 +248,38 @@ class CreateOrderIntegrationTest {
         assertThat(commitmentCount)
                 .isEqualTo(1);
     }
+    private void seedCustomerAccountBinding(
+            UUID tenantId,
+            UUID customerId,
+            UUID userId) {
+
+        jdbcTemplate.update("""
+                INSERT INTO customers.customer_profiles (
+                    tenant_id,
+                    customer_id
+                )
+                VALUES (?, ?)
+                ON CONFLICT (tenant_id, customer_id)
+                DO NOTHING
+                """,
+                tenantId,
+                customerId);
+
+        jdbcTemplate.update("""
+                INSERT INTO customers.customer_account_bindings (
+                    tenant_id,
+                    customer_id,
+                    user_id
+                )
+                VALUES (?, ?, ?)
+                ON CONFLICT (tenant_id, customer_id, user_id)
+                DO NOTHING
+                """,
+                tenantId,
+                customerId,
+                userId);
+    }
+
     private void seedActiveCatalogVariant(
             UUID tenantId,
             UUID variantId) {

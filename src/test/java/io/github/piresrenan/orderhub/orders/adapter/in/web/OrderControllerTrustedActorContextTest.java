@@ -9,18 +9,21 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateCustomerOrderUseCase;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderAllocationOutcome;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderResult;
-import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
 import io.github.piresrenan.orderhub.orders.domain.model.Order;
 import io.github.piresrenan.orderhub.orders.domain.model.OrderItem;
-import io.github.piresrenan.orderhub.security.application.model.TrustedTenantContext;
+import io.github.piresrenan.orderhub.security.application.model.TrustedActorContext;
 
-class OrderControllerTrustedTenantContextTest {
+class OrderControllerTrustedActorContextTest {
 
     @Test
-    void createsOrderCommandFromTrustedTenantContext() {
+    void createsCustomerOrderFromTrustedActorContext() {
+
+        var trustedUserId =
+                UUID.randomUUID();
 
         var trustedTenantId =
                 UUID.randomUUID();
@@ -31,11 +34,17 @@ class OrderControllerTrustedTenantContextTest {
         var variantId =
                 UUID.randomUUID();
 
+        var capturedActorUserId =
+                new AtomicReference<UUID>();
+
         var capturedCommand =
                 new AtomicReference<CreateOrderCommand>();
 
-        CreateOrderUseCase createOrder =
-                command -> {
+        CreateCustomerOrderUseCase customerCreate =
+                (actorUserId, command) -> {
+
+                    capturedActorUserId.set(
+                            actorUserId);
 
                     capturedCommand.set(
                             command);
@@ -57,7 +66,11 @@ class OrderControllerTrustedTenantContextTest {
 
         var controller =
                 new OrderController(
-                        createOrder,
+                        customerCreate,
+                        (unusedViewActorUserId, unusedViewTenantId, unusedViewOrderId) -> {
+                            throw new AssertionError(
+                                    "Create-path fixture must not invoke Order view");
+                        },
                         10);
 
         var request =
@@ -73,13 +86,18 @@ class OrderControllerTrustedTenantContextTest {
 
         headers.add(
                 OrderIdempotencyKeyHeader.NAME,
-                "trusted-tenant-context-test");
+                "trusted-actor-context-test");
 
         controller.create(
-                new TrustedTenantContext(
+                new TrustedActorContext(
+                        trustedUserId,
                         trustedTenantId),
                 headers,
                 request);
+
+        assertThat(capturedActorUserId)
+                .hasValue(
+                        trustedUserId);
 
         assertThat(capturedCommand)
                 .hasValueSatisfying(command -> {
@@ -108,20 +126,20 @@ class OrderControllerTrustedTenantContextTest {
     }
 
     @Test
-    void createEndpointDeclaresTrustedTenantContextInsteadOfRawTenantUuid()
+    void createEndpointDeclaresTrustedActorContext()
             throws Exception {
 
         var createMethod =
                 OrderController.class.getDeclaredMethod(
                         "create",
-                        TrustedTenantContext.class,
+                        TrustedActorContext.class,
                         HttpHeaders.class,
                         CreateOrderRequest.class);
 
         assertThat(
                 createMethod.getParameterTypes())
                 .containsExactly(
-                        TrustedTenantContext.class,
+                        TrustedActorContext.class,
                         HttpHeaders.class,
                         CreateOrderRequest.class);
     }

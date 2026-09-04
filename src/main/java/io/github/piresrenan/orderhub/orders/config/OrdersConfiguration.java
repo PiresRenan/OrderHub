@@ -12,7 +12,9 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import io.micrometer.core.instrument.MeterRegistry;
+import io.github.piresrenan.orderhub.authorization.application.port.in.AuthorizeCustomerOwnedResourceActionUseCase;
 import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.ValidateOrderableVariantsUseCase;
+import io.github.piresrenan.orderhub.customers.application.port.in.ResolveCustomerAccountBindingUseCase;
 import io.github.piresrenan.orderhub.inventory.application.port.in.CommitOrderInventoryUseCase;
 import io.github.piresrenan.orderhub.orders.adapter.out.observability.micrometer.MicrometerObservedCreateOrderIdempotencyRepository;
 import io.github.piresrenan.orderhub.orders.adapter.out.observability.micrometer.MicrometerObservedCreateOrderUseCase;
@@ -20,12 +22,16 @@ import io.github.piresrenan.orderhub.orders.adapter.out.observability.micrometer
 import io.github.piresrenan.orderhub.orders.adapter.out.persistence.postgresql.PostgreSqlCreateOrderIdempotencyRepository;
 import io.github.piresrenan.orderhub.orders.adapter.out.persistence.postgresql.PostgreSqlOrderRepository;
 import io.github.piresrenan.orderhub.orders.adapter.out.transaction.spring.SpringTransactionExecutor;
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateCustomerOrderUseCase;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
+import io.github.piresrenan.orderhub.orders.application.port.in.ViewCustomerOrderUseCase;
 import io.github.piresrenan.orderhub.orders.application.port.out.CreateOrderIdempotencyRepository;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderIdGenerator;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderRepository;
 import io.github.piresrenan.orderhub.orders.application.port.out.TransactionExecutor;
+import io.github.piresrenan.orderhub.orders.application.service.CreateCustomerOrderService;
 import io.github.piresrenan.orderhub.orders.application.service.CreateOrderService;
+import io.github.piresrenan.orderhub.orders.application.service.ViewCustomerOrderService;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(
@@ -125,5 +131,28 @@ public class OrdersConfiguration {
         return new MicrometerObservedCreateOrderUseCase(
                 createOrderService,
                 meterRegistry);
+    }
+
+    @Bean
+    CreateCustomerOrderUseCase createCustomerOrderUseCase(
+            ResolveCustomerAccountBindingUseCase bindings,
+            AuthorizeCustomerOwnedResourceActionUseCase authorization,
+            CreateOrderUseCase createOrderUseCase) {
+
+        return new CreateCustomerOrderService(
+                bindings,
+                authorization,
+                createOrderUseCase);
+    }
+    @Bean
+    ViewCustomerOrderUseCase viewCustomerOrderUseCase(
+            OrderRepository orderRepository,
+            ResolveCustomerAccountBindingUseCase bindings,
+            AuthorizeCustomerOwnedResourceActionUseCase authorization) {
+
+        return new ViewCustomerOrderService(
+                orderRepository,
+                bindings,
+                authorization);
     }
 }

@@ -32,6 +32,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -83,6 +84,9 @@ class SecurityRealJwtOrdersHttpEndToEndTest {
     @Autowired
     private MockMvc mockMvc;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     @MockitoBean
     private ResolveExternalIdentityUseCase externalIdentities;
 
@@ -120,6 +124,11 @@ class SecurityRealJwtOrdersHttpEndToEndTest {
         allowMembership(
                 userId,
                 tenantId);
+
+        seedCustomerAccountBinding(
+                tenantId,
+                customerId,
+                userId);
 
         when(createOrderUseCase.create(
                 any(CreateOrderCommand.class)))
@@ -412,6 +421,11 @@ class SecurityRealJwtOrdersHttpEndToEndTest {
         var variantId =
                 UUID.randomUUID();
 
+        seedCustomerAccountBinding(
+                allowedTenantId,
+                customerId,
+                userId);
+
         var token =
                 validToken();
 
@@ -472,6 +486,40 @@ class SecurityRealJwtOrdersHttpEndToEndTest {
         verify(createOrderUseCase)
                 .create(
                         any(CreateOrderCommand.class));
+    }
+
+    private void seedCustomerAccountBinding(
+            UUID tenantId,
+            UUID customerId,
+            UUID userId) {
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO customers.customer_profiles (
+                    tenant_id,
+                    customer_id
+                )
+                VALUES (?, ?)
+                ON CONFLICT (tenant_id, customer_id)
+                DO NOTHING
+                """,
+                tenantId,
+                customerId);
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO customers.customer_account_bindings (
+                    tenant_id,
+                    customer_id,
+                    user_id
+                )
+                VALUES (?, ?, ?)
+                ON CONFLICT (tenant_id, customer_id, user_id)
+                DO NOTHING
+                """,
+                tenantId,
+                customerId,
+                userId);
     }
 
     private void allowIdentity(

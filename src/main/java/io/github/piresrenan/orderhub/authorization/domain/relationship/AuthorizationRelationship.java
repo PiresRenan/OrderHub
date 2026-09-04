@@ -1,5 +1,7 @@
 package io.github.piresrenan.orderhub.authorization.domain.relationship;
 
+import org.springframework.modulith.NamedInterface;
+
 /**
  * Bounded relationship vocabulary supplied by resource-owning modules to
  * contextual authorization policy.
@@ -10,6 +12,7 @@ package io.github.piresrenan.orderhub.authorization.domain.relationship;
  * policy fact required by the decision.
  * </p>
  */
+@NamedInterface("customer-owned-resource")
 public enum AuthorizationRelationship {
 
     RESOURCE_OWNER

@@ -156,6 +156,39 @@ class CreateOrderIdempotencyHttpRecoveryAcceptanceTest {
                         new FindTenantMembershipQuery(
                                 USER_ID,
                                 TENANT_ID));
+
+        seedCustomerAccountBinding();
+    }
+
+    private void seedCustomerAccountBinding() {
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO customers.customer_profiles (
+                    tenant_id,
+                    customer_id
+                )
+                VALUES (?, ?)
+                ON CONFLICT (tenant_id, customer_id)
+                DO NOTHING
+                """,
+                TENANT_ID,
+                CUSTOMER_ID);
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO customers.customer_account_bindings (
+                    tenant_id,
+                    customer_id,
+                    user_id
+                )
+                VALUES (?, ?, ?)
+                ON CONFLICT (tenant_id, customer_id, user_id)
+                DO NOTHING
+                """,
+                TENANT_ID,
+                CUSTOMER_ID,
+                USER_ID);
     }
 
     @Test

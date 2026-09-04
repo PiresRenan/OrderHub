@@ -35,7 +35,8 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderAllocationOutcome;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderResult;
-import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateCustomerOrderUseCase;
+import io.github.piresrenan.orderhub.orders.application.port.in.ViewCustomerOrderUseCase;
 import io.github.piresrenan.orderhub.orders.domain.model.Order;
 import io.github.piresrenan.orderhub.orders.domain.model.OrderItem;
 import io.github.piresrenan.orderhub.security.adapter.in.authentication.AuthenticatedUserAuthenticationToken;
@@ -53,7 +54,10 @@ class OrderControllerTest {
         private MockMvc mockMvc;
 
         @MockitoBean
-        private CreateOrderUseCase createOrderUseCase;
+        private CreateCustomerOrderUseCase createCustomerOrderUseCase;
+
+        @MockitoBean
+        private ViewCustomerOrderUseCase viewCustomerOrderUseCase;
 
         @MockitoBean
         private ResolveTrustedTenantContextUseCase trustedTenants;
@@ -100,7 +104,7 @@ class OrderControllerTest {
                                 customerId,
                                 List.of(new OrderItem(variantId, 2)));
 
-                when(createOrderUseCase.create(any(CreateOrderCommand.class)))
+                when(createCustomerOrderUseCase.create(any(UUID.class), any(CreateOrderCommand.class)))
                                 .thenReturn(
                                                 new CreateOrderResult(
                                                                 order,
@@ -122,7 +126,7 @@ class OrderControllerTest {
 
                 var captor = ArgumentCaptor.forClass(CreateOrderCommand.class);
 
-                verify(createOrderUseCase).create(captor.capture());
+                verify(createCustomerOrderUseCase).create(any(UUID.class), captor.capture());
 
                 assertThat(captor.getValue().tenantId()).isEqualTo(tenantId);
                 assertThat(captor.getValue().customerId()).isEqualTo(customerId);
@@ -144,7 +148,7 @@ class OrderControllerTest {
                                 .andExpect(jsonPath("$.code")
                                                 .value("REQUEST_BINDING_FAILED"));
 
-                verifyNoInteractions(createOrderUseCase);
+                verifyNoInteractions(createCustomerOrderUseCase);
         }
 
         @Test
@@ -160,7 +164,7 @@ class OrderControllerTest {
                                 .andExpect(status().isBadRequest())
                                 .andExpect(jsonPath("$.code").value("TYPE_MISMATCH"));
 
-                verifyNoInteractions(createOrderUseCase);
+                verifyNoInteractions(createCustomerOrderUseCase);
         }
 
         @Test
@@ -176,7 +180,7 @@ class OrderControllerTest {
                                 .andExpect(status().isBadRequest())
                                 .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
 
-                verifyNoInteractions(createOrderUseCase);
+                verifyNoInteractions(createCustomerOrderUseCase);
         }
 
         @Test
@@ -195,7 +199,7 @@ class OrderControllerTest {
                                 .andExpect(status().isBadRequest())
                                 .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
 
-                verifyNoInteractions(createOrderUseCase);
+                verifyNoInteractions(createCustomerOrderUseCase);
         }
 
         @Test
@@ -212,7 +216,7 @@ class OrderControllerTest {
                                 .andExpect(jsonPath("$.code")
                                                 .value("UNSUPPORTED_MEDIA_TYPE"));
 
-                verifyNoInteractions(createOrderUseCase);
+                verifyNoInteractions(createCustomerOrderUseCase);
         }
 
         @ParameterizedTest(name = "{0}")
@@ -234,7 +238,7 @@ class OrderControllerTest {
                                                 .value("REQUEST_VALIDATION_FAILED"))
                                 .andExpect(jsonPath("$.errors").isArray());
 
-                verifyNoInteractions(createOrderUseCase);
+                verifyNoInteractions(createCustomerOrderUseCase);
         }
 
         @Test
@@ -266,7 +270,7 @@ class OrderControllerTest {
                                 .andExpect(status().isBadRequest())
                                 .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
 
-                verifyNoInteractions(createOrderUseCase);
+                verifyNoInteractions(createCustomerOrderUseCase);
         }
 
         @Test
@@ -294,7 +298,7 @@ class OrderControllerTest {
                                 .andExpect(content().string(
                                                 not(containsString(privateMarker))));
 
-                verifyNoInteractions(createOrderUseCase);
+                verifyNoInteractions(createCustomerOrderUseCase);
         }
 
         @Test
@@ -307,7 +311,7 @@ class OrderControllerTest {
                                 .andExpect(status().isMethodNotAllowed())
                                 .andExpect(jsonPath("$.code").value("METHOD_NOT_ALLOWED"));
 
-                verifyNoInteractions(createOrderUseCase);
+                verifyNoInteractions(createCustomerOrderUseCase);
         }
 
         @ParameterizedTest(name = "{0}")
@@ -337,7 +341,7 @@ class OrderControllerTest {
                                 .andExpect(content().string(
                                                 not(containsString(rejectedValueMarker))));
 
-                verifyNoInteractions(createOrderUseCase);
+                verifyNoInteractions(createCustomerOrderUseCase);
         }
 
         @ParameterizedTest(name = "{0}")
@@ -366,7 +370,7 @@ class OrderControllerTest {
                                 .andExpect(content().string(
                                                 not(containsString(rejectedValueMarker))));
 
-                verifyNoInteractions(createOrderUseCase);
+                verifyNoInteractions(createCustomerOrderUseCase);
         }
 
         @Test
@@ -393,7 +397,7 @@ class OrderControllerTest {
                                                 MediaType.APPLICATION_PROBLEM_JSON))
                                 .andExpect(jsonPath("$.code").value("NOT_ACCEPTABLE"));
 
-                verifyNoInteractions(createOrderUseCase);
+                verifyNoInteractions(createCustomerOrderUseCase);
         }
 
         @Test
@@ -416,7 +420,7 @@ class OrderControllerTest {
                                 .content(validBody(customerId, variantId)))
                                 .andExpect(status().isCreated());
 
-                verify(createOrderUseCase).create(any(CreateOrderCommand.class));
+                verify(createCustomerOrderUseCase).create(any(UUID.class), any(CreateOrderCommand.class));
         }
 
         /**
@@ -721,7 +725,7 @@ class OrderControllerTest {
                                                                 "dddddddd-dddd-dddd-dddd-dddddddddddd"),
                                                 2)));
 
-                when(createOrderUseCase.create(any(CreateOrderCommand.class)))
+                when(createCustomerOrderUseCase.create(any(UUID.class), any(CreateOrderCommand.class)))
                                 .thenReturn(
                                                 new CreateOrderResult(
                                                                 order,
