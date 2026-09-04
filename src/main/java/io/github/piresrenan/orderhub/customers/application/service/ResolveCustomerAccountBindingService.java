@@ -4,7 +4,9 @@ import java.util.Objects;
 import java.util.UUID;
 
 import io.github.piresrenan.orderhub.customers.application.port.in.CustomerAccountBindingResolution;
+import io.github.piresrenan.orderhub.customers.application.port.in.CustomerAccountBindingTechnicalException;
 import io.github.piresrenan.orderhub.customers.application.port.in.ResolveCustomerAccountBindingUseCase;
+import io.github.piresrenan.orderhub.customers.application.port.out.CustomerAccountBindingPersistenceException;
 import io.github.piresrenan.orderhub.customers.application.port.out.CustomerAccountBindingRepository;
 
 /**
@@ -40,16 +42,23 @@ public final class ResolveCustomerAccountBindingService
                 userId,
                 "userId");
 
-        if (
-            repository.existsExact(
-                    tenantId,
-                    customerId,
-                    userId)
-        ) {
+        try {
+            if (
+                repository.existsExact(
+                        tenantId,
+                        customerId,
+                        userId)
+            ) {
 
-            return CustomerAccountBindingResolution.BOUND;
+                return CustomerAccountBindingResolution.BOUND;
+            }
+
+            return CustomerAccountBindingResolution.NOT_BOUND;
+
+        } catch (CustomerAccountBindingPersistenceException exception) {
+
+            throw new CustomerAccountBindingTechnicalException(
+                    exception);
         }
-
-        return CustomerAccountBindingResolution.NOT_BOUND;
     }
 }

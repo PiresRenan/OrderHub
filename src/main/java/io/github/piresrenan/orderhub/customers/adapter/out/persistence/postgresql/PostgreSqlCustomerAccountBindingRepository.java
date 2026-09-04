@@ -2,8 +2,10 @@ package io.github.piresrenan.orderhub.customers.adapter.out.persistence.postgres
 
 import java.util.UUID;
 
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import io.github.piresrenan.orderhub.customers.application.port.out.CustomerAccountBindingPersistenceException;
 import io.github.piresrenan.orderhub.customers.application.port.out.CustomerAccountBindingRepository;
 
 /**
@@ -37,12 +39,18 @@ public final class PostgreSqlCustomerAccountBindingRepository
             UUID customerId,
             UUID userId) {
 
-        return Boolean.TRUE.equals(
-                jdbcTemplate.queryForObject(
-                        EXISTS_EXACT_SQL,
-                        Boolean.class,
-                        tenantId,
-                        customerId,
-                        userId));
+        try {
+            return Boolean.TRUE.equals(
+                    jdbcTemplate.queryForObject(
+                            EXISTS_EXACT_SQL,
+                            Boolean.class,
+                            tenantId,
+                            customerId,
+                            userId));
+        } catch (DataAccessException exception) {
+
+            throw new CustomerAccountBindingPersistenceException(
+                    exception);
+        }
     }
 }

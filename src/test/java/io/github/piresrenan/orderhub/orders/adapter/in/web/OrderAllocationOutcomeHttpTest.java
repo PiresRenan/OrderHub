@@ -23,7 +23,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderAllocationOutcome;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderResult;
-import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateCustomerOrderUseCase;
+import io.github.piresrenan.orderhub.orders.application.port.in.ViewCustomerOrderUseCase;
 import io.github.piresrenan.orderhub.orders.domain.model.Order;
 import io.github.piresrenan.orderhub.orders.domain.model.OrderItem;
 import io.github.piresrenan.orderhub.security.adapter.in.authentication.AuthenticatedUserAuthenticationToken;
@@ -41,7 +42,10 @@ class OrderAllocationOutcomeHttpTest {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private CreateOrderUseCase createOrderUseCase;
+    private CreateCustomerOrderUseCase createCustomerOrderUseCase;
+
+    @MockitoBean
+    private ViewCustomerOrderUseCase viewCustomerOrderUseCase;
 
     @MockitoBean
     private ResolveTrustedTenantContextUseCase trustedTenants;
@@ -92,7 +96,8 @@ class OrderAllocationOutcomeHttpTest {
                                         variantId,
                                         2)));
 
-        when(createOrderUseCase.create(
+        when(createCustomerOrderUseCase.create(
+                any(UUID.class),
                 any(CreateOrderCommand.class)))
                 .thenReturn(
                         new CreateOrderResult(

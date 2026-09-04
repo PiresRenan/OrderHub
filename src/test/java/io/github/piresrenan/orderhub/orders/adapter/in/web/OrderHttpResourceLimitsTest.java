@@ -28,7 +28,8 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderAllocationOutcome;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderResult;
-import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateCustomerOrderUseCase;
+import io.github.piresrenan.orderhub.orders.application.port.in.ViewCustomerOrderUseCase;
 import io.github.piresrenan.orderhub.orders.domain.model.Order;
 import io.github.piresrenan.orderhub.orders.domain.model.OrderItem;
 import io.github.piresrenan.orderhub.security.adapter.in.authentication.AuthenticatedUserAuthenticationToken;
@@ -56,7 +57,10 @@ class OrderHttpResourceLimitsTest {
         private JsonMapper jsonMapper;
 
         @MockitoBean
-        private CreateOrderUseCase createOrderUseCase;
+        private CreateCustomerOrderUseCase createCustomerOrderUseCase;
+
+        @MockitoBean
+        private ViewCustomerOrderUseCase viewCustomerOrderUseCase;
 
         @MockitoBean
         private ResolveTrustedTenantContextUseCase trustedTenants;
@@ -139,7 +143,7 @@ class OrderHttpResourceLimitsTest {
                                                 MediaType.APPLICATION_PROBLEM_JSON))
                                 .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
 
-                verifyNoInteractions(createOrderUseCase);
+                verifyNoInteractions(createCustomerOrderUseCase);
         }
 
         @Test
@@ -166,7 +170,7 @@ class OrderHttpResourceLimitsTest {
                                 .andExpect(jsonPath("$.detail").value("The request exceeds the supported processing limits."));
                 ;
 
-                verifyNoInteractions(createOrderUseCase);
+                verifyNoInteractions(createCustomerOrderUseCase);
         }
 
         @Test
@@ -194,7 +198,7 @@ class OrderHttpResourceLimitsTest {
                 // Covers: fail-fast validation of the Orders HTTP max-items configuration.
                 // Prevents: deployments starting with zero or negative request limits.
 
-                assertThatThrownBy(() -> new OrderController(createOrderUseCase, 0))
+                assertThatThrownBy(() -> new OrderController(createCustomerOrderUseCase, viewCustomerOrderUseCase, 0))
                                 .isInstanceOf(IllegalArgumentException.class)
                                 .hasMessage(
                                                 "orderhub.orders.http.max-items must be greater than zero");
@@ -255,7 +259,9 @@ class OrderHttpResourceLimitsTest {
                                                                 "dddddddd-dddd-dddd-dddd-dddddddddddd"),
                                                 2)));
 
-                when(createOrderUseCase.create(any(CreateOrderCommand.class)))
+                when(createCustomerOrderUseCase.create(
+                any(UUID.class),
+                any(CreateOrderCommand.class)))
                                 .thenReturn(
                                                 new CreateOrderResult(
                                                                 order,

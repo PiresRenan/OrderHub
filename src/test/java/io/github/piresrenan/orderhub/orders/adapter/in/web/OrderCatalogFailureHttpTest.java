@@ -23,7 +23,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.CatalogOrderabilityRejectedException;
 import io.github.piresrenan.orderhub.catalog.application.port.in.orderability.CatalogOrderabilityTechnicalException;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
-import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
+import io.github.piresrenan.orderhub.orders.application.port.in.CreateCustomerOrderUseCase;
+import io.github.piresrenan.orderhub.orders.application.port.in.ViewCustomerOrderUseCase;
 import io.github.piresrenan.orderhub.security.adapter.in.authentication.AuthenticatedUserAuthenticationToken;
 import io.github.piresrenan.orderhub.security.application.model.AuthenticatedUserPrincipal;
 import io.github.piresrenan.orderhub.security.application.model.TrustedTenantContext;
@@ -42,7 +43,10 @@ class OrderCatalogFailureHttpTest {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private CreateOrderUseCase createOrderUseCase;
+    private CreateCustomerOrderUseCase createCustomerOrderUseCase;
+
+    @MockitoBean
+    private ViewCustomerOrderUseCase viewCustomerOrderUseCase;
 
     @MockitoBean
     private ResolveTrustedTenantContextUseCase trustedTenants;
@@ -78,7 +82,8 @@ class OrderCatalogFailureHttpTest {
         var variantId =
                 UUID.randomUUID();
 
-        when(createOrderUseCase.create(
+        when(createCustomerOrderUseCase.create(
+                any(UUID.class),
                 any(CreateOrderCommand.class)))
                 .thenThrow(
                         new CatalogOrderabilityRejectedException());
@@ -154,7 +159,8 @@ class OrderCatalogFailureHttpTest {
         var variantId =
                 UUID.randomUUID();
 
-        when(createOrderUseCase.create(
+        when(createCustomerOrderUseCase.create(
+                any(UUID.class),
                 any(CreateOrderCommand.class)))
                 .thenThrow(
                         new CatalogOrderabilityTechnicalException(
