@@ -2,9 +2,12 @@ package io.github.piresrenan.orderhub.authorization.domain.model;
 
 import java.util.UUID;
 
+import org.springframework.modulith.NamedInterface;
+
 /**
  * Framework-neutral Tenant-scoped permission decision request.
  */
+@NamedInterface("customer-owned-resource")
 public record TenantAuthorizationRequest(
         UUID userId,
         AuthorizationPersona persona,
