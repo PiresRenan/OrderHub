@@ -1,6 +1,7 @@
 package io.github.piresrenan.orderhub.organizations.domain.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.UUID;
 
@@ -25,5 +26,18 @@ class OrganizationTest {
 
         assertThat(organization.status())
                 .isEqualTo(OrganizationStatus.ACTIVE);
+    }
+
+    @Test
+    void rejectsMissingOrganizationIdentity() {
+
+        var exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> Organization.create(
+                        null,
+                        "Acme Retail"));
+
+        assertThat(exception)
+                .hasMessage("Organization id is required");
     }
 }

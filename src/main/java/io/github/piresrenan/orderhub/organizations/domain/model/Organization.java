@@ -22,10 +22,19 @@ public final class Organization {
             UUID id,
             String name) {
 
+        validateId(id);
+
         return new Organization(
                 id,
                 name.strip(),
                 OrganizationStatus.ACTIVE);
+    }
+
+    private static void validateId(UUID id) {
+        if (id == null) {
+            throw new IllegalArgumentException(
+                    "Organization id is required");
+        }
     }
 
     public UUID id() {
