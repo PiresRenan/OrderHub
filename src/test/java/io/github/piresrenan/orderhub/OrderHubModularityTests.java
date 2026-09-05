@@ -70,4 +70,29 @@ class OrderHubModularityTests {
                 assertThat(tenants)
                                 .isNotSameAs(users);
         }
+        /**
+         * Verifies that Organizations remains a distinct top-level application
+         * module as its domain grows beyond the initial aggregate bootstrap.
+         */
+        @Test
+        void detectsOrganizationsAsApplicationModule() {
+                // Why: Organizations already lives at a Spring Modulith module
+                // root by package structure; this locks that architectural fact
+                // explicitly rather than relying on incidental discovery.
+                // Covers: Organizations module detection and module identity.
+                // Prevents: future package refactoring silently absorbing or
+                // excluding Organizations from the modular model.
+
+                var modules = ApplicationModules.of(
+                                OrderHubApplication.class);
+
+                var organizationsModule = modules.getModuleByName(
+                                "organizations");
+
+                assertThat(organizationsModule)
+                                .as(
+                                                "Organizations must be detected"
+                                                                + " as an application module")
+                                .isPresent();
+        }
 }
