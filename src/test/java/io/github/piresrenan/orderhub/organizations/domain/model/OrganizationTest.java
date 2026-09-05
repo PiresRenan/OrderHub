@@ -175,4 +175,89 @@ class OrganizationTest {
         assertThat(exception)
                 .hasMessage("Organization status is required");
     }
+    @Test
+    void transitionsOrganizationBetweenActiveAndSuspendedLifecycle()
+            throws Exception {
+
+        var statusNames =
+                java.util.Arrays.stream(
+                                OrganizationStatus.values())
+                        .map(Enum::name)
+                        .toList();
+
+        var methodNames =
+                java.util.Arrays.stream(
+                                Organization.class
+                                        .getDeclaredMethods())
+                        .map(
+                                java.lang.reflect.Method::getName)
+                        .toList();
+
+        org.junit.jupiter.api.Assertions.assertAll(
+                () -> assertThat(statusNames)
+                        .as(
+                                "Organization lifecycle must include"
+                                        + " SUSPENDED")
+                        .contains("SUSPENDED"),
+
+                () -> assertThat(methodNames)
+                        .as(
+                                "Organization lifecycle must expose"
+                                        + " suspend()")
+                        .contains("suspend"),
+
+                () -> assertThat(methodNames)
+                        .as(
+                                "Organization lifecycle must expose"
+                                        + " recover()")
+                        .contains("recover"));
+
+        var id =
+                UUID.randomUUID();
+
+        var active =
+                Organization.create(
+                        id,
+                        "Acme Retail");
+
+        var suspendMethod =
+                Organization.class
+                        .getMethod("suspend");
+
+        var suspended =
+                (Organization) suspendMethod.invoke(
+                        active);
+
+        assertThat(suspended.id())
+                .isEqualTo(id);
+
+        assertThat(suspended.name())
+                .isEqualTo("Acme Retail");
+
+        assertThat(suspended.status().name())
+                .isEqualTo("SUSPENDED");
+
+        assertThat(active.status())
+                .isEqualTo(OrganizationStatus.ACTIVE);
+
+        var recoverMethod =
+                Organization.class
+                        .getMethod("recover");
+
+        var recovered =
+                (Organization) recoverMethod.invoke(
+                        suspended);
+
+        assertThat(recovered.id())
+                .isEqualTo(id);
+
+        assertThat(recovered.name())
+                .isEqualTo("Acme Retail");
+
+        assertThat(recovered.status())
+                .isEqualTo(OrganizationStatus.ACTIVE);
+
+        assertThat(suspended.status().name())
+                .isEqualTo("SUSPENDED");
+    }
 }
