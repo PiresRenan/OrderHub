@@ -205,7 +205,7 @@ class WorkforceAuthorityChangeFactTest {
 
         assertThat(components)
                 .as("Analytical fact must expose a closed set of components")
-                .hasSize(8);
+                .hasSize(10);
 
         var rawUuidComponents =
                 java.util.Arrays.stream(components)
@@ -248,5 +248,135 @@ class WorkforceAuthorityChangeFactTest {
                         "Set",
                         "Object",
                         "byte[]");
+    }
+
+    @Test
+    void declaresBoundedFactTypeAndSchemaVersion() {
+        // Why: a persisted analytical row must remain interpretable and
+        // evolvable after the code that wrote it has changed, which requires
+        // the fact to name its own bounded type and its schema version.
+        // Covers: presence of factType and schemaVersion, and their structural
+        // representation, inspected reflectively so the contract can be stated
+        // before the production type exists.
+        // Prevents: an unbounded String fact type, a free-form textual version
+        // such as "v1.2.3-beta", and an unversioned persisted fact.
+
+        var componentTypes =
+                java.util.Arrays.stream(
+                                WorkforceAuthorityChangeFact.class
+                                        .getRecordComponents())
+                        .collect(
+                                java.util.stream.Collectors.toMap(
+                                        java.lang.reflect.RecordComponent::getName,
+                                        java.lang.reflect.RecordComponent::getType));
+
+        assertThat(componentTypes)
+                .as("Analytical schema identity must belong to the fact"
+                        + " contract")
+                .containsKeys(
+                        "factType",
+                        "schemaVersion");
+
+        assertThat(componentTypes.get("factType"))
+                .as("Fact type must be a bounded vocabulary, never arbitrary"
+                        + " text")
+                .isNotEqualTo(String.class)
+                .matches(
+                        Class::isEnum,
+                        "a bounded enum type");
+
+        assertThat(componentTypes.get("schemaVersion"))
+                .as("Schema version must be numeric, never free-form text")
+                .isNotEqualTo(String.class)
+                .isIn(
+                        int.class,
+                        Integer.class);
+    }
+
+    @Test
+    void rejectsInvalidAnalyticalSchemaIdentity() {
+        // Why: a bounded type and a numeric version are only useful if the
+        // values are actually valid; a null type or a non-positive version
+        // would persist a row that names no schema it can be read back with.
+        // Covers: acceptance of explicit valid schema identity, and rejection
+        // of an absent fact type, a zero version and a negative version.
+        // Prevents: an unidentifiable or unversioned analytical row entering
+        // storage through the canonical constructor.
+        //
+        // The assertions are aggregated so one execution proves every gap
+        // rather than stopping at the first missing guard. A positive version
+        // other than 1 is deliberately not constrained here: the invariant is
+        // positivity, not a supported-version policy.
+
+        org.junit.jupiter.api.Assertions.assertAll(
+                () -> assertThatCode(() ->
+                        new WorkforceAuthorityChangeFact(
+                                SOURCE_EVENT_ID,
+                                TENANT_ID,
+                                ACTOR,
+                                AFFECTED,
+                                WorkforceAuthorityChangeAction
+                                        .POSITION_AUTHORITY_CHANGED,
+                                WorkforceAuthorityChangeOutcome.APPLIED,
+                                null,
+                                OCCURRED_AT,
+                                AnalyticalFactType
+                                        .WORKFORCE_AUTHORITY_CHANGE,
+                                1))
+                        .as("Explicit valid schema identity must be accepted")
+                        .doesNotThrowAnyException(),
+
+                () -> assertThatThrownBy(() ->
+                        new WorkforceAuthorityChangeFact(
+                                SOURCE_EVENT_ID,
+                                TENANT_ID,
+                                ACTOR,
+                                AFFECTED,
+                                WorkforceAuthorityChangeAction
+                                        .POSITION_AUTHORITY_CHANGED,
+                                WorkforceAuthorityChangeOutcome.APPLIED,
+                                null,
+                                OCCURRED_AT,
+                                null,
+                                1))
+                        .as("An absent fact type must be rejected")
+                        .isInstanceOf(
+                                IllegalArgumentException.class),
+
+                () -> assertThatThrownBy(() ->
+                        new WorkforceAuthorityChangeFact(
+                                SOURCE_EVENT_ID,
+                                TENANT_ID,
+                                ACTOR,
+                                AFFECTED,
+                                WorkforceAuthorityChangeAction
+                                        .POSITION_AUTHORITY_CHANGED,
+                                WorkforceAuthorityChangeOutcome.APPLIED,
+                                null,
+                                OCCURRED_AT,
+                                AnalyticalFactType
+                                        .WORKFORCE_AUTHORITY_CHANGE,
+                                0))
+                        .as("A zero schema version must be rejected")
+                        .isInstanceOf(
+                                IllegalArgumentException.class),
+
+                () -> assertThatThrownBy(() ->
+                        new WorkforceAuthorityChangeFact(
+                                SOURCE_EVENT_ID,
+                                TENANT_ID,
+                                ACTOR,
+                                AFFECTED,
+                                WorkforceAuthorityChangeAction
+                                        .POSITION_AUTHORITY_CHANGED,
+                                WorkforceAuthorityChangeOutcome.APPLIED,
+                                null,
+                                OCCURRED_AT,
+                                AnalyticalFactType
+                                        .WORKFORCE_AUTHORITY_CHANGE,
+                                -1))
+                        .as("A negative schema version must be rejected")
+                        .isInstanceOf(
+                                IllegalArgumentException.class));
     }
 }

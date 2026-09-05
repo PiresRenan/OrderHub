@@ -30,6 +30,11 @@ import java.util.regex.Pattern;
  * @param outcome       closed analytical outcome vocabulary
  * @param reasonCode    bounded uppercase reason, absent when not applicable
  * @param occurredAt    occurrence time reported by the operational source
+ * @param factType      bounded analytical fact vocabulary this contract
+ *                      represents
+ * @param schemaVersion explicit schema version carried by the fact, so a
+ *                      persisted row stays interpretable after this contract
+ *                      changes
  */
 public record WorkforceAuthorityChangeFact(
         UUID sourceEventId,
@@ -39,10 +44,46 @@ public record WorkforceAuthorityChangeFact(
         WorkforceAuthorityChangeAction action,
         WorkforceAuthorityChangeOutcome outcome,
         String reasonCode,
-        Instant occurredAt) {
+        Instant occurredAt,
+        AnalyticalFactType factType,
+        int schemaVersion) {
 
     private static final Pattern REASON_CODE =
             Pattern.compile("^[A-Z][A-Z0-9_]{2,63}$");
+
+    private static final int CURRENT_SCHEMA_VERSION = 1;
+
+    /**
+     * Builds the fact from its operational attributes, supplying the schema
+     * identity intrinsic to this contract.
+     *
+     * <p>
+     * This record represents {@code WORKFORCE_AUTHORITY_CHANGE} at schema
+     * version {@code 1}, so a caller does not restate either fact.
+     * </p>
+     */
+    public WorkforceAuthorityChangeFact(
+            UUID sourceEventId,
+            UUID tenantId,
+            AnalyticalSubjectKey actorSubject,
+            AnalyticalSubjectKey affectedSubject,
+            WorkforceAuthorityChangeAction action,
+            WorkforceAuthorityChangeOutcome outcome,
+            String reasonCode,
+            Instant occurredAt) {
+
+        this(
+                sourceEventId,
+                tenantId,
+                actorSubject,
+                affectedSubject,
+                action,
+                outcome,
+                reasonCode,
+                occurredAt,
+                AnalyticalFactType.WORKFORCE_AUTHORITY_CHANGE,
+                CURRENT_SCHEMA_VERSION);
+    }
 
     public WorkforceAuthorityChangeFact {
 
@@ -79,6 +120,16 @@ public record WorkforceAuthorityChangeFact(
         if (occurredAt == null) {
             throw new IllegalArgumentException(
                     "Occurrence time is required");
+        }
+
+        if (factType == null) {
+            throw new IllegalArgumentException(
+                    "Analytical fact type is required");
+        }
+
+        if (schemaVersion <= 0) {
+            throw new IllegalArgumentException(
+                    "Analytical schema version must be positive");
         }
 
         if (reasonCode != null
