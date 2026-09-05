@@ -101,6 +101,19 @@ public final class Organization {
         return normalizedName;
     }
 
+    public Organization suspend() {
+        return new Organization(
+                id,
+                name,
+                OrganizationStatus.SUSPENDED);
+    }
+
+    public Organization recover() {
+        return new Organization(
+                id,
+                name,
+                OrganizationStatus.ACTIVE);
+    }
     public UUID id() {
         return id;
     }
