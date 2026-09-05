@@ -40,4 +40,30 @@ class OrganizationTest {
         assertThat(exception)
                 .hasMessage("Organization id is required");
     }
+
+    @Test
+    void rejectsMissingOrganizationName() {
+
+        var exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> Organization.create(
+                        UUID.randomUUID(),
+                        null));
+
+        assertThat(exception)
+                .hasMessage("Organization name is required");
+    }
+
+    @Test
+    void rejectsBlankOrganizationName() {
+
+        var exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> Organization.create(
+                        UUID.randomUUID(),
+                        "   "));
+
+        assertThat(exception)
+                .hasMessage("Organization name must not be blank");
+    }
 }

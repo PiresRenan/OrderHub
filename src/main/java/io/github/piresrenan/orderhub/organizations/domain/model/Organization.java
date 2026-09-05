@@ -24,9 +24,12 @@ public final class Organization {
 
         validateId(id);
 
+        var normalizedName =
+                normalizeAndValidateName(name);
+
         return new Organization(
                 id,
-                name.strip(),
+                normalizedName,
                 OrganizationStatus.ACTIVE);
     }
 
@@ -35,6 +38,25 @@ public final class Organization {
             throw new IllegalArgumentException(
                     "Organization id is required");
         }
+    }
+
+    private static String normalizeAndValidateName(
+            String name) {
+
+        if (name == null) {
+            throw new IllegalArgumentException(
+                    "Organization name is required");
+        }
+
+        var normalizedName =
+                name.strip();
+
+        if (normalizedName.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Organization name must not be blank");
+        }
+
+        return normalizedName;
     }
 
     public UUID id() {
