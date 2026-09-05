@@ -35,10 +35,41 @@ public final class Organization {
                 OrganizationStatus.ACTIVE);
     }
 
+    public static Organization rehydrate(
+            UUID id,
+            String name,
+            OrganizationStatus status) {
+
+        validateId(id);
+        validateStatus(status);
+
+        var normalizedName =
+                normalizeAndValidateName(name);
+
+        if (!name.equals(normalizedName)) {
+            throw new IllegalArgumentException(
+                    "Persisted organization name must be normalized");
+        }
+
+        return new Organization(
+                id,
+                name,
+                status);
+    }
+
     private static void validateId(UUID id) {
         if (id == null) {
             throw new IllegalArgumentException(
                     "Organization id is required");
+        }
+    }
+
+    private static void validateStatus(
+            OrganizationStatus status) {
+
+        if (status == null) {
+            throw new IllegalArgumentException(
+                    "Organization status is required");
         }
     }
 

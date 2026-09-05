@@ -113,4 +113,66 @@ class OrganizationTest {
                 .hasMessage(
                         "Organization name must not exceed 120 characters");
     }
+    @Test
+    void rehydratesPersistedOrganizationState() {
+
+        var id = UUID.randomUUID();
+
+        var organization = Organization.rehydrate(
+                id,
+                "Acme Retail",
+                OrganizationStatus.ACTIVE);
+
+        assertThat(organization.id())
+                .isEqualTo(id);
+
+        assertThat(organization.name())
+                .isEqualTo("Acme Retail");
+
+        assertThat(organization.status())
+                .isEqualTo(OrganizationStatus.ACTIVE);
+    }
+
+    @Test
+    void rehydrationRejectsInvalidPersistedOrganizationState() {
+
+        var exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> Organization.rehydrate(
+                        UUID.randomUUID(),
+                        "   ",
+                        OrganizationStatus.ACTIVE));
+
+        assertThat(exception)
+                .hasMessage("Organization name must not be blank");
+    }
+
+    @Test
+    void rehydrationRejectsNonNormalizedPersistedOrganizationName() {
+
+        var exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> Organization.rehydrate(
+                        UUID.randomUUID(),
+                        "  Acme Retail  ",
+                        OrganizationStatus.ACTIVE));
+
+        assertThat(exception)
+                .hasMessage(
+                        "Persisted organization name must be normalized");
+    }
+
+    @Test
+    void rehydrationRejectsMissingOrganizationStatus() {
+
+        var exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> Organization.rehydrate(
+                        UUID.randomUUID(),
+                        "Acme Retail",
+                        null));
+
+        assertThat(exception)
+                .hasMessage("Organization status is required");
+    }
 }
