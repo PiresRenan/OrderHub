@@ -1,8 +1,11 @@
 package io.github.piresrenan.orderhub.workforce.application.model;
 
+import org.springframework.modulith.NamedInterface;
+
 /**
  * Bounded vocabulary for privilege-significant workforce audit facts.
  */
+@NamedInterface("authority-change-analytics-source")
 public enum WorkforceAuditActionType {
 
     STAFF_ACTIVATED,
