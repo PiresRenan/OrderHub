@@ -108,12 +108,14 @@ class PostgreSqlAnalyticalSubjectPseudonymSchemaTest {
     }
 
     @Test
-    void v21CreatesOnlyThePseudonymMappingRelation() {
-        // Why: this slice must not freeze a fact or ingestion-cursor design
-        // that is still deliberately undecided.
-        // Covers: the complete table inventory of the analytics schema.
-        // Prevents: a fact table, checkpoint or watermark relation entering
-        // persistence before a test demonstrates the need for it.
+    void analyticsSchemaContainsOnlyEvidenceBackedRelations() {
+        // Why: analytics persistence must expand only after executable
+        // evidence justifies each relation.
+        // Covers: the complete currently evidence-backed relation inventory
+        // of the analytics schema.
+        // Prevents: a checkpoint, watermark or another speculative relation
+        // entering analytics persistence before its own executable evidence
+        // exists.
 
         var tables =
                 jdbcTemplate.queryForList(
@@ -126,9 +128,10 @@ class PostgreSqlAnalyticalSubjectPseudonymSchemaTest {
                         String.class);
 
         assertThat(tables)
-                .as("V21 must materialize exactly the pseudonym mapping")
+                .as("Analytics must contain only evidence-backed relations")
                 .containsExactly(
-                        "subject_pseudonyms");
+                        "subject_pseudonyms",
+                        "workforce_authority_change_facts");
     }
 
     @Test
