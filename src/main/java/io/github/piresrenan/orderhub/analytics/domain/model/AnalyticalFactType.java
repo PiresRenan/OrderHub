@@ -12,5 +12,28 @@ package io.github.piresrenan.orderhub.analytics.domain.model;
  */
 public enum AnalyticalFactType {
 
-    WORKFORCE_AUTHORITY_CHANGE
+    WORKFORCE_AUTHORITY_CHANGE(
+            AnalyticalDataClassification.PSEUDONYMOUS);
+
+    private final AnalyticalDataClassification classification;
+
+    AnalyticalFactType(
+            AnalyticalDataClassification classification) {
+
+        this.classification = classification;
+    }
+
+    /**
+     * Returns the privacy classification intrinsic to this fact schema.
+     *
+     * <p>
+     * Classification is schema metadata rather than caller-supplied row state,
+     * so a fact cannot be constructed with a classification that contradicts
+     * its own type.
+     * </p>
+     */
+    public AnalyticalDataClassification classification() {
+
+        return classification;
+    }
 }
