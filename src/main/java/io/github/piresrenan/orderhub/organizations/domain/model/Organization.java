@@ -4,6 +4,8 @@ import java.util.UUID;
 
 public final class Organization {
 
+    private static final int MAX_NAME_CODE_POINTS = 120;
+
     private final UUID id;
     private final String name;
     private final OrganizationStatus status;
@@ -54,6 +56,15 @@ public final class Organization {
         if (normalizedName.isBlank()) {
             throw new IllegalArgumentException(
                     "Organization name must not be blank");
+        }
+
+        if (normalizedName.codePointCount(
+                0,
+                normalizedName.length())
+                > MAX_NAME_CODE_POINTS) {
+
+            throw new IllegalArgumentException(
+                    "Organization name must not exceed 120 characters");
         }
 
         return normalizedName;

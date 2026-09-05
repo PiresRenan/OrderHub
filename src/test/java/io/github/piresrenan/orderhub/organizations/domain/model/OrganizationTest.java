@@ -66,4 +66,51 @@ class OrganizationTest {
         assertThat(exception)
                 .hasMessage("Organization name must not be blank");
     }
+
+    @Test
+    void acceptsOrganizationNameAt120CodePointBoundary() {
+
+        var boundaryName =
+                "A".repeat(119) + "\uD83D\uDE00";
+
+        assertThat(boundaryName.codePointCount(
+                0,
+                boundaryName.length()))
+                .isEqualTo(120);
+
+        assertThat(boundaryName.length())
+                .isEqualTo(121);
+
+        var organization = Organization.create(
+                UUID.randomUUID(),
+                boundaryName);
+
+        assertThat(organization.name())
+                .isEqualTo(boundaryName);
+    }
+
+    @Test
+    void rejectsOrganizationNameAbove120CodePointBoundary() {
+
+        var tooLongName =
+                "A".repeat(120) + "\uD83D\uDE00";
+
+        assertThat(tooLongName.codePointCount(
+                0,
+                tooLongName.length()))
+                .isEqualTo(121);
+
+        assertThat(tooLongName.length())
+                .isEqualTo(122);
+
+        var exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> Organization.create(
+                        UUID.randomUUID(),
+                        tooLongName));
+
+        assertThat(exception)
+                .hasMessage(
+                        "Organization name must not exceed 120 characters");
+    }
 }
