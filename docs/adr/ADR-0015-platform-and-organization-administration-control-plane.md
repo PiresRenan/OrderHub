@@ -488,9 +488,29 @@ Accepted historical migrations remain immutable.
 
 Flyway out-of-order remains prohibited.
 
-The next potential migration number after this checkpoint is V25, but it is not
+V25 is now justified by executable Organization persistence evidence. The
+Organizations module requires durable aggregate storage before lifecycle and
+placement application behavior can be implemented without transient state.
 
-authorized until another semantic RED proves new schema state is required.
+V25 therefore creates only the Organization aggregate table:
+
+```text
+organizations.organizations
+    id      UUID PRIMARY KEY
+    name    canonical / bounded
+    status  ACTIVE | SUSPENDED
+```
+
+The database mirrors the aggregate invariants for canonical non-blank name,
+bounded length and operational status. `status` has no implicit default so the
+application/repository mapping must provide complete aggregate state explicitly.
+
+Organization/Tenant placement is intentionally not persisted in V25. Its
+cardinality, conditional mutation and concurrency strategy require a separate
+semantic RED.
+
+The next potential migration number after this checkpoint is V26, but it is not
+authorized until executable placement or other persistence evidence requires it.
 
 ## Initial implementation evidence
 
