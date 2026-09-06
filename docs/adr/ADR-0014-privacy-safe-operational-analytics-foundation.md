@@ -1,6 +1,6 @@
 # ADR-0014 — Privacy-Safe Operational Analytics Foundation
 
-Status: TESTED
+Status: DESIGNED
 
 ## Context
 
@@ -20,8 +20,9 @@ while minimizing unnecessary personal-data processing.
 
 OH-016 therefore establishes the durable analytical boundaries first, and commits
 to a transport for operational evidence only once evidence supports choosing one.
-That transport is selected, implemented and executably proven; the evidence is
-recorded at the end of this document.
+That transport is selected and implemented, and the evidence recorded at the end
+of this document is executable. The decision stays DESIGNED until a reviewed
+implementation checkpoint carries no unresolved finding.
 
 ## Decision
 
@@ -148,7 +149,8 @@ introduced.
 
 ## Workforce-to-analytics ingestion decision
 
-Status of this section: **SELECTED AND EXECUTABLY PROVEN.**
+Status of this section: **SELECTED AND IMPLEMENTED; PENDING REVIEWED
+IMPLEMENTATION CHECKPOINT.**
 
 The first workforce-to-analytics ingestion uses Spring Modulith's persistent JDBC
 Event Publication Registry.
@@ -263,10 +265,36 @@ persistence. It is not exactly-once transport, and must not be described as such
 **Recovery.**
 
 Recovery uses the framework's own resubmission APIs for failed and incomplete
-publications. This ADR selects explicit controlled resubmission over automatic
-republication on application restart, which stays disabled: explicit recovery is
-deterministic and testable, and avoids restart-driven ambiguity in multi-instance
-deployments. No custom scheduler and no separate recovery table is introduced.
+publications, in two distinct roles.
+
+The **production baseline** is automatic republication of outstanding
+publications when an instance starts, enabled through
+`spring.modulith.events.republish-outstanding-events-on-restart`. A process can
+stop after committing a publication but before its asynchronous listener
+completes, and OrderHub deliberately exposes only the health endpoint, so no
+remote surface exists that an operator could call to drive resubmission.
+Startup republication is therefore the recovery path a deployment actually has.
+
+An earlier revision of this decision disabled it and described recovery as
+"explicit and controlled". That was not deployable: the explicit API was
+reachable only from a test, so a crash between commit and projection could leave
+an analytical fact missing indefinitely. Adding an administrative endpoint
+instead was rejected, because it would introduce a privileged, externally
+reachable management contract with its own authentication, authorization and API
+governance, purely to recover framework publications.
+
+Explicit `FailedEventPublications` resubmission remains a **tested framework
+primitive** rather than OrderHub's production recovery surface. It is exercised
+directly so the recovery mechanism is proven at the API level as well as through
+a restart.
+
+Startup republication reopens the multi-instance ambiguity the earlier revision
+avoided: several instances may republish concurrently, and delivery stays
+at-least-once. That is accepted rather than coordinated away, because
+convergence is already the responsibility of analytical fact identity
+(`tenantId` + `sourceEventId` + `factType`) with idempotent exact replay and
+fail-closed divergent duplicates. No distributed recovery coordinator, custom
+scheduler and no separate recovery table is introduced.
 
 **Registry lifecycle and persistence.**
 
@@ -347,7 +375,8 @@ Costs and trade-offs:
 - one Spring Modulith JDBC starter is expected to be added later;
 - listener processing is at-least-once, so correctness relies on the accepted
   idempotent and fail-closed fact repository;
-- explicit recovery is operational behaviour that must itself be tested, and is;
+- recovery is operational behaviour that must itself be tested, both as startup
+  republication and as explicit API resubmission, and is;
 - the analytical vocabulary models only the workforce actions a concrete
   workflow produces, so audit evidence outside it is deliberately not projected
   and analytical completeness is bounded by that vocabulary rather than by the
@@ -375,7 +404,11 @@ introduced implicitly while completing OH-016.
 
 ## Executable evidence
 
-The mechanism is proven by executable tests against a real PostgreSQL database
+This matrix records the evidence that exists. It is not yet a promotion: this
+decision remains DESIGNED until an implementation checkpoint passes local
+verification, the required workflows and review with no unresolved finding.
+
+The mechanism is exercised by executable tests against a real PostgreSQL database
 migrated from empty through `V23`, the real Spring Modulith 2.1.1 JDBC Event
 Publication Registry, the real workforce services and the real analytics
 listener. Only analytical fact persistence can be made to fail on demand, by a
@@ -401,11 +434,12 @@ condition reliably.
 | 15 | Retry converges on one fact | `WorkforceAuthorityChangeIngestionE2ETest` |
 | 16 | Divergent duplicate fails closed | `PostgreSqlWorkforceAuthorityChangeFactRepositoryTest` |
 | 17 | `DELETE` completion removes successful publications | `WorkforceAuthorityChangeIngestionE2ETest`, `PlatformEventPublicationRegistryRuntimeConfigurationTest` |
-| 18 | Restart republication stays disabled | `PlatformEventPublicationRegistryRuntimeConfigurationTest` |
+| 18 | Restart republication enabled as the deployable recovery baseline | `PlatformEventPublicationRegistryRuntimeConfigurationTest` |
 | 19 | Observability carries no high-cardinality identifier | `WorkforceAuthorityChangeIngestionE2ETest` |
 | 20 | Module edge explicit and acyclic | `AnalyticsModuleContractTest`, `OrderHubModularityTests` |
 | 21 | Flyway owns `event_publication`; empty database bootstraps to `V23` | `PostgreSqlEventPublicationRegistrySchemaTest`, full suite |
-| 22 | Analytical fact schema, classification and retention | `PostgreSqlWorkforceAuthorityChangeFactSchemaTest`, `PostgreSqlWorkforceAuthorityChangeFactConstraintsTest`, `PostgreSqlWorkforceAuthorityChangeFactRetentionTest`, `AnalyticalRetentionPolicyCatalogTest` |
+| 22 | Deployable crash and restart recovery: an outstanding publication is automatically republished by the next application startup against the same database | `WorkforceAuthorityChangeRestartRecoveryE2ETest` |
+| 23 | Analytical fact schema, classification and retention | `PostgreSqlWorkforceAuthorityChangeFactSchemaTest`, `PostgreSqlWorkforceAuthorityChangeFactConstraintsTest`, `PostgreSqlWorkforceAuthorityChangeFactRetentionTest`, `AnalyticalRetentionPolicyCatalogTest` |
 
 Delivery semantics are **at-least-once delivery over idempotent, fail-closed
 projection persistence**. This is deliberately not exactly-once transport and
@@ -431,9 +465,17 @@ analytical vocabulary.
 
 Recovery is explicit and uses the framework's own
 `org.springframework.modulith.events.FailedEventPublications.resubmit(ResubmissionOptions)`,
-implemented by `PersistentApplicationEventMulticaster`. Automatic republication
-on restart stays disabled. No custom scheduler, recovery table, retry queue or
-outbox exists.
+implemented by `PersistentApplicationEventMulticaster`, which also implements
+`IncompleteEventPublications`.
+
+The production baseline is that same multicaster's
+`afterSingletonsInstantiated()` startup hook: it reads
+`spring.modulith.events.republish-outstanding-events-on-restart` and, when true,
+calls `resubmitIncompletePublications(...)`. The JDBC repository selects
+outstanding work as `COMPLETION_DATE IS NULL OR STATUS = 'FAILED'`, so a
+publication left `FAILED` by a projection failure is republished on the next
+startup. No custom scheduler, recovery table, retry queue, administrative
+endpoint or outbox exists.
 
 **Residual conditions.**
 

@@ -303,7 +303,7 @@ the same internal User.
 
 ### OH-016 — Privacy-safe operational analytics foundation
 
-Status: COMPLETE — issue #31 and ADR-0014 `TESTED`; initially developed in
+Status: IN PROGRESS — issue #31 and ADR-0014 `DESIGNED`; initially developed in
 parallel from the integrated OH-014 baseline and synchronized on 2026-09-04 with
 post-OH-015 `pre-release@db7004a0df6035fa4c4fb886b4e383f4ae967f89` through merge
 checkpoint `5b15baac4f0bdfc65253889eb705b7b9ac987c2f`.
@@ -312,8 +312,9 @@ The executable slice establishes analytics as an independent module owning
 pseudonymous subject identity, versioned fact schemas and retention, and ingests
 workforce authority-change evidence through Spring Modulith's durable JDBC event
 publication registry: at-least-once delivery over idempotent, fail-closed
-analytical fact persistence, with explicit framework resubmission as the
-recovery path. The remaining direction below stays future scope.
+analytical fact persistence, recovered by automatic republication of outstanding
+publications on application startup. The remaining direction below stays future
+scope.
 
 The first concrete producer remains the append-oriented workforce operational
 evidence already integrated by OH-014. OH-015 Customer semantics are now present

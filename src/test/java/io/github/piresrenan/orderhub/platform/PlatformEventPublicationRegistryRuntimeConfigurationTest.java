@@ -72,10 +72,10 @@ class PlatformEventPublicationRegistryRuntimeConfigurationTest {
         // repository, the framework's own Jackson 3 serializer, framework
         // schema creation switched off, the publication table pinned to the
         // public schema, DELETE completion reaching the JDBC settings, and
-        // restart republication left disabled.
+        // restart republication enabled.
         // Prevents: a registry that silently owns its schema, an unqualified
-        // table name, completed publications accumulating, and restart-driven
-        // republication in a multi-instance deployment.
+        // table name, completed publications accumulating, and a publication
+        // left outstanding by a crash with no deployable way to recover it.
         //
         // The framework packages are referenced only as version-pinned name
         // strings and bean names. Importing them would make this test fail to
@@ -197,10 +197,12 @@ class PlatformEventPublicationRegistryRuntimeConfigurationTest {
                 () -> assertThat(
                         environment.getProperty(
                                 RESTART_REPUBLICATION_PROPERTY))
-                        .as("Restart republication must stay disabled"
-                                + " explicitly, because recovery is controlled"
-                                + " and multi-instance restarts are ambiguous")
-                        .isEqualTo("false"));
+                        .as("Restart republication must be enabled, because it"
+                                + " is the only deployable recovery path for a"
+                                + " publication left outstanding by a crash;"
+                                + " OrderHub exposes no management surface to"
+                                + " drive resubmission remotely")
+                        .isEqualTo("true"));
     }
 
     /**
