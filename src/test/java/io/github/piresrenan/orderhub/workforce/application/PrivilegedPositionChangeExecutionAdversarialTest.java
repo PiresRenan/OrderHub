@@ -20,7 +20,6 @@ import io.github.piresrenan.orderhub.OrderHubApplication;
 import io.github.piresrenan.orderhub.authorization.domain.model.PermissionCode;
 import io.github.piresrenan.orderhub.authorization.domain.model.PermissionEnvelope;
 import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
-import io.github.piresrenan.orderhub.workforce.adapter.out.persistence.postgresql.PostgreSqlWorkforceAuditRepository;
 import io.github.piresrenan.orderhub.workforce.adapter.out.persistence.postgresql.PostgreSqlWorkforcePositionChangeRepository;
 import io.github.piresrenan.orderhub.workforce.application.model.PrivilegedPositionChangeCommand;
 import io.github.piresrenan.orderhub.workforce.application.model.WorkforcePositionChangeSnapshot;
@@ -28,6 +27,7 @@ import io.github.piresrenan.orderhub.workforce.application.port.out.WorkforcePos
 import io.github.piresrenan.orderhub.workforce.application.port.out.WorkforceTransactionExecutor;
 import io.github.piresrenan.orderhub.workforce.application.service.PrivilegedPositionChangeExecutionService;
 import io.github.piresrenan.orderhub.workforce.application.service.PrivilegedWorkforceMutationAuthorizationService;
+import io.github.piresrenan.orderhub.workforce.application.service.WorkforceAuditRecorder;
 import io.github.piresrenan.orderhub.workforce.domain.model.WorkforceMutationDecision;
 
 @SpringBootTest
@@ -46,6 +46,15 @@ class PrivilegedPositionChangeExecutionAdversarialTest {
 
     @Autowired
     private PrivilegedPositionChangeExecutionService service;
+
+    /**
+     * The application-owned recorder is stateless, so the manually constructed
+     * service below stays aligned with production dependencies without
+     * duplicating recorder setup. Only the position repository is substituted,
+     * which keeps this test focused on PostgreSQL locking.
+     */
+    @Autowired
+    private WorkforceAuditRecorder auditRecorder;
 
     @BeforeEach
     void cleanWorkforceState() {
@@ -147,8 +156,7 @@ class PrivilegedPositionChangeExecutionAdversarialTest {
                 new PrivilegedPositionChangeExecutionService(
                         transactionExecutor,
                         pausingRepository,
-                        new PostgreSqlWorkforceAuditRepository(
-                                jdbcTemplate),
+                        auditRecorder,
                         new PrivilegedWorkforceMutationAuthorizationService());
 
         var first =

@@ -9,7 +9,6 @@ import io.github.piresrenan.orderhub.workforce.application.model.WorkforceAuditE
 import io.github.piresrenan.orderhub.workforce.application.model.WorkforceAuditOutcome;
 import io.github.piresrenan.orderhub.workforce.application.model.WorkforceAuditState;
 import io.github.piresrenan.orderhub.workforce.application.model.WorkforcePositionChangeSnapshot;
-import io.github.piresrenan.orderhub.workforce.application.port.out.WorkforceAuditRepository;
 import io.github.piresrenan.orderhub.workforce.application.port.out.WorkforcePositionChangeRepository;
 import io.github.piresrenan.orderhub.workforce.application.port.out.WorkforceTransactionExecutor;
 import io.github.piresrenan.orderhub.workforce.domain.model.EffectiveWorkforceAuthority;
@@ -40,7 +39,7 @@ public final class PrivilegedPositionChangeExecutionService {
 
     private final WorkforcePositionChangeRepository positionRepository;
 
-    private final WorkforceAuditRepository auditRepository;
+    private final WorkforceAuditRecorder auditRecorder;
 
     private final PrivilegedWorkforceMutationAuthorizationService
             authorizationService;
@@ -48,7 +47,7 @@ public final class PrivilegedPositionChangeExecutionService {
     public PrivilegedPositionChangeExecutionService(
             WorkforceTransactionExecutor transactionExecutor,
             WorkforcePositionChangeRepository positionRepository,
-            WorkforceAuditRepository auditRepository,
+            WorkforceAuditRecorder auditRecorder,
             PrivilegedWorkforceMutationAuthorizationService authorizationService) {
 
         this.transactionExecutor =
@@ -61,10 +60,10 @@ public final class PrivilegedPositionChangeExecutionService {
                         positionRepository,
                         "positionRepository");
 
-        this.auditRepository =
+        this.auditRecorder =
                 Objects.requireNonNull(
-                        auditRepository,
-                        "auditRepository");
+                        auditRecorder,
+                        "auditRecorder");
 
         this.authorizationService =
                 Objects.requireNonNull(
@@ -125,7 +124,7 @@ public final class PrivilegedPositionChangeExecutionService {
 
         if (decision != WorkforceMutationDecision.ALLOW) {
 
-            auditRepository.append(
+            auditRecorder.record(
                     deniedEvidence(
                             command,
                             snapshot,
@@ -140,7 +139,7 @@ public final class PrivilegedPositionChangeExecutionService {
                         snapshot.requestedTargetPosition()
                                 .positionId())) {
 
-            auditRepository.append(
+            auditRecorder.record(
                     deniedEvidence(
                             command,
                             snapshot,
@@ -157,7 +156,7 @@ public final class PrivilegedPositionChangeExecutionService {
                 snapshot.requestedTargetPosition()
                         .positionId());
 
-        auditRepository.append(
+        auditRecorder.record(
                 appliedEvidence(
                         command,
                         snapshot));

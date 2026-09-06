@@ -3,7 +3,6 @@ package io.github.piresrenan.orderhub.workforce.application.service;
 import java.util.Objects;
 
 import io.github.piresrenan.orderhub.workforce.application.model.WorkforceAuditEvidence;
-import io.github.piresrenan.orderhub.workforce.application.port.out.WorkforceAuditRepository;
 import io.github.piresrenan.orderhub.workforce.application.port.out.WorkforceTransactionExecutor;
 
 /**
@@ -14,21 +13,21 @@ public final class AuditedWorkforceMutationService {
 
     private final WorkforceTransactionExecutor transactionExecutor;
 
-    private final WorkforceAuditRepository auditRepository;
+    private final WorkforceAuditRecorder auditRecorder;
 
     public AuditedWorkforceMutationService(
             WorkforceTransactionExecutor transactionExecutor,
-            WorkforceAuditRepository auditRepository) {
+            WorkforceAuditRecorder auditRecorder) {
 
         this.transactionExecutor =
                 Objects.requireNonNull(
                         transactionExecutor,
                         "transactionExecutor");
 
-        this.auditRepository =
+        this.auditRecorder =
                 Objects.requireNonNull(
-                        auditRepository,
-                        "auditRepository");
+                        auditRecorder,
+                        "auditRecorder");
     }
 
     public void execute(
@@ -47,7 +46,7 @@ public final class AuditedWorkforceMutationService {
                 () -> {
                     mutation.run();
 
-                    auditRepository.append(
+                    auditRecorder.record(
                             evidence);
 
                     return null;
