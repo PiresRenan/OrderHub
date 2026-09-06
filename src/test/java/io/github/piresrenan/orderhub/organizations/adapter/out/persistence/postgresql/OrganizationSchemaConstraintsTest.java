@@ -58,7 +58,11 @@ class OrganizationSchemaConstraintsTest {
     void clearOrganizations() {
 
         jdbcTemplate.update(
-                "TRUNCATE TABLE organizations.organizations");
+                """
+                TRUNCATE TABLE
+                    organizations.tenant_placements,
+                    organizations.organizations
+                """);
     }
 
     @Test

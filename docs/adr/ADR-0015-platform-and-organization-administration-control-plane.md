@@ -314,18 +314,61 @@ A stale detach must never remove a placement that was concurrently moved.
 
 PostgreSQL, not a process-local lock, is the correctness boundary.
 
-Persistence must eventually prove:
+V26 owns the concrete single-parent relation inside `organizations`:
+
+```text
+organizations.tenant_placements
+    tenant_id        UUID PRIMARY KEY
+    organization_id  UUID NOT NULL
+```
+
+`tenant_id` is the structural cardinality key, so one Tenant can have at most one
+Organization placement. `organization_id` references only the Organization table
+owned by this module. No foreign key reaches into `tenants.tenants`; Tenant
+existence/eligibility must be established later through the smallest Tenant-owned
+application contract required by the control-plane use case.
+
+Persistence operations are intentionally distinct:
+
+```text
+ATTACH
+    lock ACTIVE destination
+    INSERT ... ON CONFLICT (tenant_id) DO NOTHING
+    same destination -> idempotent success
+    different destination -> conflict
+
+MOVE
+    lock ACTIVE destination
+    UPDATE ... WHERE tenant_id = ? AND organization_id = expected_source
+    zero rows -> conflict
+
+DETACH
+    DELETE ... WHERE tenant_id = ? AND organization_id = expected_source
+    no current placement -> idempotent success
+    different current placement -> conflict
+```
+
+ATTACH and MOVE execute inside an adapter-owned Spring `TransactionTemplate`.
+Before mutation they read the destination Organization with PostgreSQL
+`SELECT ... FOR SHARE`; this is deliberately narrow row locking intended to keep
+the validated destination lifecycle stable until that placement transaction
+commits. Spring transaction infrastructure does not leak into the application
+port.
+
+Executable PostgreSQL concurrency evidence now proves:
 
 - one-parent Tenant placement;
-- conditional mutation using expected source;
-- concurrent attach correctness;
-- concurrent move correctness;
+- concurrent attach to different Organizations has one winner;
+- concurrent attach to the same Organization is idempotent;
+- concurrent moves from one expected source have one winner;
 - stale move rejection;
 - stale detach rejection;
-- destination lifecycle stability during mutation.
+- concurrent move versus expected detach cannot remove a completed newer move.
 
-Narrow row locking may be used where executable evidence proves it is necessary
-to preserve an ACTIVE destination precondition until transaction commit.
+The dedicated race between destination lifecycle mutation and placement remains a
+required later executable proof when Organization lifecycle persistence gains its
+own authoritative write path. No synthetic lifecycle write path is introduced
+only to manufacture that test early.
 
 No generic locking framework is introduced.
 
@@ -509,8 +552,16 @@ Organization/Tenant placement is intentionally not persisted in V25. Its
 cardinality, conditional mutation and concurrency strategy require a separate
 semantic RED.
 
-The next potential migration number after this checkpoint is V26, but it is not
-authorized until executable placement or other persistence evidence requires it.
+V26 is now justified by executable placement persistence evidence and creates
+only the Organization-owned Tenant placement relation plus the bounded
+Organization lookup index required by later administrative listing.
+
+The migration structurally enforces one parent per Tenant through the
+`tenant_id` primary key and deliberately creates no foreign key into Tenant-owned
+persistence.
+
+The next potential migration number after this checkpoint is V27, but it is not
+authorized until another semantic RED proves additional schema state is required.
 
 ## Initial implementation evidence
 
