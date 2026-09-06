@@ -9,15 +9,19 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import io.github.piresrenan.orderhub.workforce.adapter.out.notification.spring.SpringWorkforceAuthorityChangeAuditNotificationPublisher;
 import io.github.piresrenan.orderhub.workforce.adapter.out.persistence.postgresql.PostgreSqlWorkforceAuditRepository;
+import io.github.piresrenan.orderhub.workforce.adapter.out.persistence.postgresql.PostgreSqlWorkforceAuthorityChangeAnalyticsSourceRepository;
 import io.github.piresrenan.orderhub.workforce.adapter.out.persistence.postgresql.PostgreSqlWorkforcePositionChangeRepository;
 import io.github.piresrenan.orderhub.workforce.adapter.out.transaction.spring.SpringWorkforceTransactionExecutor;
+import io.github.piresrenan.orderhub.workforce.application.port.in.ResolveWorkforceAuthorityChangeAnalyticsSourceUseCase;
 import io.github.piresrenan.orderhub.workforce.application.port.out.WorkforceAuditRepository;
+import io.github.piresrenan.orderhub.workforce.application.port.out.WorkforceAuthorityChangeAnalyticsSourceRepository;
 import io.github.piresrenan.orderhub.workforce.application.port.out.WorkforceAuthorityChangeAuditNotificationPublisher;
 import io.github.piresrenan.orderhub.workforce.application.port.out.WorkforcePositionChangeRepository;
 import io.github.piresrenan.orderhub.workforce.application.port.out.WorkforceTransactionExecutor;
 import io.github.piresrenan.orderhub.workforce.application.service.AuditedWorkforceMutationService;
 import io.github.piresrenan.orderhub.workforce.application.service.PrivilegedPositionChangeExecutionService;
 import io.github.piresrenan.orderhub.workforce.application.service.PrivilegedWorkforceMutationAuthorizationService;
+import io.github.piresrenan.orderhub.workforce.application.service.ResolveWorkforceAuthorityChangeAnalyticsSourceService;
 import io.github.piresrenan.orderhub.workforce.application.service.WorkforceAuditRecorder;
 
 @Configuration(proxyBeanMethods = false)
@@ -49,6 +53,25 @@ public class WorkforceConfiguration {
         return new WorkforceAuditRecorder(
                 auditRepository,
                 notificationPublisher);
+    }
+
+    @Bean
+    WorkforceAuthorityChangeAnalyticsSourceRepository
+            workforceAuthorityChangeAnalyticsSourceRepository(
+                    JdbcTemplate jdbcTemplate) {
+
+        return new PostgreSqlWorkforceAuthorityChangeAnalyticsSourceRepository(
+                jdbcTemplate);
+    }
+
+    @Bean
+    ResolveWorkforceAuthorityChangeAnalyticsSourceUseCase
+            resolveWorkforceAuthorityChangeAnalyticsSourceUseCase(
+                    WorkforceAuthorityChangeAnalyticsSourceRepository
+                            analyticsSourceRepository) {
+
+        return new ResolveWorkforceAuthorityChangeAnalyticsSourceService(
+                analyticsSourceRepository);
     }
 
     @Bean

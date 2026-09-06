@@ -1,6 +1,6 @@
 # ADR-0014 — Privacy-Safe Operational Analytics Foundation
 
-Status: DESIGNED
+Status: TESTED
 
 ## Context
 
@@ -20,8 +20,8 @@ while minimizing unnecessary personal-data processing.
 
 OH-016 therefore establishes the durable analytical boundaries first, and commits
 to a transport for operational evidence only once evidence supports choosing one.
-That transport is now selected. It is a design selection, not yet proof that it
-behaves as described.
+That transport is selected, implemented and executably proven; the evidence is
+recorded at the end of this document.
 
 ## Decision
 
@@ -33,18 +33,18 @@ Analytics will consume operational facts only through explicit application
 contracts. It owns its own PostgreSQL schema, and does not participate in
 operational correctness.
 
-The module is declared fail-closed, permitted no dependency on any other
-application module, so a future cross-module edge must be an explicit reviewed
-change rather than an accidental import.
+The module was declared fail-closed, permitted no dependency on any other
+application module, so the cross-module edge ingestion needs had to be an
+explicit reviewed change rather than an accidental import. It now declares
+exactly one dependency, on the workforce named interface that carries the
+notification and the bounded source contract.
 
 Customer semantics are present in the integrated baseline. That does not admit
 Customer analytical facts into this slice; doing so requires an explicit
 governed scope change.
 
-The first workforce-to-analytics ingestion mechanism is selected in
-"Workforce-to-analytics ingestion decision". The module remains declared
-fail-closed until the reviewed dependency edge that mechanism requires is
-introduced as an explicit change.
+The first workforce-to-analytics ingestion mechanism is described in
+"Workforce-to-analytics ingestion decision", and is implemented.
 
 ## Architectural invariants
 
@@ -148,7 +148,7 @@ introduced.
 
 ## Workforce-to-analytics ingestion decision
 
-Status of this section: **SELECTED, NOT YET EXECUTABLY PROVEN.**
+Status of this section: **SELECTED AND EXECUTABLY PROVEN.**
 
 The first workforce-to-analytics ingestion uses Spring Modulith's persistent JDBC
 Event Publication Registry.
@@ -225,9 +225,12 @@ persisted in the registry payload or in analytical fact storage.
 Workforce owns and publishes the notification, and does not depend on analytics.
 Analytics may depend only on the reviewed workforce contract this projection
 requires, and still may not import or query workforce persistence. The
-fail-closed declaration was deliberately temporary: implementation will require
-an explicit reviewed module dependency from analytics to the exported workforce
-contract. That edge does not exist yet.
+fail-closed declaration was deliberately temporary: the implementation
+required an explicit reviewed module dependency from analytics to the exported
+workforce contract. That edge now exists and is declared as
+`workforce :: authority-change-analytics-source`, naming the interface rather
+than the module so workforce persistence, configuration and internal services
+stay unreachable.
 
 **Source transaction coupling.**
 
@@ -281,10 +284,10 @@ cross-schema foreign key, no new database and no new service.
 **Schema authority.**
 
 Flyway remains the schema authority. The framework's automatic JDBC schema
-initialization will be disabled, and a later migration is expected to introduce
-the required `event_publication` relation and its indexes from the official
-Spring Modulith 2.1.1 PostgreSQL schema. That migration is expected to be `V23`;
-it does not exist and is not accepted.
+initialization is disabled, and `V23` introduces the required
+`event_publication` relation and its indexes from the official Spring Modulith
+2.1.1 PostgreSQL schema. No further migration was required to complete
+ingestion.
 
 **Dependency.**
 
@@ -292,8 +295,8 @@ The intended addition is the single `spring-modulith-starter-jdbc` artifact,
 versioned by the existing Spring Modulith BOM. It supplies the JDBC publication
 registry and the default event serialization path, which targets the Jackson 3
 mapper that Spring Boot 4 already provides. No custom serializer, no Jackson 2
-dependency and no compatibility bridge is authorized. The dependency is not added
-by this decision.
+dependency and no compatibility bridge is authorized. That single artifact is the
+only dependency the completed ingestion added.
 
 ## Alternatives rejected for now
 
@@ -344,14 +347,13 @@ Costs and trade-offs:
 - one Spring Modulith JDBC starter is expected to be added later;
 - listener processing is at-least-once, so correctness relies on the accepted
   idempotent and fail-closed fact repository;
-- explicit recovery is operational behaviour that must itself be tested;
-- production ingestion is still not implemented, so analytical completeness
-  cannot be claimed and no consumer may assume it;
-- several issue #31 acceptance criteria therefore remain unsatisfied at this
-  checkpoint.
-
-This ADR records intent and a selected mechanism. It is not evidence that any of
-the above behaves as described.
+- explicit recovery is operational behaviour that must itself be tested, and is;
+- the analytical vocabulary models only the workforce actions a concrete
+  workflow produces, so audit evidence outside it is deliberately not projected
+  and analytical completeness is bounded by that vocabulary rather than by the
+  workforce audit vocabulary;
+- asynchronous annotation processing is now enabled application-wide, because
+  the selected listener semantics depend on it.
 
 ## Deferred
 
@@ -371,48 +373,73 @@ them:
 Deferred items require an explicit governed scope change rather than being
 introduced implicitly while completing OH-016.
 
-## Verification required before TESTED
+## Executable evidence
 
-ADR-0014 remains DESIGNED until executable evidence proves:
+The mechanism is proven by executable tests against a real PostgreSQL database
+migrated from empty through `V23`, the real Spring Modulith 2.1.1 JDBC Event
+Publication Registry, the real workforce services and the real analytics
+listener. Only analytical fact persistence can be made to fail on demand, by a
+test-owned decorator, because no deployment can be asked to produce that
+condition reliably.
 
-- analytical fact persistence with bounded fact type, explicit schema version
-  and Tenant isolation;
-- rejection of structurally malformed analytical state;
-- privacy and adversarial behavior over persisted analytical rows;
-- cross-Tenant isolation for both mappings and facts;
-- retention and purge safety, including that workforce audit evidence is neither
-  deleted nor mutated;
+| # | Invariant | Executable evidence |
+| --- | --- | --- |
+| 1 | Publication registration joins the source transaction | `WorkforceAuthorityChangePublicationTransactionTest` |
+| 2 | A rolled-back source leaves no durable publication | `WorkforceAuthorityChangePublicationTransactionTest` |
+| 3 | Real registry persistence failure rolls back mutation and audit | `WorkforceAuthorityChangePublicationFailureAtomicityTest` |
+| 4 | Durable payload is exactly `tenantId` and `auditEventId` | `WorkforceAuthorityChangePublicationTransactionTest` |
+| 5 | Listener is after-commit with its own transaction | `WorkforceAuthorityChangeIngestionE2ETest` |
+| 6 | A committed source survives projection failure | `WorkforceAuthorityChangeIngestionE2ETest` |
+| 7 | Source is read only through the workforce contract | `PostgreSqlWorkforceAuthorityChangeAnalyticsSourceTest`, `WorkforceAuthorityChangeIngestionE2ETest` |
+| 8 | `occurred_at` comes from the committed audit row | `WorkforceAuthorityChangeIngestionE2ETest` |
+| 9 | Staff identifiers cross only transiently | `WorkforceAuthorityChangeIngestionE2ETest` |
+| 10 | Persisted analytics carries only pseudonymous subjects | `WorkforceAuthorityChangeIngestionE2ETest`, `PostgreSqlAnalyticalSubjectPseudonymRepositoryTest` |
+| 11 | Translation uses the bounded analytical vocabulary | `WorkforceAuthorityChangeIngestionE2ETest` |
+| 12 | Successful projection completes the publication | `WorkforceAuthorityChangeIngestionE2ETest` |
+| 13 | Failed projection retains a recoverable publication | `WorkforceAuthorityChangeIngestionE2ETest` |
+| 14 | Framework resubmission recovers it | `WorkforceAuthorityChangeIngestionE2ETest` |
+| 15 | Retry converges on one fact | `WorkforceAuthorityChangeIngestionE2ETest` |
+| 16 | Divergent duplicate fails closed | `PostgreSqlWorkforceAuthorityChangeFactRepositoryTest` |
+| 17 | `DELETE` completion removes successful publications | `WorkforceAuthorityChangeIngestionE2ETest`, `PlatformEventPublicationRegistryRuntimeConfigurationTest` |
+| 18 | Restart republication stays disabled | `PlatformEventPublicationRegistryRuntimeConfigurationTest` |
+| 19 | Observability carries no high-cardinality identifier | `WorkforceAuthorityChangeIngestionE2ETest` |
+| 20 | Module edge explicit and acyclic | `AnalyticsModuleContractTest`, `OrderHubModularityTests` |
+| 21 | Flyway owns `event_publication`; empty database bootstraps to `V23` | `PostgreSqlEventPublicationRegistrySchemaTest`, full suite |
+| 22 | Analytical fact schema, classification and retention | `PostgreSqlWorkforceAuthorityChangeFactSchemaTest`, `PostgreSqlWorkforceAuthorityChangeFactConstraintsTest`, `PostgreSqlWorkforceAuthorityChangeFactRetentionTest`, `AnalyticalRetentionPolicyCatalogTest` |
 
-and, for the selected ingestion mechanism specifically:
+Delivery semantics are **at-least-once delivery over idempotent, fail-closed
+projection persistence**. This is deliberately not exactly-once transport and
+must not be described as such: recovery may deliver a notification again, and
+correctness comes from the fact repository accepting an exact replay and
+rejecting a divergent one.
 
-- the workforce notification publication joins the source transaction;
-- a rolled-back source transaction leaves no durable analytical fact;
-- the registry payload carries only the approved opaque notification fields;
-- the post-commit listener reads the operational source only through the
-  explicit workforce contract;
-- the `occurred_at` persisted by `V16` is preserved into the analytical fact;
-- a committed source operation survives listener and fact-persistence failure;
-- a failed publication is recoverable by explicit resubmission;
-- recovery converges on exactly one semantic fact;
-- the same identity with divergent content remains fail-closed;
-- the analytics-to-workforce module dependency is explicit and acyclic;
-- the `event_publication` schema matches the framework's own PostgreSQL schema
-  and is owned by Flyway;
-- automatic framework schema initialization is disabled;
-- completion mode and recovery semantics behave as designed;
-- analytics observability with bounded dimensions;
-- Spring Modulith verification;
-- PostgreSQL integration evidence from an empty database;
-- `git diff --check` and full `mvnw clean verify`;
-- required workflows on the exact candidate HEAD;
-- final Codex review with no unresolved irregularity.
+**Analytical vocabulary boundary.**
 
-Issue #31 remains the authoritative full acceptance specification.
+Only `POSITION_CHANGED`, `POSITION_AUTHORITY_CHANGED` and `PRIVILEGED_MUTATION`
+are produced by a concrete workforce workflow today, and those are exactly the
+actions the analytical vocabulary models. `STAFF_ACTIVATED`,
+`STAFF_DEACTIVATED`, `DEPARTMENT_CHANGED` and `SUPERVISOR_CHANGED` are reachable
+only through generic audit infrastructure with no current production caller.
+They are therefore a deliberate non-projecting success: the notification is
+acknowledged, no fact is written and the publication completes. Treating them as
+failures would create publications that can never succeed; inventing analytical
+meaning for them would put semantics in the fact contract that no analytical
+purpose asked for. Admitting one later is an explicit change here and in the
+analytical vocabulary.
 
-Only after that evidence exists may ADR-0014 become TESTED. Following the
-ADR-0011 to ADR-0013 precedent, the documentation-only promotion commit is not
-itself the reviewed implementation checkpoint and remains subject to its own
-gates.
+**Recovery.**
+
+Recovery is explicit and uses the framework's own
+`org.springframework.modulith.events.FailedEventPublications.resubmit(ResubmissionOptions)`,
+implemented by `PersistentApplicationEventMulticaster`. Automatic republication
+on restart stays disabled. No custom scheduler, recovery table, retry queue or
+outbox exists.
+
+**Residual conditions.**
+
+Issue #31 remains the authoritative acceptance specification. Required GitHub
+workflows on the exact candidate HEAD and final review with no unresolved
+irregularity remain governance conditions outside this document.
 
 ## References
 
