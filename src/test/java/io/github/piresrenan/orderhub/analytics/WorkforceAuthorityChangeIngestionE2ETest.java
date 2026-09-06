@@ -28,6 +28,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 import io.github.piresrenan.orderhub.OrderHubApplication;
 import io.github.piresrenan.orderhub.analytics.adapter.in.event.spring.WorkforceAuthorityChangeAuditRecordedListener;
@@ -44,6 +45,7 @@ import io.github.piresrenan.orderhub.workforce.application.model.WorkforceAuditA
 import io.github.piresrenan.orderhub.workforce.application.model.WorkforceAuditEvidence;
 import io.github.piresrenan.orderhub.workforce.application.model.WorkforceAuditOutcome;
 import io.github.piresrenan.orderhub.workforce.application.model.WorkforceAuditState;
+import io.github.piresrenan.orderhub.workforce.application.model.WorkforceAuthorityChangeAuditRecorded;
 import io.github.piresrenan.orderhub.workforce.application.service.AuditedWorkforceMutationService;
 import io.github.piresrenan.orderhub.workforce.application.service.PrivilegedPositionChangeExecutionService;
 import io.github.piresrenan.orderhub.workforce.domain.model.StaffStatus;
@@ -584,6 +586,91 @@ class WorkforceAuthorityChangeIngestionE2ETest {
                             "ignored",
                             "failed");
         }
+    }
+
+    @Test
+    void projectionThatDoesNotCommitIsNotCountedAsASuccess() {
+        // Why: the listener transaction commits after the listener method
+        // returns, so a projection that completed its statements can still be
+        // rolled back — by a lost connection at commit, for instance. Counting
+        // when the method returns would report a durable projection that does
+        // not exist, and the publication would still be outstanding.
+        // Covers: the projection result being recorded from the transaction's
+        // actual completion rather than from the method returning.
+        // Prevents: monitoring showing a successful projection for a fact that
+        // was never durably written.
+        //
+        // The listener is invoked directly inside a transaction this test rolls
+        // back, so the statements succeed and only the outcome of the
+        // transaction differs.
+
+        var fixture =
+                createFixture();
+
+        var auditEventId =
+                UUID.randomUUID();
+
+        privilegedPositionChangeService.execute(
+                appliedCommand(
+                        fixture,
+                        auditEventId));
+
+        awaitSingleFact(
+                fixture.tenantId(),
+                auditEventId);
+
+        var meterRegistry =
+                new SimpleMeterRegistry();
+
+        var listener =
+                new WorkforceAuthorityChangeAuditRecordedListener(
+                        projectionService,
+                        meterRegistry);
+
+        new TransactionTemplate(
+                transactionManager)
+                .executeWithoutResult(status -> {
+
+                    listener.onWorkforceAuthorityChangeAuditRecorded(
+                            new WorkforceAuthorityChangeAuditRecorded(
+                                    fixture.tenantId(),
+                                    auditEventId));
+
+                    status.setRollbackOnly();
+                });
+
+        assertThat(
+                counted(
+                        meterRegistry,
+                        "projected"))
+                .as("A projection whose transaction rolled back must not be"
+                        + " counted as projected")
+                .isZero();
+
+        assertThat(
+                counted(
+                        meterRegistry,
+                        "failed"))
+                .as("The rolled-back projection must be counted as failed,"
+                        + " because that is what the durable state shows")
+                .isEqualTo(1.0);
+    }
+
+    private double counted(
+            MeterRegistry meterRegistry,
+            String result) {
+
+        var counter =
+                meterRegistry.find(
+                                WorkforceAuthorityChangeAuditRecordedListener
+                                        .PROJECTION_METRIC)
+                        .tag(
+                                WorkforceAuthorityChangeAuditRecordedListener
+                                        .RESULT_TAG,
+                                result)
+                        .counter();
+
+        return counter == null ? 0.0 : counter.count();
     }
 
     /**

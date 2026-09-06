@@ -5,6 +5,7 @@ import java.util.UUID;
 
 import io.github.piresrenan.orderhub.analytics.application.port.out.AnalyticalSubjectPseudonymRepository;
 import io.github.piresrenan.orderhub.analytics.application.port.out.WorkforceAuthorityChangeFactRepository;
+import io.github.piresrenan.orderhub.analytics.domain.model.AnalyticalSubjectKey;
 import io.github.piresrenan.orderhub.analytics.domain.model.WorkforceAuthorityChangeAction;
 import io.github.piresrenan.orderhub.analytics.domain.model.WorkforceAuthorityChangeFact;
 import io.github.piresrenan.orderhub.analytics.domain.model.WorkforceAuthorityChangeOutcome;
@@ -113,22 +114,18 @@ public final class WorkforceAuthorityChangeProjectionService {
             return WorkforceAuthorityChangeProjectionResult.IGNORED;
         }
 
-        var actorSubject =
-                pseudonymRepository.resolveOrCreate(
+        var subjects =
+                resolveSubjectsInStableOrder(
                         source.tenantId(),
-                        source.actorStaffId());
-
-        var affectedSubject =
-                pseudonymRepository.resolveOrCreate(
-                        source.tenantId(),
+                        source.actorStaffId(),
                         source.affectedStaffId());
 
         factRepository.append(
                 new WorkforceAuthorityChangeFact(
                         source.auditEventId(),
                         source.tenantId(),
-                        actorSubject,
-                        affectedSubject,
+                        subjects.actorSubject(),
+                        subjects.affectedSubject(),
                         analyticalAction.get(),
                         analyticalOutcome(
                                 source.outcome()),
@@ -136,6 +133,84 @@ public final class WorkforceAuthorityChangeProjectionService {
                         source.occurredAt()));
 
         return WorkforceAuthorityChangeProjectionResult.PROJECTED;
+    }
+
+    /**
+     * Resolves both analytical subjects, always visiting the operational
+     * identifiers in the same global order.
+     *
+     * <p>
+     * Establishing a mapping locks its row until the surrounding transaction
+     * resolves. Two concurrent first-time projections with reversed subjects —
+     * one where A acted on B, another where B acted on A — would otherwise take
+     * those locks in opposite orders and deadlock, and PostgreSQL would abort
+     * one of them. Ordering by the operational identifier makes both callers
+     * acquire the same rows in the same sequence, so one simply waits for the
+     * other.
+     * </p>
+     *
+     * <p>
+     * Only consistency matters, not which identifier sorts first. The natural
+     * ordering of {@link UUID} is a total order and is therefore sufficient,
+     * even though it compares the bit halves as signed values and so is not the
+     * textual order.
+     * </p>
+     *
+     * <p>
+     * The order is a lock-acquisition detail only. Which key belongs to the
+     * actor and which to the affected subject is restored before the fact is
+     * built, so the projected fact is identical either way.
+     * </p>
+     */
+    private ResolvedSubjects resolveSubjectsInStableOrder(
+            UUID tenantId,
+            UUID actorStaffId,
+            UUID affectedStaffId) {
+
+        if (actorStaffId.equals(affectedStaffId)) {
+
+            var single =
+                    pseudonymRepository.resolveOrCreate(
+                            tenantId,
+                            actorStaffId);
+
+            return new ResolvedSubjects(
+                    single,
+                    single);
+        }
+
+        var actorSortsFirst =
+                actorStaffId.compareTo(
+                        affectedStaffId) < 0;
+
+        var firstStaffId =
+                actorSortsFirst ? actorStaffId : affectedStaffId;
+
+        var secondStaffId =
+                actorSortsFirst ? affectedStaffId : actorStaffId;
+
+        var firstSubject =
+                pseudonymRepository.resolveOrCreate(
+                        tenantId,
+                        firstStaffId);
+
+        var secondSubject =
+                pseudonymRepository.resolveOrCreate(
+                        tenantId,
+                        secondStaffId);
+
+        return actorSortsFirst
+                ? new ResolvedSubjects(
+                        firstSubject,
+                        secondSubject)
+                : new ResolvedSubjects(
+                        secondSubject,
+                        firstSubject);
+    }
+
+    private record ResolvedSubjects(
+            AnalyticalSubjectKey actorSubject,
+            AnalyticalSubjectKey affectedSubject) {
     }
 
     /**

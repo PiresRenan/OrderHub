@@ -1,6 +1,10 @@
 package io.github.piresrenan.orderhub.analytics.adapter.in.event.spring;
 
+import java.util.concurrent.atomic.AtomicReference;
+
 import org.springframework.modulith.events.ApplicationModuleListener;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import io.micrometer.core.instrument.MeterRegistry;
 
@@ -88,10 +92,26 @@ public class WorkforceAuthorityChangeAuditRecordedListener {
      * complete the publication and permanently lose the projection, so the
      * measurement deliberately observes the failure without altering it.
      * </p>
+     *
+     * <p>
+     * The result is recorded when the listener transaction completes, not when
+     * this method returns. Commit happens after the method returns, so counting
+     * here would report a successful projection for a transaction that then
+     * failed to commit and left the fact absent and the publication
+     * outstanding. Deferring keeps the metric describing durable outcomes.
+     * </p>
      */
     @ApplicationModuleListener(id = LISTENER_ID)
     public void onWorkforceAuthorityChangeAuditRecorded(
             WorkforceAuthorityChangeAuditRecorded notification) {
+
+        var outcome =
+                new AtomicReference<>(
+                        FAILED_RESULT);
+
+        var deferred =
+                countWhenTransactionCompletes(
+                        outcome);
 
         final WorkforceAuthorityChangeProjectionResult result;
 
@@ -102,15 +122,60 @@ public class WorkforceAuthorityChangeAuditRecordedListener {
                             notification.auditEventId());
 
         } catch (RuntimeException failure) {
-            count(FAILED_RESULT);
+
+            if (!deferred) {
+                count(FAILED_RESULT);
+            }
 
             throw failure;
         }
 
-        count(
+        outcome.set(
                 result == WorkforceAuthorityChangeProjectionResult.PROJECTED
                         ? PROJECTED_RESULT
                         : IGNORED_RESULT);
+
+        if (!deferred) {
+            count(outcome.get());
+        }
+    }
+
+    /**
+     * Arranges for the outcome to be counted once the surrounding transaction
+     * has actually resolved.
+     *
+     * <p>
+     * A rollback for any reason, including a failure raised during commit
+     * itself, is reported as a failed projection, because that is what the
+     * durable state will show.
+     * </p>
+     *
+     * @return whether counting was deferred; when no transaction is active the
+     *         caller counts directly instead
+     */
+    private boolean countWhenTransactionCompletes(
+            AtomicReference<String> outcome) {
+
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return false;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+
+                    @Override
+                    public void afterCompletion(
+                            int status) {
+
+                        count(
+                                status == TransactionSynchronization
+                                        .STATUS_COMMITTED
+                                        ? outcome.get()
+                                        : FAILED_RESULT);
+                    }
+                });
+
+        return true;
     }
 
     /**
