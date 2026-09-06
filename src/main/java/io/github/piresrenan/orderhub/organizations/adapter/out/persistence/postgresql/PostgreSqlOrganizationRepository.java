@@ -1,5 +1,6 @@
 package io.github.piresrenan.orderhub.organizations.adapter.out.persistence.postgresql;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -30,6 +31,12 @@ public final class PostgreSqlOrganizationRepository
                 status
             FROM organizations.organizations
             WHERE id = ?
+            """;
+
+    private static final String FIND_ALL_SQL = """
+            SELECT id, name, status
+            FROM organizations.organizations
+            ORDER BY name, id
             """;
 
     private final JdbcTemplate jdbcTemplate;
@@ -93,6 +100,20 @@ public final class PostgreSqlOrganizationRepository
 
             throw new OrganizationPersistenceException(
                     exception);
+        }
+    }
+
+    @Override
+    public List<Organization> findAll() {
+        try {
+            return jdbcTemplate.query(
+                    FIND_ALL_SQL,
+                    (resultSet, rowNumber) -> Organization.rehydrate(
+                            resultSet.getObject("id", UUID.class),
+                            resultSet.getString("name"),
+                            OrganizationStatus.valueOf(resultSet.getString("status"))));
+        } catch (DataAccessException exception) {
+            throw new OrganizationPersistenceException(exception);
         }
     }
 }

@@ -1,5 +1,6 @@
 package io.github.piresrenan.orderhub.organizations.application.port.out;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -12,4 +13,6 @@ public interface OrganizationRepository {
 
     Optional<Organization> findById(
             UUID organizationId);
+
+    List<Organization> findAll();
 }

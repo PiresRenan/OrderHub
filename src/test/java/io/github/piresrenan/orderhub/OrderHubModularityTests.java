@@ -90,7 +90,7 @@ class OrderHubModularityTests {
     }
 
     @Test
-    void declaresOrganizationsAsClosedModuleWithNoDependencies() {
+    void declaresOrganizationsAsClosedModuleWithNarrowAdministrationDependencies() {
 
         var modules =
                 ApplicationModules.of(
@@ -124,10 +124,10 @@ class OrderHubModularityTests {
                         ApplicationModule.Type.CLOSED);
 
         assertThat(declaration.allowedDependencies())
-                .as(
-                        "The domain-only Organizations checkpoint"
-                                + " must permit no cross-module dependency")
-                .isEmpty();
+                .containsExactlyInAnyOrder(
+                        "authorization::administration",
+                        "tenants::administration",
+                        "users::api");
 
         assertThat(
                 organizations
@@ -135,9 +135,9 @@ class OrderHubModularityTests {
                                 modules)
                         .isEmpty())
                 .as(
-                        "Spring Modulith must resolve no explicitly"
-                                + " allowed Organizations dependency")
-                .isTrue();
+                        "Spring Modulith must resolve the explicitly"
+                                + " allowed Organizations dependencies")
+                .isFalse();
 
         assertThat(organizations.isOpen())
                 .as(

@@ -57,8 +57,7 @@ migrations through V23.
 Introduce `organizations` as the business module that owns Organization identity,
 Organization lifecycle and Organization/Tenant placement.
 
-Introduce `administration` later as a thin control-plane adapter only when an
-executable HTTP use case requires it. It does not own Organization, Tenant,
+Introduce `administration` as a thin control-plane HTTP adapter. It does not own Organization, Tenant,
 identity, grant or authorization persistence.
 
 Keep:
@@ -595,7 +594,7 @@ evidence and transaction orchestration for that mutation. This preserves
 modularity and avoids forcing Organization/Tenant/Authorization persistence
 through a shared audit module merely to obtain atomicity.
 
-The first executable proof is administrative grant mutation in `authorization`.
+The first executable proof was administrative grant mutation in `authorization`.
 
 V28 creates append-only:
 
@@ -657,15 +656,17 @@ than a false repeated transition.
 
 No `REQUIRES_NEW` or autonomous audit transaction is introduced.
 
-The audited grant mutation coordinator remains internal to `authorization`; it is
-not part of `authorization::administration` yet. A public privileged grant
-management use case remains blocked until target existence/privacy,
-authorization ordering and anti-enumeration are composed around this atomic
-primitive.
+The audited grant mutation coordinator remains internal to `authorization`.
+`authorization::administration` exposes only a narrow mutation input contract;
+Organization-owned orchestration performs authorization and privacy-safe target
+validation before invoking it.
 
-Organization lifecycle/placement and Tenant lifecycle will apply the same
-owner-local transaction/evidence rule when their privileged application
-orchestration is introduced.
+V29 and V30 add owner-local append-only evidence for Organization lifecycle,
+Organization/Tenant placement, and Tenant lifecycle respectively. Their
+repositories participate in caller-owned REQUIRED transactions. PostgreSQL
+integration tests prove that audit failure rolls back Organization create,
+Tenant create and placement mutation; lifecycle operations use the same
+transaction executors and repository propagation.
 
 ## Observability
 
@@ -798,8 +799,10 @@ V28 creates only authorization-owned administrative grant audit evidence. It
 does not add a second grant store, a cross-module foreign key, a broker or an
 autonomous transaction mechanism.
 
-The next potential migration number after this checkpoint is V29, but it is not
-authorized until another semantic RED proves additional schema state is required.
+Executable migration REDs demonstrated the missing owner-local evidence state.
+V29 creates `organizations.administrative_audit_events`; V30 creates
+`tenants.administrative_audit_events`. Both are append-only, bounded, contain no
+cross-module foreign keys and are the final OH-017 migrations.
 
 ## Initial implementation evidence
 
@@ -827,18 +830,26 @@ OH-017 reconciled checkpoint:
 
 The aggregate OH-017 patch remained byte-equivalent through the rebase.
 
-At that checkpoint:
+At the final implementation gate before documentation promotion:
 
 ```text
-972 tests
+1147 tests
 0 failures
 0 errors
 0 skipped
 ```
 
-Spring Modulith detected `organizations`, but explicit module dependency metadata
-had not yet been established. That missing R07 evidence remains part of this
-DESIGNED phase.
+Spring Modulith verifies the closed `administration`, `organizations`, `tenants`,
+`authorization`, `security` and `users` boundaries. The thin HTTP module consumes
+only named application interfaces, and Organizations consumes no foreign
+persistence contract.
+
+The complete HTTP surface, anti-enumeration ordering, bounded Tenant metadata,
+sanitized RFC 9457 Problem Details, exact administrative authorization,
+idempotent lifecycle/placement/grant behavior, owner-local audit atomicity and
+the existing PostgreSQL concurrency suites are executable and green. The ADR
+remains DESIGNED only until the published implementation checkpoint completes
+its exact-HEAD CI/review gate.
 
 ## Verification required before TESTED
 

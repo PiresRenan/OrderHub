@@ -8,6 +8,10 @@
  * </p>
  */
 @org.springframework.modulith.ApplicationModule(
-        allowedDependencies = {}
+        allowedDependencies = {
+                "authorization::administration",
+                "tenants::administration",
+                "users::api"
+        }
 )
 package io.github.piresrenan.orderhub.organizations;

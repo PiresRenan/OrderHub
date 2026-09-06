@@ -1,6 +1,7 @@
 package io.github.piresrenan.orderhub.organizations.adapter.out.persistence.postgresql;
 
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.dao.DataAccessException;
@@ -53,6 +54,13 @@ public final class PostgreSqlOrganizationTenantPlacementRepository
                 organization_id
             FROM organizations.tenant_placements
             WHERE tenant_id = ?
+            """;
+
+    private static final String FIND_TENANTS_BY_ORGANIZATION_SQL = """
+            SELECT tenant_id
+            FROM organizations.tenant_placements
+            WHERE organization_id = ?
+            ORDER BY tenant_id
             """;
 
     private final JdbcTemplate jdbcTemplate;
@@ -183,6 +191,19 @@ public final class PostgreSqlOrganizationTenantPlacementRepository
 
             throw new OrganizationPersistenceException(
                     exception);
+        }
+    }
+
+    @Override
+    public List<UUID> findTenantIdsByOrganizationId(UUID organizationId) {
+        validateRequiredId(organizationId, "Organization id is required");
+        try {
+            return jdbcTemplate.query(
+                    FIND_TENANTS_BY_ORGANIZATION_SQL,
+                    (resultSet, rowNumber) -> resultSet.getObject("tenant_id", UUID.class),
+                    organizationId);
+        } catch (DataAccessException exception) {
+            throw new OrganizationPersistenceException(exception);
         }
     }
 

@@ -12,6 +12,7 @@ import io.github.piresrenan.orderhub.authorization.adapter.out.persistence.postg
 import io.github.piresrenan.orderhub.authorization.adapter.out.transaction.spring.SpringAuthorizationTransactionExecutor;
 import io.github.piresrenan.orderhub.authorization.application.port.in.AuthorizeCustomerOwnedResourceActionUseCase;
 import io.github.piresrenan.orderhub.authorization.application.port.in.administration.AuthorizeAdministrativeActionUseCase;
+import io.github.piresrenan.orderhub.authorization.application.port.in.administration.MutateAdministrativeGrantUseCase;
 import io.github.piresrenan.orderhub.authorization.application.port.out.AdministrativeGrantAuditRepository;
 import io.github.piresrenan.orderhub.authorization.application.port.out.AdministrativeGrantRepository;
 import io.github.piresrenan.orderhub.authorization.application.port.out.AuthorizationTransactionExecutor;
@@ -63,6 +64,26 @@ public class AuthorizationConfiguration {
                 grants,
                 audit,
                 UUID::randomUUID);
+    }
+
+    @Bean
+    MutateAdministrativeGrantUseCase mutateAdministrativeGrantUseCase(
+            AuditedAdministrativeGrantMutationService service) {
+        return new MutateAdministrativeGrantUseCase() {
+            @Override
+            public void grant(UUID actorUserId,
+                    io.github.piresrenan.orderhub.authorization.domain.model.AdministrativeGrant grant,
+                    UUID correlationId) {
+                service.grant(actorUserId, grant, correlationId);
+            }
+
+            @Override
+            public void revoke(UUID actorUserId,
+                    io.github.piresrenan.orderhub.authorization.domain.model.AdministrativeGrant grant,
+                    UUID correlationId) {
+                service.revoke(actorUserId, grant, correlationId);
+            }
+        };
     }
 
     @Bean
