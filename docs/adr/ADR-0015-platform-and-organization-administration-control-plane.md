@@ -129,8 +129,29 @@ SUSPENDED
 A suspended Tenant remains durable and administratively remediable but is not a
 valid Tenant workspace.
 
-Security must eventually resolve Tenant operational state through a narrow Tenant
-application/named interface. It must not query Tenant persistence directly.
+Security resolves Tenant operational state exclusively through the Tenants-owned
+Spring Modulith Named Interface:
+
+```text
+tenants::operational
+```
+
+That boundary exposes only a bounded query, operational-state vocabulary and a
+sanitized technical-unavailability failure. It does not expose `Tenant`,
+`TenantStatus`, Tenant repositories, JDBC or PostgreSQL types.
+
+Trusted Tenant resolution is deliberately ordered:
+
+```text
+authenticated User
+-> exact TenantMembership
+-> Tenant operational-state lookup
+-> ACTIVE only
+-> TrustedTenantContext
+```
+
+Missing membership short-circuits before Tenant-state lookup. Missing or
+SUSPENDED Tenant state creates no trusted Tenant context.
 
 Technical failure to establish Tenant operational state is technical uncertainty,
 not a false policy denial:

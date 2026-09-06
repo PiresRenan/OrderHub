@@ -8,9 +8,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import io.github.piresrenan.orderhub.tenants.adapter.out.persistence.postgresql.PostgreSqlTenantRepository;
 import io.github.piresrenan.orderhub.tenants.application.port.in.CreateTenantUseCase;
+import io.github.piresrenan.orderhub.tenants.application.port.in.operational.FindTenantOperationalStateUseCase;
 import io.github.piresrenan.orderhub.tenants.application.port.out.TenantIdGenerator;
 import io.github.piresrenan.orderhub.tenants.application.port.out.TenantRepository;
 import io.github.piresrenan.orderhub.tenants.application.service.CreateTenantService;
+import io.github.piresrenan.orderhub.tenants.application.service.FindTenantOperationalStateService;
 
 @Configuration(proxyBeanMethods = false)
 public class TenantsConfiguration {
@@ -69,5 +71,19 @@ public class TenantsConfiguration {
         return new CreateTenantService(
                 tenantRepository,
                 tenantIdGenerator);
+    }
+
+    /**
+     * Exposes the bounded Tenant operational-state application contract.
+     *
+     * @param tenantRepository Tenant-owned durable source of operational state
+     * @return operational-state lookup boundary
+     */
+    @Bean
+    FindTenantOperationalStateUseCase findTenantOperationalStateUseCase(
+            TenantRepository tenantRepository) {
+
+        return new FindTenantOperationalStateService(
+                tenantRepository);
     }
 }

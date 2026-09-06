@@ -22,6 +22,7 @@ import io.github.piresrenan.orderhub.security.application.port.in.ResolveAuthent
 import io.github.piresrenan.orderhub.security.application.port.in.ResolveTrustedTenantContextUseCase;
 import io.github.piresrenan.orderhub.security.application.service.ResolveAuthenticatedUserService;
 import io.github.piresrenan.orderhub.security.application.service.ResolveTrustedTenantContextService;
+import io.github.piresrenan.orderhub.tenants.application.port.in.operational.FindTenantOperationalStateUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.FindTenantMembershipUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityUseCase;
 
@@ -56,22 +57,24 @@ public class SecurityConfiguration {
     }
 
     /**
-     * Composes trusted Tenant-context derivation from the Users-owned membership
-     * lookup boundary.
+     * Composes trusted Tenant-context derivation from exact membership and
+     * Tenant-owned operational state.
      *
-     * <p>Security consumes only the Users application input contract. Membership
-     * presence is interpreted by the Security application service and Users
-     * domain or persistence types are not exposed across this module boundary.
+     * <p>Security consumes only module-owned application contracts. The Tenant
+     * aggregate and Tenant persistence internals never cross this boundary.
      *
      * @param memberships Users-owned Tenant membership lookup boundary
+     * @param tenantOperationalStates Tenants-owned operational-state boundary
      * @return trusted Tenant-context resolution use case
      */
     @Bean
     ResolveTrustedTenantContextUseCase resolveTrustedTenantContextUseCase(
-            FindTenantMembershipUseCase memberships) {
+            FindTenantMembershipUseCase memberships,
+            FindTenantOperationalStateUseCase tenantOperationalStates) {
 
         return new ResolveTrustedTenantContextService(
-                memberships);
+                memberships,
+                tenantOperationalStates);
     }
     /**
      * Creates the servlet adapter that derives trusted Tenant context from the

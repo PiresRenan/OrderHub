@@ -8,6 +8,8 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import io.github.piresrenan.orderhub.security.adapter.in.authentication.jwt.JwtResourceServerProperties;
 import io.github.piresrenan.orderhub.users.application.port.in.FindTenantMembershipUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityUseCase;
+import io.github.piresrenan.orderhub.tenants.application.port.in.operational.FindTenantOperationalStateUseCase;
+import io.github.piresrenan.orderhub.tenants.application.port.in.operational.TenantOperationalState;
 
 class SecurityConfigurationPropertiesBindingTest {
 
@@ -24,6 +26,11 @@ class SecurityConfigurationPropertiesBindingTest {
             new ApplicationContextRunner()
                     .withUserConfiguration(
                             SecurityConfiguration.class)
+                .withBean(
+                        FindTenantOperationalStateUseCase.class,
+                        () -> query ->
+                                java.util.Optional.of(
+                                        TenantOperationalState.ACTIVE))
                     .withBean(
                             ResolveExternalIdentityUseCase.class,
                             () -> query -> {

@@ -23,6 +23,7 @@ import io.github.piresrenan.orderhub.security.application.model.AuthenticatedUse
 import io.github.piresrenan.orderhub.security.application.model.TrustedTenantContext;
 import io.github.piresrenan.orderhub.security.application.port.in.ResolveTrustedTenantContextQuery;
 import io.github.piresrenan.orderhub.security.application.port.in.ResolveTrustedTenantContextUseCase;
+import io.github.piresrenan.orderhub.tenants.application.port.in.operational.TenantOperationalStateUnavailableException;
 
 class TrustedTenantContextArgumentResolverTest {
 
@@ -243,6 +244,42 @@ class TrustedTenantContextArgumentResolverTest {
                 });
     }
 
+    @Test
+    void propagatesTenantOperationalStateTechnicalFailureWithoutConvertingToAccessDenied() {
+
+        var userId =
+                UUID.randomUUID();
+
+        var tenantId =
+                UUID.randomUUID();
+
+        var technicalFailure =
+                new TenantOperationalStateUnavailableException(
+                        new IllegalStateException(
+                                "synthetic-internal-detail"));
+
+        ResolveTrustedTenantContextUseCase trustedTenants =
+                query -> {
+                    throw technicalFailure;
+                };
+
+        var resolver =
+                new TrustedTenantContextArgumentResolver(
+                        trustedTenants);
+
+        assertThatThrownBy(() ->
+                resolver.resolveArgument(
+                        trustedTenantParameter(),
+                        null,
+                        authenticatedRequest(
+                                userId,
+                                tenantId.toString()),
+                        null))
+                .isSameAs(
+                        technicalFailure)
+                .isNotInstanceOf(
+                        AccessDeniedException.class);
+    }
     @Test
     void failsClosedWhenInternalAuthenticatedPrincipalIsUnavailable() {
         // Why: TrustedTenantContext may only originate after successful
