@@ -2,15 +2,13 @@ package io.github.piresrenan.orderhub.authorization.domain.model;
 
 import org.springframework.modulith.NamedInterface;
 
-/**
- * Framework-neutral result of an authorization policy evaluation.
- */
 @NamedInterface({
-    "customer-owned-resource",
+    "policy-model",
     "administration"
 })
-public enum AuthorizationDecision {
+public enum AdministrativeScopeType {
 
-    ALLOW,
-    DENY
+    PLATFORM,
+    ORGANIZATION,
+    TENANT
 }

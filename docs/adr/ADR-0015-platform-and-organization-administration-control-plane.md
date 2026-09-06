@@ -165,9 +165,9 @@ fail closed
 
 ## Administrative scope
 
-Administrative scope is distinct from persona and permission.
+Administrative scope is distinct from Tenant persona and permission.
 
-Initial scope semantics are:
+The concrete scope vocabulary is now:
 
 ```text
 PLATFORM
@@ -175,62 +175,137 @@ ORGANIZATION(organizationId)
 TENANT(tenantId)
 ```
 
-Scope expresses where an administrative permission may be exercised.
+`PLATFORM` carries no scoped resource UUID. `ORGANIZATION` and `TENANT` require
+one immutable opaque UUID.
 
-It does not itself grant permission.
+Scope is only a jurisdiction coordinate. It grants no permission and creates no
+hierarchical permission inheritance.
+
+In particular:
+
+```text
+PLATFORM grant
+!= implicit ORGANIZATION grant
+!= implicit TENANT grant
+```
 
 ## Persona / capacity
 
-The current authorization kernel contains `STAFF` and `CUSTOMER`.
+The existing Tenant authorization personas remain:
 
-OH-017 does not add `PLATFORM_ADMIN`, `ORGANIZATION_ADMIN` or another persona
-merely to encode a role name.
+```text
+STAFF
+CUSTOMER
+```
 
-It also does not yet assert that all Platform/Organization administrative
-permissions are necessarily `STAFF` permissions.
+OH-017 deliberately does not add `PLATFORM_ADMIN`, `ORGANIZATION_ADMIN` or
+another fake Tenant persona.
 
-The exact compatibility between an authenticated actor capacity and future
-upper-scope administrative permissions must be established by executable
-authorization evidence before the shared authorization model changes.
+`PermissionCode` now has two mutually exclusive compatibility dimensions:
 
-Whatever representation is selected must preserve these invariants:
+```text
+Tenant permission
+    -> supported AuthorizationPersona
+    -> no administrative scope classification
 
-- authentication alone never grants administrative authority;
-- upper scope is not represented as a higher Tenant workforce AuthorityBand;
-- Platform/Organization authority does not manufacture TenantMembership or
-   StaffProfile;
-- CUSTOMER authority never leaks into administrative permission;
-- permission/scope/capacity compatibility fails closed.
+Administrative permission
+    -> supported AdministrativeScopeType
+    -> no Tenant persona classification
+```
+
+This preserves the distinction between Tenant workforce/customer capacity and
+upper control-plane authority. Administrative capability is established by an
+authenticated internal User plus an exact durable administrative grant for the
+required scope and permission.
+
+`CUSTOMER` permissions therefore cannot become administrative authority, and an
+administrative permission cannot masquerade as `STAFF`.
 
 ## Administrative grants
 
-Upper-scope authority is represented by explicit durable grants, not JWT claims
-and not hierarchy alone.
-
-The intended bounded relation is equivalent to:
+Upper-scope authority is represented by an explicit durable relation:
 
 ```text
 internal User
-+ administrative scope
++ AdministrativeScope
 + bounded PermissionCode
 ```
 
-Required structural compatibility includes:
+V27 persists the relation in:
 
-- Platform permission cannot be persisted at Organization scope;
-- Organization permission cannot be persisted at Platform scope;
-- Tenant business permission is not automatically an administrative grant;
-- incompatible actor capacity is rejected;
-- external provider/JWT claims cannot materialize durable Platform or
-   Organization authority.
+```text
+access_control.administrative_grants
+```
 
-The exact persistence representation is deferred until its PostgreSQL RED.
+The table stores an internal persistence UUID plus:
+
+```text
+user_id
+scope_type
+scope_id
+permission_code
+created_at
+```
+
+Platform scope requires `scope_id IS NULL`; Organization/Tenant scopes require a
+non-null opaque scope UUID.
+
+Grant identity is unique across:
+
+```text
+user_id
+scope_type
+scope_id
+permission_code
+```
+
+using PostgreSQL `UNIQUE NULLS NOT DISTINCT`, so Platform grants retain one
+natural idempotency identity even though their scoped UUID is null.
+
+No foreign key reaches into `users`, `organizations` or `tenants`. Cross-module
+target existence remains an application-contract responsibility rather than
+relational coupling.
+
+PostgreSQL enforces permission/scope compatibility. A Platform permission cannot
+be persisted at Organization scope, an Organization permission cannot be
+persisted at Platform scope, and Tenant business permissions cannot be stored as
+administrative grants.
+
+The grant repository provides concurrency-safe idempotent persistence primitives:
+
+```text
+grant
+    GRANTED | ALREADY_GRANTED
+
+revoke
+    REVOKED | ALREADY_ABSENT
+```
+
+These mutation primitives are not yet exposed as privileged control-plane
+commands. Grant-management application orchestration remains blocked on the
+required same-transaction administrative audit evidence.
+
+Administrative authorization itself is read-only and exact-grant based and
+reuses the kernel's existing framework-neutral `AuthorizationDecision` rather
+than introducing a second ALLOW/DENY vocabulary:
+
+```text
+required AdministrativeGrant exists -> ALLOW
+otherwise                           -> DENY
+```
+
+No scope hierarchy is traversed. Authorization persistence failure propagates as
+technical uncertainty and is never converted into a false policy `DENY`.
+
+The Spring Modulith named boundary for the read decision is:
+
+```text
+authorization::administration
+```
 
 ## Permission vocabulary
 
-Administrative permission names remain system-owned and bounded.
-
-The issue currently requires capabilities equivalent to:
+The system-owned administrative permission surface is now exactly:
 
 Platform:
 
@@ -247,10 +322,24 @@ Organization:
 ORGANIZATION_TENANTS_VIEW
 ```
 
-Names may be refined only with compatible executable contracts.
+No wildcard such as `PLATFORM_ALL` or generic `ORGANIZATION_ADMIN` exists.
 
-No wildcard such as `PLATFORM_ALL` or generic `ORGANIZATION_ADMIN` is introduced
-for convenience.
+V27 evolves `access_control.permissions` without creating a second permission
+registry. Exactly one classification is valid for each permission row:
+
+```text
+persona != null              + administrative_scope == null
+or
+persona == null              + administrative_scope != null
+```
+
+The existing Tenant role-permission compatibility trigger rejects administrative
+permissions because they have no Tenant persona. V27 additionally prevents an
+administrative permission from being persisted as a Tenant user permission
+override.
+
+Permission persona classification remains immutable, and V27 adds immutable
+administrative-scope classification.
 
 ## Organization lifecycle persistence and concurrency
 
@@ -612,12 +701,28 @@ The migration structurally enforces one parent per Tenant through the
 `tenant_id` primary key and deliberately creates no foreign key into Tenant-owned
 persistence.
 
-Organization lifecycle desired-state persistence requires no V27: V25 already
-owns the bounded `ACTIVE | SUSPENDED` status column, and V26 owns only placement.
+Organization lifecycle desired-state persistence itself required no migration
+beyond the V25 lifecycle column and V26 placement relation.
 
-The next potential migration number after this checkpoint remains V27, but it is
-not authorized until another semantic RED proves additional schema state is
-required.
+V27 is now justified by executable administrative authorization evidence. The
+pre-V27 permission registry required every permission to carry a Tenant persona
+and had no durable upper-scope grant relation, so it could not represent OH-017
+administrative authority without falsely modeling Platform/Organization
+permissions as Tenant `STAFF`.
+
+V27 therefore:
+
+- evolves the single `access_control.permissions` registry so exactly one of
+  Tenant persona or administrative scope classifies each permission;
+- registers the five bounded administrative permission codes required by OH-017;
+- creates `access_control.administrative_grants`;
+- enforces administrative permission/scope compatibility in PostgreSQL;
+- prevents administrative permissions from entering Tenant permission
+  overrides;
+- creates no foreign key into User, Organization or Tenant-owned schemas.
+
+The next potential migration number after this checkpoint is V28, but it is not
+authorized until another semantic RED proves additional schema state is required.
 
 ## Initial implementation evidence
 

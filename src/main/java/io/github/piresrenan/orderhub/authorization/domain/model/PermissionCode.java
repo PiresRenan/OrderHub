@@ -3,14 +3,18 @@ package io.github.piresrenan.orderhub.authorization.domain.model;
 import org.springframework.modulith.NamedInterface;
 
 /**
- * System-owned atomic business authorization vocabulary.
+ * System-owned atomic business and administrative authorization vocabulary.
  *
  * <p>
- * Tenants may later compose these permissions into constrained custom roles,
- * but cannot invent new executable permission codes.
+ * Tenant-persona permissions and administrative permissions are deliberately
+ * classified through different dimensions. An upper-scope permission never
+ * becomes a STAFF permission merely because it is privileged.
  * </p>
  */
-@NamedInterface("policy-model")
+@NamedInterface({
+    "policy-model",
+    "administration"
+})
 public enum PermissionCode {
 
     TENANT_MEMBERS_VIEW(AuthorizationPersona.STAFF),
@@ -36,19 +40,51 @@ public enum PermissionCode {
     CUSTOMER_ORDERS_VIEW(AuthorizationPersona.CUSTOMER),
     CUSTOMER_ORDERS_CREATE(AuthorizationPersona.CUSTOMER),
 
-    AUDIT_VIEW(AuthorizationPersona.STAFF);
+    AUDIT_VIEW(AuthorizationPersona.STAFF),
+
+    PLATFORM_ORGANIZATIONS_VIEW(AdministrativeScopeType.PLATFORM),
+    PLATFORM_ORGANIZATIONS_MANAGE(AdministrativeScopeType.PLATFORM),
+    PLATFORM_TENANTS_MANAGE(AdministrativeScopeType.PLATFORM),
+    PLATFORM_ORGANIZATION_GRANTS_MANAGE(AdministrativeScopeType.PLATFORM),
+
+    ORGANIZATION_TENANTS_VIEW(AdministrativeScopeType.ORGANIZATION);
 
     private final AuthorizationPersona supportedPersona;
+    private final AdministrativeScopeType supportedAdministrativeScope;
 
     PermissionCode(
             AuthorizationPersona supportedPersona) {
 
+        if (supportedPersona == null) {
+            throw new IllegalArgumentException(
+                    "Supported authorization persona is required");
+        }
+
         this.supportedPersona =
                 supportedPersona;
+
+        this.supportedAdministrativeScope =
+                null;
+    }
+
+    PermissionCode(
+            AdministrativeScopeType supportedAdministrativeScope) {
+
+        if (supportedAdministrativeScope == null) {
+            throw new IllegalArgumentException(
+                    "Supported administrative scope is required");
+        }
+
+        this.supportedPersona =
+                null;
+
+        this.supportedAdministrativeScope =
+                supportedAdministrativeScope;
     }
 
     /**
-     * Reports whether the current permission is meaningful for one persona.
+     * Reports whether the current permission is meaningful for one Tenant
+     * authorization persona.
      *
      * @param persona authorization persona
      * @return true when this permission may participate in that persona policy
@@ -63,5 +99,23 @@ public enum PermissionCode {
 
         return supportedPersona
                 == persona;
+    }
+
+    public boolean isAdministrative() {
+
+        return supportedAdministrativeScope
+                != null;
+    }
+
+    public boolean supportsAdministrativeScope(
+            AdministrativeScopeType scopeType) {
+
+        if (scopeType == null) {
+            throw new IllegalArgumentException(
+                    "Administrative scope type is required");
+        }
+
+        return supportedAdministrativeScope
+                == scopeType;
     }
 }
