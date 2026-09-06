@@ -1,4 +1,4 @@
-# OrderHub Engineering Roadmap
+﻿# OrderHub Engineering Roadmap
 
 This roadmap records the current engineering direction for OrderHub after OH-012.
 It is an architectural planning baseline, not a promise to introduce a technology
@@ -433,6 +433,55 @@ The Inventory Policy administration requirement identified after OH-012 is
 preserved here explicitly; it is a consumer of the authorization foundation,
 not a substitute for it.
 
+## Operational data lifecycle and housekeeping - planned
+
+Status: PLANNED / DISCOVERY REQUIRED - explicitly outside OH-017 implementation
+scope.
+
+OrderHub should eventually provide a bounded, owner-driven operational data
+lifecycle capability to prevent unbounded growth of ephemeral and derived state
+without weakening replay, audit, authorization or domain correctness.
+
+This direction is intentionally broader and more precise than a generic
+"garbage collector". The owning module decides whether a record is purgeable,
+archivable or still authoritative; a future housekeeping capability may
+orchestrate execution but must not invent retention semantics for foreign data.
+
+Initial candidate classes include only datasets with a proven lifecycle need,
+such as:
+
+- completed Spring Modulith event-publication records;
+- durable idempotency records after an explicitly defined contractual retention
+  window;
+- analytical facts/projections after retention and replay semantics explicitly
+  prevent deleted data from being resurrected;
+- other ephemeral or derived operational records admitted by an owner-defined
+  retention policy.
+
+Required engineering principles for any future implementation include:
+
+- retention/purge eligibility owned by the module that owns the data;
+- bounded batch size and bounded execution time;
+- index-supported selection rather than unbounded table scans/deletes;
+- idempotent and retry-safe execution;
+- multi-instance correctness without relying on JVM-local locking;
+- transactional chunk boundaries appropriate to each dataset;
+- observability for duration, outcome, purged/archive counts and last successful
+  execution without high-cardinality identifiers;
+- explicit interaction with replay/recovery semantics;
+- no deletion of authoritative business state or privileged audit evidence based
+  on age alone;
+- no replacement of PostgreSQL autovacuum/ANALYZE responsibilities;
+- no new broker, distributed scheduler or storage technology without measured
+  need.
+
+JVM garbage-collector selection/tuning is a separate runtime-performance concern
+and remains evidence-driven through heap, allocation, pause, CPU and container
+memory telemetry. It is not implemented as part of this roadmap item.
+
+No housekeeping scheduler, retention deletion, archive mechanism or new
+infrastructure is introduced by OH-017. This entry records future engineering
+intent only.
 ## Identity provisioning and account lifecycle — planned
 
 Authenticated internal identity already supports durable external identity
