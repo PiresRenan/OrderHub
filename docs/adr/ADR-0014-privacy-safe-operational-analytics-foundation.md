@@ -1,6 +1,6 @@
 # ADR-0014 — Privacy-Safe Operational Analytics Foundation
 
-Status: DESIGNED
+Status: TESTED
 
 ## Context
 
@@ -20,9 +20,8 @@ while minimizing unnecessary personal-data processing.
 
 OH-016 therefore establishes the durable analytical boundaries first, and commits
 to a transport for operational evidence only once evidence supports choosing one.
-That transport is selected and implemented, and the evidence recorded at the end
-of this document is executable. The decision stays DESIGNED until a reviewed
-implementation checkpoint carries no unresolved finding.
+That transport is selected, implemented and executably proven against a reviewed
+implementation checkpoint carrying no unresolved review finding.
 
 ## Decision
 
@@ -149,8 +148,7 @@ introduced.
 
 ## Workforce-to-analytics ingestion decision
 
-Status of this section: **SELECTED AND IMPLEMENTED; PENDING REVIEWED
-IMPLEMENTATION CHECKPOINT.**
+Status of this section: **SELECTED, IMPLEMENTED AND EXECUTABLY PROVEN.**
 
 The first workforce-to-analytics ingestion uses Spring Modulith's persistent JDBC
 Event Publication Registry.
@@ -404,11 +402,23 @@ introduced implicitly while completing OH-016.
 
 ## Executable evidence
 
-This matrix records the evidence that exists. It is not yet a promotion: this
-decision remains DESIGNED until an implementation checkpoint passes local
-verification, the required workflows and review with no unresolved finding.
+**TESTED against implementation checkpoint
+`d63d6a362379a303de1c02d3982420fdd524c033`.**
 
-The mechanism is exercised by executable tests against a real PostgreSQL database
+That checkpoint carries:
+
+| Gate | Result |
+| --- | --- |
+| Local `mvnw clean verify` | BUILD SUCCESS — 957 tests, 0 failures, 0 errors, 0 skipped |
+| Spring Modulith verification | 10 tests green across four module-contract classes |
+| Flyway from an empty PostgreSQL 18.6 database | reaches `v23` |
+| Branch Policy | SUCCESS |
+| CI | SUCCESS |
+| Platform CI | SUCCESS |
+| Codex review on that exact SHA | no findings |
+| Unresolved review threads | none |
+
+The mechanism is proven by executable tests against a real PostgreSQL database
 migrated from empty through `V23`, the real Spring Modulith 2.1.1 JDBC Event
 Publication Registry, the real workforce services and the real analytics
 listener. Only analytical fact persistence can be made to fail on demand, by a
@@ -507,11 +517,34 @@ Until one of those is chosen, retention stays unwired and the interaction stays
 unreachable. This is recorded as a precondition rather than resolved, because
 resolving it silently would decide the retention window as a side effect.
 
+**Review history.**
+
+The reviewed path to this checkpoint corrected three real defects rather than
+only accumulating evidence, and each correction carries its own executable
+proof:
+
+- restart recovery was not deployable. Republication on restart was disabled
+  while the only resubmission path was reachable from a test, so a crash between
+  commit and projection could lose a fact permanently. Corrected by enabling
+  startup republication and proving it across two application lifecycles;
+- concurrent first-time projections with reversed subjects could deadlock on the
+  subject mapping rows. Corrected by resolving both mappings in one global
+  order;
+- the projection metric was recorded before the listener transaction committed,
+  so a transaction that failed at commit reported a successful projection.
+  Corrected by recording the result from transaction completion.
+
+A fourth finding, the interaction between analytical retention and durable
+replay, is recorded above as a binding precondition on wiring retention rather
+than resolved, because retention is not instantiated in this slice and every
+remedy would decide something this ADR defers. Review of the checkpoint accepted
+that boundary.
+
 **Residual conditions.**
 
-Issue #31 remains the authoritative acceptance specification. Required GitHub
-workflows on the exact candidate HEAD and final review with no unresolved
-irregularity remain governance conditions outside this document.
+Issue #31 remains the authoritative acceptance specification. Merge into the
+integration branch remains an explicit maintainer decision outside this
+document.
 
 ## References
 

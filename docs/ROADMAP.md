@@ -303,7 +303,7 @@ the same internal User.
 
 ### OH-016 — Privacy-safe operational analytics foundation
 
-Status: IN PROGRESS — issue #31 and ADR-0014 `DESIGNED`; initially developed in
+Status: COMPLETE — issue #31 and ADR-0014 `TESTED`; initially developed in
 parallel from the integrated OH-014 baseline and synchronized on 2026-09-04 with
 post-OH-015 `pre-release@db7004a0df6035fa4c4fb886b4e383f4ae967f89` through merge
 checkpoint `5b15baac4f0bdfc65253889eb705b7b9ac987c2f`.
