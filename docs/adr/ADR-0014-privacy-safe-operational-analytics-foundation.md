@@ -477,6 +477,36 @@ publication left `FAILED` by a projection failure is republished on the next
 startup. No custom scheduler, recovery table, retry queue, administrative
 endpoint or outbox exists.
 
+**Binding precondition on enabling retention.**
+
+Analytical retention is deliberately not wired in this slice: no policy catalog,
+retention service or purge schedule is instantiated, because the effective
+window is a legal and business decision this ADR does not fix.
+
+Review raised a real interaction that becomes reachable the moment it is wired.
+A purge deletes an expired fact by occurrence time; if a publication for that
+same source event is still outstanding, a later replay recreates the fact with
+its original `occurred_at`. Retention is not extended — the deadline is
+unchanged and the next purge removes it again — but the row is present again
+after its deadline, for up to one purge cycle.
+
+Wiring retention therefore requires resolving that interaction first, and each
+available remedy carries a decision this slice must not make implicitly:
+
+- refusing to project a source that is already past its retention deadline
+  requires fixing the retention window now, which is exactly the decision
+  deferred above;
+- keeping a retained idempotency marker requires a new relation that stores
+  `source_event_id` beyond the fact's own lifetime, which is itself a privacy
+  cost and a new migration;
+- having retention also complete the outstanding publication would make
+  analytics operate the shared integration registry, crossing a boundary this
+  ADR forbids.
+
+Until one of those is chosen, retention stays unwired and the interaction stays
+unreachable. This is recorded as a precondition rather than resolved, because
+resolving it silently would decide the retention window as a side effect.
+
 **Residual conditions.**
 
 Issue #31 remains the authoritative acceptance specification. Required GitHub
