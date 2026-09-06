@@ -123,6 +123,17 @@
             <artifactId>spring-modulith-starter-core</artifactId>
         </dependency>
 
+        <!--
+            Spring Modulith JDBC event publication registry: durable
+            publication log for transactional event listeners, persisted in
+            PostgreSQL. Version stays governed by the Spring Modulith BOM
+            above.
+        -->
+        <dependency>
+            <groupId>org.springframework.modulith</groupId>
+            <artifactId>spring-modulith-starter-jdbc</artifactId>
+        </dependency>
+
         <!-- ==============================================================
              4. PERSISTENCE
              JDBC access, schema versioning and the database driver.

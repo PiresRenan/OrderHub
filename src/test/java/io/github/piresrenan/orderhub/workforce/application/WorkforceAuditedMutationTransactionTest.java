@@ -24,8 +24,10 @@ import io.github.piresrenan.orderhub.workforce.application.model.WorkforceAuditO
 import io.github.piresrenan.orderhub.workforce.application.model.WorkforceAuditState;
 import io.github.piresrenan.orderhub.workforce.application.port.out.WorkforceAuditPersistenceException;
 import io.github.piresrenan.orderhub.workforce.application.port.out.WorkforceAuditRepository;
+import io.github.piresrenan.orderhub.workforce.application.port.out.WorkforceAuthorityChangeAuditNotificationPublisher;
 import io.github.piresrenan.orderhub.workforce.application.port.out.WorkforceTransactionExecutor;
 import io.github.piresrenan.orderhub.workforce.application.service.AuditedWorkforceMutationService;
+import io.github.piresrenan.orderhub.workforce.application.service.WorkforceAuditRecorder;
 import io.github.piresrenan.orderhub.workforce.domain.model.StaffStatus;
 import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
 
@@ -82,7 +84,7 @@ class WorkforceAuditedMutationTransactionTest {
     }
 
     @Test
-    void serviceExecutesMutationBeforeAuditInsideOneExecutorInvocation() {
+    void serviceExecutesMutationThenAuditThenNotificationInsideOneExecutorInvocation() {
 
         var executions = new AtomicInteger();
         var order = new ArrayList<String>();
@@ -101,10 +103,15 @@ class WorkforceAuditedMutationTransactionTest {
         WorkforceAuditRepository repository =
                 evidence -> order.add("audit");
 
+        WorkforceAuthorityChangeAuditNotificationPublisher publisher =
+                notification -> order.add("notification");
+
         var service =
                 new AuditedWorkforceMutationService(
                         executor,
-                        repository);
+                        new WorkforceAuditRecorder(
+                                repository,
+                                publisher));
 
         service.execute(
                 () -> order.add("mutation"),
@@ -117,9 +124,13 @@ class WorkforceAuditedMutationTransactionTest {
                 .isEqualTo(1);
 
         assertThat(order)
+                .as("the announcement references an operational audit event, so"
+                        + " it must follow the mutation and the append it"
+                        + " describes")
                 .containsExactly(
                         "mutation",
-                        "audit");
+                        "audit",
+                        "notification");
     }
 
     @Test
