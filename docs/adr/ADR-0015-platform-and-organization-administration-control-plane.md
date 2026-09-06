@@ -252,6 +252,59 @@ Names may be refined only with compatible executable contracts.
 No wildcard such as `PLATFORM_ALL` or generic `ORGANIZATION_ADMIN` is introduced
 for convenience.
 
+## Organization lifecycle persistence and concurrency
+
+Organization lifecycle desired-state persistence reuses the `status` column
+introduced by V25. No new schema state is required.
+
+Lifecycle mutation is not implemented by converting aggregate `save()` into an
+upsert. Creation/read persistence and lifecycle mutation remain distinct so a
+stale aggregate cannot silently overwrite an authoritative lifecycle decision.
+
+The lifecycle persistence port accepts only:
+
+```text
+Organization id
++
+desired OrganizationStatus
+```
+
+and returns a bounded outcome:
+
+```text
+UPDATED
+ALREADY_DESIRED
+NOT_FOUND
+```
+
+The PostgreSQL adapter executes inside an adapter-owned Spring
+`TransactionTemplate` and locks the Organization row using:
+
+```sql
+SELECT status
+FROM organizations.organizations
+WHERE id = ?
+FOR NO KEY UPDATE
+```
+
+`FOR NO KEY UPDATE` is deliberately selected instead of the stronger
+`FOR UPDATE`: lifecycle changes modify no key used by the Organization placement
+foreign key, while this lock is still mutually incompatible with the placement
+adapter's `FOR SHARE` lock.
+
+Executable PostgreSQL evidence proves both directions of the lifecycle/placement
+race:
+
+- a placement-style `FOR SHARE` lock keeps an Organization ACTIVE/stable through
+  the placement transaction and blocks concurrent lifecycle mutation;
+- a lifecycle writer lock blocks placement validation until commit, after which
+  placement observes the committed SUSPENDED state rather than stale ACTIVE;
+- real concurrent suspend/attach execution produces only serializable valid
+  outcomes: attach commits while ACTIVE before suspension, or attach is rejected
+  after suspension wins.
+
+Suspension does not cascade-detach existing Tenants. Automatic lifecycle
+cascades remain explicitly deferred.
 ## Organization/Tenant placement
 
 A Tenant is:
@@ -365,10 +418,9 @@ Executable PostgreSQL concurrency evidence now proves:
 - stale detach rejection;
 - concurrent move versus expected detach cannot remove a completed newer move.
 
-The dedicated race between destination lifecycle mutation and placement remains a
-required later executable proof when Organization lifecycle persistence gains its
-own authoritative write path. No synthetic lifecycle write path is introduced
-only to manufacture that test early.
+The destination lifecycle/placement race is now closed by the authoritative
+lifecycle persistence path and executable PostgreSQL lock-conflict evidence
+described above. No JVM-local synchronization participates in correctness.
 
 No generic locking framework is introduced.
 
@@ -560,8 +612,12 @@ The migration structurally enforces one parent per Tenant through the
 `tenant_id` primary key and deliberately creates no foreign key into Tenant-owned
 persistence.
 
-The next potential migration number after this checkpoint is V27, but it is not
-authorized until another semantic RED proves additional schema state is required.
+Organization lifecycle desired-state persistence requires no V27: V25 already
+owns the bounded `ACTIVE | SUSPENDED` status column, and V26 owns only placement.
+
+The next potential migration number after this checkpoint remains V27, but it is
+not authorized until another semantic RED proves additional schema state is
+required.
 
 ## Initial implementation evidence
 
