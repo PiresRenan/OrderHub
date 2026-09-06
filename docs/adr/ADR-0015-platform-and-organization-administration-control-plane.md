@@ -587,16 +587,85 @@ Public responses must not expose:
 
 ## Privileged audit evidence
 
-Every privileged mutation introduced by OH-017 must persist bounded
-append-oriented evidence in the same authoritative transaction.
+Privileged audit is owner-local rather than a centralized cross-module mutation
+service.
 
-Audit persistence failure aborts the mutation.
+The module that owns an authoritative privileged mutation also owns the audit
+evidence and transaction orchestration for that mutation. This preserves
+modularity and avoids forcing Organization/Tenant/Authorization persistence
+through a shared audit module merely to obtain atomicity.
 
-No autonomous `REQUIRES_NEW` audit transaction is introduced to preserve
-evidence for a mutation that may later roll back.
+The first executable proof is administrative grant mutation in `authorization`.
 
-Evidence excludes credentials, tokens, arbitrary request/response bodies, raw
-exception text and unnecessary personal data.
+V28 creates append-only:
+
+```text
+access_control.administrative_grant_audit_events
+```
+
+with bounded evidence only:
+
+```text
+auditEventId
+actorUserId
+targetUserId
+administrative scope
+permission code
+GRANT_PERMISSION | REVOKE_PERMISSION
+APPLIED | NO_CHANGE
+correlationId
+beforeGranted
+afterGranted
+database-owned occurredAt
+```
+
+The database structurally proves:
+
+- scope shape is valid;
+- only the bounded OH-017 administrative permission vocabulary is accepted;
+- permission and scope are compatible;
+- GRANT evidence ends granted;
+- REVOKE evidence ends absent;
+- `APPLIED` means state changed;
+- `NO_CHANGE` means state did not change;
+- audit rows are append-only;
+- no foreign key points to mutable User, Organization, Tenant or grant rows.
+
+The audit repository deliberately owns no independent transaction.
+
+`AuditedAdministrativeGrantMutationService` uses an authorization-owned
+transaction executor and executes:
+
+```text
+grant/revoke mutation
+-> append bounded audit evidence
+-> commit together
+```
+
+Executable PostgreSQL evidence proves both rollback directions:
+
+```text
+grant succeeds + audit append fails
+-> grant rolls back
+
+revoke succeeds + audit append fails
+-> revoke rolls back
+```
+
+Idempotent repeated grant/revoke commands persist `NO_CHANGE` evidence rather
+than a false repeated transition.
+
+No `REQUIRES_NEW` or autonomous audit transaction is introduced.
+
+The audited grant mutation coordinator remains internal to `authorization`; it is
+not part of `authorization::administration` yet. A public privileged grant
+management use case remains blocked until target existence/privacy,
+authorization ordering and anti-enumeration are composed around this atomic
+primitive.
+
+Organization lifecycle/placement and Tenant lifecycle will apply the same
+owner-local transaction/evidence rule when their privileged application
+orchestration is introduced.
 
 ## Observability
 
@@ -721,7 +790,15 @@ V27 therefore:
   overrides;
 - creates no foreign key into User, Organization or Tenant-owned schemas.
 
-The next potential migration number after this checkpoint is V28, but it is not
+V28 is now justified by executable privileged-audit evidence. The V27 grant
+relation has no append-oriented historical evidence table, so audit atomicity
+cannot be proven without new durable state.
+
+V28 creates only authorization-owned administrative grant audit evidence. It
+does not add a second grant store, a cross-module foreign key, a broker or an
+autonomous transaction mechanism.
+
+The next potential migration number after this checkpoint is V29, but it is not
 authorized until another semantic RED proves additional schema state is required.
 
 ## Initial implementation evidence
