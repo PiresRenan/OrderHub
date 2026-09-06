@@ -350,8 +350,9 @@ Direction:
 
 ### OH-017 — Platform and Organization administration
 
-Status: IN PROGRESS — issue #33 and ADR-0015 `DESIGNED`; branch reconciled onto
-integrated OH-016 baseline
+Status: COMPLETE — issue #33 and ADR-0015 `TESTED`; implementation checkpoint
+`a1b0f4bb73fb866dbfc648ed33620df65ff4a1bc` passed `branch-policy`, `ci-build`
+and `platform-validation` on PR #35 against integrated OH-016 baseline
 `pre-release@d4beb38d0d03f0b016e12ff7766c2117d0fad42d`.
 
 `Organization` is the canonical multi-Tenant business grouping for this slice;

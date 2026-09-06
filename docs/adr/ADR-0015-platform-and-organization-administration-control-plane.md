@@ -1,6 +1,6 @@
 # ADR-0015 — Platform and Organization Administration Control Plane
 
-Status: DESIGNED
+Status: TESTED
 
 ## Context
 
@@ -847,14 +847,21 @@ persistence contract.
 The complete HTTP surface, anti-enumeration ordering, bounded Tenant metadata,
 sanitized RFC 9457 Problem Details, exact administrative authorization,
 idempotent lifecycle/placement/grant behavior, owner-local audit atomicity and
-the existing PostgreSQL concurrency suites are executable and green. The ADR
-remains DESIGNED only until the published implementation checkpoint completes
-its exact-HEAD CI/review gate.
+the existing PostgreSQL concurrency suites are executable and green.
 
-## Verification required before TESTED
+The reviewed implementation checkpoint is:
 
-ADR-0015 remains `DESIGNED` until reviewed executable evidence proves the
-complete OH-017 scope.
+```text
+a1b0f4bb73fb866dbfc648ed33620df65ff4a1bc
+```
+
+GitHub PR #35 verified that exact checkpoint with successful `branch-policy`,
+`ci-build` and `platform-validation` workflows and no unresolved review finding.
+
+## Verification evidence for TESTED
+
+ADR-0015 is `TESTED` because reviewed executable evidence proves the complete
+OH-017 scope.
 
 At minimum that includes:
 
@@ -881,11 +888,9 @@ At minimum that includes:
 - required GitHub workflows on the exact implementation checkpoint;
 - final review with no unresolved valid finding.
 
-Only after the reviewed executable implementation checkpoint passes those gates
-may ADR-0015 be promoted from `DESIGNED` to `TESTED`.
-
-That promotion must be a separate documentation-only checkpoint and receives its
-own final workflow/review gates.
+The reviewed executable implementation checkpoint passed every gate above. This
+separate documentation-only promotion records that evidence and receives its own
+final workflow/review gates before merge.
 
 ## Explicitly deferred
 
