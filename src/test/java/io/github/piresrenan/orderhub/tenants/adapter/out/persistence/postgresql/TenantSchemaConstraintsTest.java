@@ -257,9 +257,10 @@ class TenantSchemaConstraintsTest {
         jdbcTemplate.update("""
                 INSERT INTO tenants.tenants (
                     id,
-                    name
+                    name,
+                    status
                 )
-                VALUES (?, ?)
+                VALUES (?, ?, 'ACTIVE')
                 """,
                 tenantId,
                 name);

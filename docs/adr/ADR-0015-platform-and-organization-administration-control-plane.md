@@ -439,23 +439,40 @@ Organizations must not import foreign persistence internals.
 
 ## Migration authority
 
-The reconciled baseline contains accepted migrations through V23.
+The reconciled OH-017 baseline originally contained accepted migrations through
+V23.
 
 V19 and V20 remain intentionally absent and are not reusable merely to make the
 sequence contiguous.
 
-The next potential migration number is V24.
+V24 is now justified by executable OH-017 evidence: Tenant operational lifecycle
+cannot remain an in-memory state because Tenant is already persisted and
+rehydrated through PostgreSQL.
 
-V24 is not authorized by this ADR alone.
+V24 therefore establishes the durable Tenant operational-state invariant:
 
-It becomes justified only when a semantic RED proves persistence/schema state is
-required for the next OH-017 invariant.
+```text
+tenants.tenants.status
+    NOT NULL
+    ACTIVE | SUSPENDED
+```
+
+Existing pre-V24 Tenant rows are migrated to `ACTIVE`.
+
+The migration intentionally leaves no column default after upgrade so future
+
+persistence paths must supply aggregate operational state explicitly.
 
 Accepted historical migrations remain immutable.
 
 Flyway out-of-order remains prohibited.
 
+The next potential migration number after this checkpoint is V25, but it is not
+
+authorized until another semantic RED proves new schema state is required.
+
 ## Initial implementation evidence
+
 
 Before this ADR was materialized, OH-017 already established executable domain
 evidence for:
