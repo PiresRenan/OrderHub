@@ -348,10 +348,15 @@ Direction:
 
 ## S3 — Hierarchical Administration
 
-### OH-017 — Platform and Network / Organization administration
+### OH-017 — Platform and Organization administration
 
-Status: PLANNED — depends on the scoped authorization model and concrete
-organizational requirements.
+Status: IN PROGRESS — issue #33 and ADR-0015 `DESIGNED`; branch reconciled onto
+integrated OH-016 baseline
+`pre-release@d4beb38d0d03f0b016e12ff7766c2117d0fad42d`.
+
+`Organization` is the canonical multi-Tenant business grouping for this slice;
+`Network` is not introduced as a second aggregate without an independent
+requirement.
 
 OrderHub is expected to support three administrative experiences without
 requiring three independently secured backends:

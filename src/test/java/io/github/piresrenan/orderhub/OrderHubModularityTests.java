@@ -3,96 +3,160 @@ package io.github.piresrenan.orderhub;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.modulith.ApplicationModule;
 import org.springframework.modulith.core.ApplicationModules;
 
 class OrderHubModularityTests {
 
-        /**
-         * Verifies the structural rules enforced across every detected application
-         * module.
-         */
-        @Test
-        void verifiesApplicationModuleBoundaries() {
-                // Why: architectural violations often compile and survive normal unit tests.
-                // Covers: module cycles and illegal access to module internals.
-                // Prevents: gradual erosion of the intended modular/hexagonal architecture.
+    private static final String ORGANIZATIONS_PACKAGE_INFO =
+            "io.github.piresrenan.orderhub.organizations.package-info";
 
-                ApplicationModules
-                                .of(OrderHubApplication.class)
-                                .verify();
+    @Test
+    void verifiesApplicationModuleBoundaries() {
+
+        ApplicationModules
+                .of(OrderHubApplication.class)
+                .verify();
+    }
+
+    @Test
+    void detectsOrdersTenantsAndUsersAsApplicationModules() {
+
+        var modules =
+                ApplicationModules.of(
+                        OrderHubApplication.class);
+
+        var ordersModule =
+                modules.getModuleByName(
+                        "orders");
+
+        var tenantsModule =
+                modules.getModuleByName(
+                        "tenants");
+
+        var usersModule =
+                modules.getModuleByName(
+                        "users");
+
+        assertThat(ordersModule)
+                .as(
+                        "Orders must be detected"
+                                + " as an application module")
+                .isPresent();
+
+        assertThat(tenantsModule)
+                .as(
+                        "Tenants must be detected"
+                                + " as an application module")
+                .isPresent();
+
+        assertThat(usersModule)
+                .as(
+                        "Users must be detected"
+                                + " as an application module")
+                .isPresent();
+
+        var orders =
+                ordersModule.orElseThrow();
+
+        var tenants =
+                tenantsModule.orElseThrow();
+
+        var users =
+                usersModule.orElseThrow();
+
+        assertThat(orders)
+                .isNotSameAs(tenants)
+                .isNotSameAs(users);
+
+        assertThat(tenants)
+                .isNotSameAs(users);
+    }
+
+    @Test
+    void detectsOrganizationsAsApplicationModule() {
+
+        var modules =
+                ApplicationModules.of(
+                        OrderHubApplication.class);
+
+        assertThat(
+                modules.getModuleByName(
+                        "organizations"))
+                .as(
+                        "Organizations must be detected"
+                                + " as an application module")
+                .isPresent();
+    }
+
+    @Test
+    void declaresOrganizationsAsClosedModuleWithNoDependencies() {
+
+        var modules =
+                ApplicationModules.of(
+                        OrderHubApplication.class);
+
+        var organizations =
+                modules.getModuleByName(
+                                "organizations")
+                        .orElseThrow();
+
+        var packageInfoType =
+                loadOrganizationsPackageInfo();
+
+        var declaration =
+                packageInfoType
+                        .getPackage()
+                        .getAnnotation(
+                                ApplicationModule.class);
+
+        assertThat(declaration)
+                .as(
+                        "Organizations must explicitly declare"
+                                + " its root-package module contract")
+                .isNotNull();
+
+        assertThat(declaration.type())
+                .as(
+                        "Organizations must remain"
+                                + " a closed application module")
+                .isEqualTo(
+                        ApplicationModule.Type.CLOSED);
+
+        assertThat(declaration.allowedDependencies())
+                .as(
+                        "The domain-only Organizations checkpoint"
+                                + " must permit no cross-module dependency")
+                .isEmpty();
+
+        assertThat(
+                organizations
+                        .getAllowedDependencies(
+                                modules)
+                        .isEmpty())
+                .as(
+                        "Spring Modulith must resolve no explicitly"
+                                + " allowed Organizations dependency")
+                .isTrue();
+
+        assertThat(organizations.isOpen())
+                .as(
+                        "Organizations must not be"
+                                + " an open application module")
+                .isFalse();
+    }
+
+    private static Class<?> loadOrganizationsPackageInfo() {
+
+        try {
+            return Class.forName(
+                    ORGANIZATIONS_PACKAGE_INFO);
         }
-
-        /**
-         * Verifies that the expected top-level business capabilities are recognized
-         * as independent Spring Modulith application modules.
-         */
-        @Test
-        void detectsOrdersTenantsAndUsersAsApplicationModules() {
-                // Why: package organization alone does not prove that Spring Modulith
-                // recognizes each business capability as an independent application module.
-                // Covers: explicit discovery and distinct identity of Orders, Tenants and
-                // Users module roots.
-                // Prevents: structural refactoring silently collapsing or excluding an
-                // intended module boundary.
-
-                var modules = ApplicationModules.of(
-                                OrderHubApplication.class);
-
-                var ordersModule = modules.getModuleByName(
-                                "orders");
-
-                var tenantsModule = modules.getModuleByName(
-                                "tenants");
-
-                var usersModule = modules.getModuleByName(
-                                "users");
-
-                assertThat(ordersModule)
-                                .as("Orders must be detected as an application module")
-                                .isPresent();
-
-                assertThat(tenantsModule)
-                                .as("Tenants must be detected as an application module")
-                                .isPresent();
-
-                assertThat(usersModule)
-                                .as("Users must be detected as an application module")
-                                .isPresent();
-
-                var orders = ordersModule.orElseThrow();
-                var tenants = tenantsModule.orElseThrow();
-                var users = usersModule.orElseThrow();
-
-                assertThat(orders)
-                                .isNotSameAs(tenants)
-                                .isNotSameAs(users);
-
-                assertThat(tenants)
-                                .isNotSameAs(users);
+        catch (ClassNotFoundException exception) {
+            throw new AssertionError(
+                    "Organizations must explicitly declare"
+                            + " package-level module metadata",
+                    exception);
         }
-        /**
-         * Verifies that Organizations remains a distinct top-level application
-         * module as its domain grows beyond the initial aggregate bootstrap.
-         */
-        @Test
-        void detectsOrganizationsAsApplicationModule() {
-                // Why: Organizations already lives at a Spring Modulith module
-                // root by package structure; this locks that architectural fact
-                // explicitly rather than relying on incidental discovery.
-                // Covers: Organizations module detection and module identity.
-                // Prevents: future package refactoring silently absorbing or
-                // excluding Organizations from the modular model.
-
-                var modules = ApplicationModules.of(
-                                OrderHubApplication.class);
-
-                var organizationsModule = modules.getModuleByName(
-                                "organizations");
-
-                assertThat(organizationsModule)
-                                .as(
-                                                "Organizations must be detected"
-                                                                + " as an application module")
-                                .isPresent();
-        }
+    }
 }

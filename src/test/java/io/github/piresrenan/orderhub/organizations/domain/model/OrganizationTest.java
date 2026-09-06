@@ -1,6 +1,7 @@
 package io.github.piresrenan.orderhub.organizations.domain.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
+
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.UUID;
@@ -9,255 +10,212 @@ import org.junit.jupiter.api.Test;
 
 class OrganizationTest {
 
-    @Test
-    void createsActiveOrganizationWithCanonicalName() {
+@Test
+void createsActiveOrganizationWithCanonicalName() {
 
-        var id = UUID.randomUUID();
+    var id = UUID.randomUUID();
 
-        var organization = Organization.create(
-                id,
-                "  Acme Retail  ");
+    var organization = Organization.create(
+            id,
+            "  Acme Retail  ");
 
-        assertThat(organization.id())
-                .isEqualTo(id);
+    assertThat(organization.id())
+            .isEqualTo(id);
 
-        assertThat(organization.name())
-                .isEqualTo("Acme Retail");
+    assertThat(organization.name())
+            .isEqualTo("Acme Retail");
 
-        assertThat(organization.status())
-                .isEqualTo(OrganizationStatus.ACTIVE);
-    }
+    assertThat(organization.status())
+            .isEqualTo(OrganizationStatus.ACTIVE);
+}
 
-    @Test
-    void rejectsMissingOrganizationIdentity() {
+@Test
+void rejectsMissingOrganizationIdentity() {
 
-        var exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> Organization.create(
-                        null,
-                        "Acme Retail"));
+    var exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> Organization.create(
+                    null,
+                    "Acme Retail"));
 
-        assertThat(exception)
-                .hasMessage("Organization id is required");
-    }
+    assertThat(exception)
+            .hasMessage("Organization id is required");
+}
 
-    @Test
-    void rejectsMissingOrganizationName() {
+@Test
+void rejectsMissingOrganizationName() {
 
-        var exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> Organization.create(
-                        UUID.randomUUID(),
-                        null));
+    var exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> Organization.create(
+                    UUID.randomUUID(),
+                    null));
 
-        assertThat(exception)
-                .hasMessage("Organization name is required");
-    }
+    assertThat(exception)
+            .hasMessage("Organization name is required");
+}
 
-    @Test
-    void rejectsBlankOrganizationName() {
+@Test
+void rejectsBlankOrganizationName() {
 
-        var exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> Organization.create(
-                        UUID.randomUUID(),
-                        "   "));
+    var exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> Organization.create(
+                    UUID.randomUUID(),
+                    "   "));
 
-        assertThat(exception)
-                .hasMessage("Organization name must not be blank");
-    }
+    assertThat(exception)
+            .hasMessage("Organization name must not be blank");
+}
 
-    @Test
-    void acceptsOrganizationNameAt120CodePointBoundary() {
+@Test
+void acceptsOrganizationNameAt120CodePointBoundary() {
 
-        var boundaryName =
-                "A".repeat(119) + "\uD83D\uDE00";
+    var boundaryName =
+            "A".repeat(119) + "\uD83D\uDE00";
 
-        assertThat(boundaryName.codePointCount(
-                0,
-                boundaryName.length()))
-                .isEqualTo(120);
+    assertThat(boundaryName.codePointCount(
+            0,
+            boundaryName.length()))
+            .isEqualTo(120);
 
-        assertThat(boundaryName.length())
-                .isEqualTo(121);
+    assertThat(boundaryName.length())
+            .isEqualTo(121);
 
-        var organization = Organization.create(
-                UUID.randomUUID(),
-                boundaryName);
+    var organization = Organization.create(
+            UUID.randomUUID(),
+            boundaryName);
 
-        assertThat(organization.name())
-                .isEqualTo(boundaryName);
-    }
+    assertThat(organization.name())
+            .isEqualTo(boundaryName);
+}
 
-    @Test
-    void rejectsOrganizationNameAbove120CodePointBoundary() {
+@Test
+void rejectsOrganizationNameAbove120CodePointBoundary() {
 
-        var tooLongName =
-                "A".repeat(120) + "\uD83D\uDE00";
+    var tooLongName =
+            "A".repeat(120) + "\uD83D\uDE00";
 
-        assertThat(tooLongName.codePointCount(
-                0,
-                tooLongName.length()))
-                .isEqualTo(121);
+    assertThat(tooLongName.codePointCount(
+            0,
+            tooLongName.length()))
+            .isEqualTo(121);
 
-        assertThat(tooLongName.length())
-                .isEqualTo(122);
+    assertThat(tooLongName.length())
+            .isEqualTo(122);
 
-        var exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> Organization.create(
-                        UUID.randomUUID(),
-                        tooLongName));
+    var exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> Organization.create(
+                    UUID.randomUUID(),
+                    tooLongName));
 
-        assertThat(exception)
-                .hasMessage(
-                        "Organization name must not exceed 120 characters");
-    }
-    @Test
-    void rehydratesPersistedOrganizationState() {
+    assertThat(exception)
+            .hasMessage(
+                    "Organization name must not exceed 120 characters");
+}
 
-        var id = UUID.randomUUID();
+@Test
+void rehydratesPersistedOrganizationState() {
 
-        var organization = Organization.rehydrate(
-                id,
-                "Acme Retail",
-                OrganizationStatus.ACTIVE);
+    var id = UUID.randomUUID();
 
-        assertThat(organization.id())
-                .isEqualTo(id);
+    var organization = Organization.rehydrate(
+            id,
+            "Acme Retail",
+            OrganizationStatus.ACTIVE);
 
-        assertThat(organization.name())
-                .isEqualTo("Acme Retail");
+    assertThat(organization.id())
+            .isEqualTo(id);
 
-        assertThat(organization.status())
-                .isEqualTo(OrganizationStatus.ACTIVE);
-    }
+    assertThat(organization.name())
+            .isEqualTo("Acme Retail");
 
-    @Test
-    void rehydrationRejectsInvalidPersistedOrganizationState() {
+    assertThat(organization.status())
+            .isEqualTo(OrganizationStatus.ACTIVE);
+}
 
-        var exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> Organization.rehydrate(
-                        UUID.randomUUID(),
-                        "   ",
-                        OrganizationStatus.ACTIVE));
+@Test
+void rehydrationRejectsInvalidPersistedOrganizationState() {
 
-        assertThat(exception)
-                .hasMessage("Organization name must not be blank");
-    }
+    var exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> Organization.rehydrate(
+                    UUID.randomUUID(),
+                    "   ",
+                    OrganizationStatus.ACTIVE));
 
-    @Test
-    void rehydrationRejectsNonNormalizedPersistedOrganizationName() {
+    assertThat(exception)
+            .hasMessage("Organization name must not be blank");
+}
 
-        var exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> Organization.rehydrate(
-                        UUID.randomUUID(),
-                        "  Acme Retail  ",
-                        OrganizationStatus.ACTIVE));
+@Test
+void rehydrationRejectsNonNormalizedPersistedOrganizationName() {
 
-        assertThat(exception)
-                .hasMessage(
-                        "Persisted organization name must be normalized");
-    }
+    var exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> Organization.rehydrate(
+                    UUID.randomUUID(),
+                    "  Acme Retail  ",
+                    OrganizationStatus.ACTIVE));
 
-    @Test
-    void rehydrationRejectsMissingOrganizationStatus() {
+    assertThat(exception)
+            .hasMessage(
+                    "Persisted organization name must be normalized");
+}
 
-        var exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> Organization.rehydrate(
-                        UUID.randomUUID(),
-                        "Acme Retail",
-                        null));
+@Test
+void rehydrationRejectsMissingOrganizationStatus() {
 
-        assertThat(exception)
-                .hasMessage("Organization status is required");
-    }
-    @Test
-    void transitionsOrganizationBetweenActiveAndSuspendedLifecycle()
-            throws Exception {
+    var exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> Organization.rehydrate(
+                    UUID.randomUUID(),
+                    "Acme Retail",
+                    null));
 
-        var statusNames =
-                java.util.Arrays.stream(
-                                OrganizationStatus.values())
-                        .map(Enum::name)
-                        .toList();
+    assertThat(exception)
+            .hasMessage("Organization status is required");
+}
 
-        var methodNames =
-                java.util.Arrays.stream(
-                                Organization.class
-                                        .getDeclaredMethods())
-                        .map(
-                                java.lang.reflect.Method::getName)
-                        .toList();
+@Test
+void transitionsOrganizationBetweenActiveAndSuspendedLifecycle() {
 
-        org.junit.jupiter.api.Assertions.assertAll(
-                () -> assertThat(statusNames)
-                        .as(
-                                "Organization lifecycle must include"
-                                        + " SUSPENDED")
-                        .contains("SUSPENDED"),
+    var id = UUID.randomUUID();
 
-                () -> assertThat(methodNames)
-                        .as(
-                                "Organization lifecycle must expose"
-                                        + " suspend()")
-                        .contains("suspend"),
+    var active = Organization.create(
+            id,
+            "Acme Retail");
 
-                () -> assertThat(methodNames)
-                        .as(
-                                "Organization lifecycle must expose"
-                                        + " recover()")
-                        .contains("recover"));
+    var suspended =
+            active.suspend();
 
-        var id =
-                UUID.randomUUID();
+    assertThat(suspended.id())
+            .isEqualTo(id);
 
-        var active =
-                Organization.create(
-                        id,
-                        "Acme Retail");
+    assertThat(suspended.name())
+            .isEqualTo("Acme Retail");
 
-        var suspendMethod =
-                Organization.class
-                        .getMethod("suspend");
+    assertThat(suspended.status())
+            .isEqualTo(OrganizationStatus.SUSPENDED);
 
-        var suspended =
-                (Organization) suspendMethod.invoke(
-                        active);
+    assertThat(active.status())
+            .isEqualTo(OrganizationStatus.ACTIVE);
 
-        assertThat(suspended.id())
-                .isEqualTo(id);
+    var recovered =
+            suspended.recover();
 
-        assertThat(suspended.name())
-                .isEqualTo("Acme Retail");
+    assertThat(recovered.id())
+            .isEqualTo(id);
 
-        assertThat(suspended.status().name())
-                .isEqualTo("SUSPENDED");
+    assertThat(recovered.name())
+            .isEqualTo("Acme Retail");
 
-        assertThat(active.status())
-                .isEqualTo(OrganizationStatus.ACTIVE);
+    assertThat(recovered.status())
+            .isEqualTo(OrganizationStatus.ACTIVE);
 
-        var recoverMethod =
-                Organization.class
-                        .getMethod("recover");
+    assertThat(suspended.status())
+            .isEqualTo(OrganizationStatus.SUSPENDED);
+}
 
-        var recovered =
-                (Organization) recoverMethod.invoke(
-                        suspended);
-
-        assertThat(recovered.id())
-                .isEqualTo(id);
-
-        assertThat(recovered.name())
-                .isEqualTo("Acme Retail");
-
-        assertThat(recovered.status())
-                .isEqualTo(OrganizationStatus.ACTIVE);
-
-        assertThat(suspended.status().name())
-                .isEqualTo("SUSPENDED");
-    }
 }
