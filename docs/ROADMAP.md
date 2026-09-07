@@ -350,9 +350,10 @@ Direction:
 
 ### OH-017 — Platform and Organization administration
 
-Status: COMPLETE — issue #33 and ADR-0015 `TESTED`; implementation checkpoint
+Status: IN PROGRESS — issue #33 and ADR-0015 `DESIGNED`; implementation checkpoint
 `a1b0f4bb73fb866dbfc648ed33620df65ff4a1bc` passed `branch-policy`, `ci-build`
-and `platform-validation` on PR #35 against integrated OH-016 baseline
+and `platform-validation` on PR #35, with two P2 review findings under correction,
+against integrated OH-016 baseline
 `pre-release@d4beb38d0d03f0b016e12ff7766c2117d0fad42d`.
 
 `Organization` is the canonical multi-Tenant business grouping for this slice;
@@ -483,6 +484,7 @@ memory telemetry. It is not implemented as part of this roadmap item.
 No housekeeping scheduler, retention deletion, archive mechanism or new
 infrastructure is introduced by OH-017. This entry records future engineering
 intent only.
+
 ## Identity provisioning and account lifecycle — planned
 
 Authenticated internal identity already supports durable external identity

@@ -1,6 +1,9 @@
 package io.github.piresrenan.orderhub.organizations.adapter.out.persistence.postgresql;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import java.util.UUID;
 
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
@@ -29,7 +32,67 @@ class AdministrativeControlAuditMigrationTest {
 
     @Test
     void createsOwnerLocalOrganizationAndTenantAdministrativeAuditRelations() {
+        var jdbc = migratedJdbc();
 
+        assertThat(tableCount(jdbc, "organizations", "administrative_audit_events"))
+                .isEqualTo(1);
+
+        assertThat(tableCount(jdbc, "tenants", "administrative_audit_events"))
+                .isEqualTo(1);
+    }
+
+    @Test
+    void rejectsLifecycleAuditEvidenceWhoseActionContradictsItsDestinationState() {
+        var jdbc = migratedJdbc();
+
+        assertThatThrownBy(() -> jdbc.update(
+                """
+                INSERT INTO organizations.administrative_audit_events (
+                    audit_event_id, actor_user_id, organization_id, action_type,
+                    outcome, before_organization_status, after_organization_status,
+                    correlation_id
+                ) VALUES (?, ?, ?, 'SUSPEND_ORGANIZATION', 'APPLIED',
+                    'SUSPENDED', 'ACTIVE', ?)
+                """,
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()))
+                .hasMessageContaining("ck_organization_administrative_audit_lifecycle_destination");
+
+        assertThatThrownBy(() -> jdbc.update(
+                """
+                INSERT INTO organizations.administrative_audit_events (
+                    audit_event_id, actor_user_id, organization_id, action_type,
+                    outcome, before_organization_status, after_organization_status,
+                    correlation_id
+                ) VALUES (?, ?, ?, 'RECOVER_ORGANIZATION', 'NO_CHANGE',
+                    'SUSPENDED', 'SUSPENDED', ?)
+                """,
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()))
+                .hasMessageContaining("ck_organization_administrative_audit_lifecycle_destination");
+
+        assertThatThrownBy(() -> jdbc.update(
+                """
+                INSERT INTO tenants.administrative_audit_events (
+                    audit_event_id, actor_user_id, tenant_id, action_type,
+                    outcome, before_status, after_status, correlation_id
+                ) VALUES (?, ?, ?, 'SUSPEND_TENANT', 'APPLIED',
+                    'SUSPENDED', 'ACTIVE', ?)
+                """,
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()))
+                .hasMessageContaining("ck_tenant_administrative_audit_lifecycle_destination");
+
+        assertThatThrownBy(() -> jdbc.update(
+                """
+                INSERT INTO tenants.administrative_audit_events (
+                    audit_event_id, actor_user_id, tenant_id, action_type,
+                    outcome, before_status, after_status, correlation_id
+                ) VALUES (?, ?, ?, 'RECOVER_TENANT', 'NO_CHANGE',
+                    'SUSPENDED', 'SUSPENDED', ?)
+                """,
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()))
+                .hasMessageContaining("ck_tenant_administrative_audit_lifecycle_destination");
+    }
+
+    private static JdbcTemplate migratedJdbc() {
         var dataSource =
                 new DriverManagerDataSource(
                         POSTGRES.getJdbcUrl(),
@@ -42,13 +105,7 @@ class AdministrativeControlAuditMigrationTest {
                 .load()
                 .migrate();
 
-        var jdbc = new JdbcTemplate(dataSource);
-
-        assertThat(tableCount(jdbc, "organizations", "administrative_audit_events"))
-                .isEqualTo(1);
-
-        assertThat(tableCount(jdbc, "tenants", "administrative_audit_events"))
-                .isEqualTo(1);
+        return new JdbcTemplate(dataSource);
     }
 
     private static int tableCount(

@@ -1,6 +1,6 @@
 # ADR-0015 — Platform and Organization Administration Control Plane
 
-Status: TESTED
+Status: DESIGNED
 
 ## Context
 
@@ -662,11 +662,12 @@ Organization-owned orchestration performs authorization and privacy-safe target
 validation before invoking it.
 
 V29 and V30 add owner-local append-only evidence for Organization lifecycle,
-Organization/Tenant placement, and Tenant lifecycle respectively. Their
-repositories participate in caller-owned REQUIRED transactions. PostgreSQL
-integration tests prove that audit failure rolls back Organization create,
-Tenant create and placement mutation; lifecycle operations use the same
-transaction executors and repository propagation.
+Organization/Tenant placement, and Tenant lifecycle respectively. V31 adds
+forward-only constraints binding each lifecycle action to its only valid
+destination state. Their repositories participate in caller-owned REQUIRED
+transactions. PostgreSQL integration tests prove that audit failure rolls back
+Organization create, Tenant create and placement mutation; lifecycle operations
+use the same transaction executors and repository propagation.
 
 ## Observability
 
@@ -801,8 +802,11 @@ autonomous transaction mechanism.
 
 Executable migration REDs demonstrated the missing owner-local evidence state.
 V29 creates `organizations.administrative_audit_events`; V30 creates
-`tenants.administrative_audit_events`. Both are append-only, bounded, contain no
-cross-module foreign keys and are the final OH-017 migrations.
+`tenants.administrative_audit_events`. Both are append-only, bounded and contain
+no cross-module foreign keys. V31 is the final OH-017 migration and tightens the
+published relations without rewriting V29/V30: `SUSPEND` evidence must end in
+`SUSPENDED`, while `RECOVER` evidence must end in `ACTIVE`, including
+`NO_CHANGE` records.
 
 ## Initial implementation evidence
 
@@ -830,10 +834,10 @@ OH-017 reconciled checkpoint:
 
 The aggregate OH-017 patch remained byte-equivalent through the rebase.
 
-At the final implementation gate before documentation promotion:
+At the local verification gate after applying the review corrections:
 
 ```text
-1147 tests
+1149 tests
 0 failures
 0 errors
 0 skipped
@@ -849,19 +853,21 @@ sanitized RFC 9457 Problem Details, exact administrative authorization,
 idempotent lifecycle/placement/grant behavior, owner-local audit atomicity and
 the existing PostgreSQL concurrency suites are executable and green.
 
-The reviewed implementation checkpoint is:
+The initially reviewed implementation checkpoint was:
 
 ```text
 a1b0f4bb73fb866dbfc648ed33620df65ff4a1bc
 ```
 
 GitHub PR #35 verified that exact checkpoint with successful `branch-policy`,
-`ci-build` and `platform-validation` workflows and no unresolved review finding.
+`ci-build` and `platform-validation` workflows. Automated review then identified
+two valid P2 findings; this ADR remains `DESIGNED` until their forward-only fixes
+and regression evidence pass a fresh Codex review with no unresolved finding.
 
-## Verification evidence for TESTED
+## Verification required before TESTED
 
-ADR-0015 is `TESTED` because reviewed executable evidence proves the complete
-OH-017 scope.
+ADR-0015 remains `DESIGNED` until reviewed executable evidence proves the
+complete OH-017 scope without unresolved findings.
 
 At minimum that includes:
 
@@ -888,9 +894,9 @@ At minimum that includes:
 - required GitHub workflows on the exact implementation checkpoint;
 - final review with no unresolved valid finding.
 
-The reviewed executable implementation checkpoint passed every gate above. This
-separate documentation-only promotion records that evidence and receives its own
-final workflow/review gates before merge.
+The reviewed executable implementation checkpoint must pass every gate above.
+Only then may a separate documentation-only promotion record that evidence and
+receive its own final workflow/review gates before merge.
 
 ## Explicitly deferred
 

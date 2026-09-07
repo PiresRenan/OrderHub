@@ -77,6 +77,24 @@ class AdministrationControllerTest {
     }
 
     @Test
+    void validatesOrganizationNamesAfterStrippingByUnicodeCodePoint() throws Exception {
+        var name = " " + "😀".repeat(120) + " ";
+        var id = UUID.randomUUID();
+        when(organizations.create(any(), any(), any()))
+                .thenReturn(new AdministrativeOrganization(id, name.strip(), "ACTIVE"));
+
+        mvc.perform(authenticated(post("/platform/organizations"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"" + name + "\"}"))
+                .andExpect(status().isCreated());
+
+        mvc.perform(authenticated(post("/platform/organizations"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"" + "😀".repeat(121) + "\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void deniedTargetProducesSanitizedProblemDetails() throws Exception {
         when(organizations.list(any())).thenThrow(new PlatformAdministrationAccessDeniedException());
 

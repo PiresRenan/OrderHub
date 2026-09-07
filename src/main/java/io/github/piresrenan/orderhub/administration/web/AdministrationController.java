@@ -5,9 +5,7 @@ import java.util.List;
 import java.util.UUID;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -156,7 +154,7 @@ public final class AdministrationController {
     }
 
     public record NameRequest(
-            @NotBlank @Size(max = 120) String name) {
+            @NormalizedAdministrativeName String name) {
     }
 
     public record MoveTenantRequest(
