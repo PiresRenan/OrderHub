@@ -157,9 +157,27 @@ class CreateOrderIdempotencyHttpRecoveryAcceptanceTest {
                                 USER_ID,
                                 TENANT_ID));
 
+        seedActiveTenant();
         seedCustomerAccountBinding();
     }
 
+    private void seedActiveTenant() {
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO tenants.tenants (
+                    id,
+                    name,
+                    status
+                )
+                VALUES (?, ?, 'ACTIVE')
+                ON CONFLICT (id)
+                DO UPDATE SET
+                    status = EXCLUDED.status
+                """,
+                TENANT_ID,
+                "Synthetic Idempotency Tenant");
+    }
     private void seedCustomerAccountBinding() {
 
         jdbcTemplate.update(

@@ -14,6 +14,8 @@ import io.github.piresrenan.orderhub.users.application.port.in.FindTenantMembers
 import io.github.piresrenan.orderhub.users.application.port.out.TenantMembershipRepository;
 import io.github.piresrenan.orderhub.users.application.port.out.UserIdGenerator;
 import io.github.piresrenan.orderhub.users.application.port.out.UserRepository;
+import io.github.piresrenan.orderhub.users.application.port.in.UserExistenceUseCase;
+import io.github.piresrenan.orderhub.users.application.service.UserExistenceService;
 import io.github.piresrenan.orderhub.users.application.service.CreateUserService;
 import io.github.piresrenan.orderhub.users.application.service.EstablishTenantMembershipService;
 import io.github.piresrenan.orderhub.users.application.service.FindTenantMembershipService;
@@ -162,5 +164,10 @@ public class UsersConfiguration {
 
                 return new ResolveExternalIdentityService(
                                 externalIdentityBindingRepository);
+        }
+
+        @Bean
+        UserExistenceUseCase userExistenceUseCase(UserRepository userRepository) {
+                return new UserExistenceService(userRepository);
         }
 }

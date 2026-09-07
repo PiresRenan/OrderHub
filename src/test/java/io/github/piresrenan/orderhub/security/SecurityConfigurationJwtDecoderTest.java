@@ -32,6 +32,8 @@ import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import com.sun.net.httpserver.HttpServer;
+import io.github.piresrenan.orderhub.tenants.application.port.in.operational.FindTenantOperationalStateUseCase;
+import io.github.piresrenan.orderhub.tenants.application.port.in.operational.TenantOperationalState;
 
 class SecurityConfigurationJwtDecoderTest {
 
@@ -243,6 +245,11 @@ class SecurityConfigurationJwtDecoderTest {
         return new ApplicationContextRunner()
                 .withUserConfiguration(
                         SecurityConfiguration.class)
+                .withBean(
+                        FindTenantOperationalStateUseCase.class,
+                        () -> query ->
+                                java.util.Optional.of(
+                                        TenantOperationalState.ACTIVE))
                 .withBean(
                         ResolveExternalIdentityUseCase.class,
                         () -> query -> {

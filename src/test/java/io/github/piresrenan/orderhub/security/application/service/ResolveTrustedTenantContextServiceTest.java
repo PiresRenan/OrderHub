@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 
 import io.github.piresrenan.orderhub.security.application.model.AuthenticatedUserPrincipal;
 import io.github.piresrenan.orderhub.security.application.port.in.ResolveTrustedTenantContextQuery;
+import io.github.piresrenan.orderhub.tenants.application.port.in.operational.TenantOperationalState;
 import io.github.piresrenan.orderhub.users.application.port.in.FindTenantMembershipQuery;
 import io.github.piresrenan.orderhub.users.application.port.in.FindTenantMembershipUseCase;
 import io.github.piresrenan.orderhub.users.domain.model.TenantMembership;
@@ -37,7 +38,9 @@ class ResolveTrustedTenantContextServiceTest {
 
         var service =
                 new ResolveTrustedTenantContextService(
-                        memberships);
+                        memberships,
+                        query -> Optional.of(
+                                TenantOperationalState.ACTIVE));
 
         var result =
                 service.resolve(
@@ -80,7 +83,9 @@ class ResolveTrustedTenantContextServiceTest {
 
         var service =
                 new ResolveTrustedTenantContextService(
-                        memberships);
+                        memberships,
+                        query -> Optional.of(
+                                TenantOperationalState.ACTIVE));
 
         service.resolve(
                 new ResolveTrustedTenantContextQuery(
@@ -112,7 +117,9 @@ class ResolveTrustedTenantContextServiceTest {
 
         var service =
                 new ResolveTrustedTenantContextService(
-                        memberships);
+                        memberships,
+                        query -> Optional.of(
+                                TenantOperationalState.ACTIVE));
 
         var result =
                 service.resolve(
@@ -152,7 +159,9 @@ class ResolveTrustedTenantContextServiceTest {
 
         var service =
                 new ResolveTrustedTenantContextService(
-                        memberships);
+                        memberships,
+                        query -> Optional.of(
+                                TenantOperationalState.ACTIVE));
 
         var authorized =
                 service.resolve(
@@ -188,7 +197,9 @@ class ResolveTrustedTenantContextServiceTest {
 
         assertThatThrownBy(() ->
                 new ResolveTrustedTenantContextService(
-                        null))
+                        null,
+                        query -> Optional.of(
+                                TenantOperationalState.ACTIVE)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

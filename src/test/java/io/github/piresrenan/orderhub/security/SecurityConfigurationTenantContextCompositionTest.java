@@ -16,6 +16,8 @@ import io.github.piresrenan.orderhub.security.application.service.ResolveTrusted
 import io.github.piresrenan.orderhub.users.application.port.in.FindTenantMembershipQuery;
 import io.github.piresrenan.orderhub.users.application.port.in.FindTenantMembershipUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityUseCase;
+import io.github.piresrenan.orderhub.tenants.application.port.in.operational.FindTenantOperationalStateUseCase;
+import io.github.piresrenan.orderhub.tenants.application.port.in.operational.TenantOperationalState;
 
 class SecurityConfigurationTenantContextCompositionTest {
 
@@ -62,6 +64,11 @@ class SecurityConfigurationTenantContextCompositionTest {
         new ApplicationContextRunner()
                 .withUserConfiguration(
                         SecurityConfiguration.class)
+                .withBean(
+                        FindTenantOperationalStateUseCase.class,
+                        () -> query ->
+                                java.util.Optional.of(
+                                        TenantOperationalState.ACTIVE))
                 .withBean(
                         ResolveExternalIdentityUseCase.class,
                         () -> externalIdentities)

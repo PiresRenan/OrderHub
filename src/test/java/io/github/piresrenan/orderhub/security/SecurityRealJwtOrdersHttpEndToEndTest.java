@@ -535,11 +535,32 @@ class SecurityRealJwtOrdersHttpEndToEndTest {
                                         userId)));
     }
 
+    private void seedActiveTenant(
+            UUID tenantId) {
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO tenants.tenants (
+                    id,
+                    name,
+                    status
+                )
+                VALUES (?, ?, 'ACTIVE')
+                ON CONFLICT (id)
+                DO UPDATE SET
+                    status = EXCLUDED.status
+                """,
+                tenantId,
+                "Synthetic Security Tenant");
+    }
     private void allowMembership(
             UUID userId,
             UUID tenantId) {
 
-        var membership =
+                seedActiveTenant(
+                tenantId);
+
+var membership =
                 mock(
                         TenantMembership.class);
 

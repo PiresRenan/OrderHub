@@ -135,7 +135,8 @@ class TenantTest {
 
                 var tenant = Tenant.rehydrate(
                                 id,
-                                "Acme Commerce");
+                                "Acme Commerce",
+                                TenantStatus.ACTIVE);
 
                 assertThat(tenant.id())
                                 .isEqualTo(id);
@@ -153,7 +154,8 @@ class TenantTest {
 
                 assertThatThrownBy(() -> Tenant.rehydrate(
                                 UUID.randomUUID(),
-                                "   "))
+                                "   ",
+                                TenantStatus.ACTIVE))
                                 .isInstanceOf(IllegalArgumentException.class)
                                 .hasMessage("Tenant name must not be blank");
         }
@@ -168,7 +170,8 @@ class TenantTest {
 
                 assertThatThrownBy(() -> Tenant.rehydrate(
                                 UUID.randomUUID(),
-                                "  Acme Commerce  "))
+                                "  Acme Commerce  ",
+                                TenantStatus.ACTIVE))
                                 .isInstanceOf(IllegalArgumentException.class)
                                 .hasMessage("Persisted tenant name must be normalized");
         }

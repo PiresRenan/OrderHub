@@ -33,6 +33,7 @@ import io.github.piresrenan.orderhub.orders.application.port.out.CreateOrderIdem
 import io.github.piresrenan.orderhub.orders.application.port.out.CreateOrderIdempotencyPersistenceException;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderPersistenceException;
 import io.github.piresrenan.orderhub.orders.application.port.out.TransactionExecutionException;
+import io.github.piresrenan.orderhub.tenants.application.port.in.operational.TenantOperationalStateUnavailableException;
 
 @RestControllerAdvice
 public final class ApiExceptionHandler extends ResponseEntityExceptionHandler {
@@ -233,7 +234,8 @@ public final class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                         TransactionExecutionException.class,
                         InventoryOperationException.class,
                         CatalogOrderabilityTechnicalException.class,
-                        CustomerAccountBindingTechnicalException.class
+                        CustomerAccountBindingTechnicalException.class,
+                        TenantOperationalStateUnavailableException.class
         })
         protected ResponseEntity<Object> handleInternalTechnicalFailure() {
 
