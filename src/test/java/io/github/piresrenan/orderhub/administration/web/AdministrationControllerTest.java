@@ -149,6 +149,23 @@ class AdministrationControllerTest {
     }
 
     @Test
+    void frameworkHttpErrorsPreserveStatusWithSanitizedProblemDetails() throws Exception {
+        mvc.perform(authenticated(post("/platform/organizations"))
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content("sensitive-plain-body"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("administration-request-rejected"))
+                .andExpect(content().string(not(containsString("sensitive-plain-body"))));
+
+        mvc.perform(authenticated(get("/platform/organizations"))
+                        .accept(MediaType.TEXT_PLAIN))
+                .andExpect(status().isNotAcceptable())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("administration-request-rejected"));
+    }
+
+    @Test
     void exposesEveryRequiredMutationRoute() throws Exception {
         var organization = UUID.randomUUID();
         var destination = UUID.randomUUID();

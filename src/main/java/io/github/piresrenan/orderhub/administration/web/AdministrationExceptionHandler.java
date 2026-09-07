@@ -3,8 +3,10 @@ package io.github.piresrenan.orderhub.administration.web;
 import java.net.URI;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -66,14 +68,19 @@ public final class AdministrationExceptionHandler {
     }
 
     @ExceptionHandler(Exception.class)
-    ProblemDetail technical() {
+    ProblemDetail technical(Exception exception) {
+        if (exception instanceof ErrorResponse errorResponse) {
+            return problem(errorResponse.getStatusCode(), "administration-request-rejected",
+                    "Administration request could not be processed");
+        }
         return problem(HttpStatus.INTERNAL_SERVER_ERROR, "administration-technical-failure",
                 "Administration operation could not be completed");
     }
 
-    private static ProblemDetail problem(HttpStatus status, String code, String detail) {
+    private static ProblemDetail problem(HttpStatusCode status, String code, String detail) {
         var problem = ProblemDetail.forStatusAndDetail(status, detail);
-        problem.setTitle(status.getReasonPhrase());
+        var standardStatus = HttpStatus.resolve(status.value());
+        problem.setTitle(standardStatus == null ? "HTTP " + status.value() : standardStatus.getReasonPhrase());
         problem.setType(URI.create("urn:orderhub:problem:" + code));
         problem.setProperty("code", code);
         return problem;
