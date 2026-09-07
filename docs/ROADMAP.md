@@ -406,8 +406,9 @@ access.
 
 ### OH-018 — Catalog and Inventory administration
 
-Status: PLANNED — depends on OH-013 and the relevant Tenant administration
-surface.
+Status: IN PROGRESS — issue #36 and ADR-0016 `DESIGNED`, started from integrated
+`pre-release@35c389197d0ea73ae0182fda9f502425fb67eb91`. The executable scope and
+acceptance contract are recorded in the issue and ADR; completion is not yet proved.
 
 Expose controlled administration capabilities such as:
 
