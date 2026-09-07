@@ -1,6 +1,6 @@
 # ADR-0015 — Platform and Organization Administration Control Plane
 
-Status: DESIGNED
+Status: TESTED
 
 ## Context
 
@@ -862,14 +862,21 @@ a1b0f4bb73fb866dbfc648ed33620df65ff4a1bc
 GitHub PR #35 verified that exact checkpoint with successful `branch-policy`,
 `ci-build` and `platform-validation` workflows. Automated review identified two
 valid P2 findings, addressed by `3cf2ded0ebb3883a95c6cac015e96d66ce92af42`.
-A fresh review of that checkpoint identified three further valid P2 findings;
-this ADR remains `DESIGNED` until their fixes and regression evidence pass a
-fresh Codex review with no unresolved finding.
+A fresh review of that checkpoint identified three further valid P2 findings,
+addressed by the final executable checkpoint:
 
-## Verification required before TESTED
+```text
+be3b45ceb49575c9b75e641b8a5865cb471a7dd8
+```
 
-ADR-0015 remains `DESIGNED` until reviewed executable evidence proves the
-complete OH-017 scope without unresolved findings.
+That exact checkpoint passed `branch-policy`, `ci-build` and
+`platform-validation`. Codex then completed a fresh review and reported no major
+issues; all five review threads are resolved.
+
+## Verification evidence for TESTED
+
+ADR-0015 is `TESTED` because reviewed executable evidence proves the complete
+OH-017 scope without unresolved findings.
 
 At minimum that includes:
 
@@ -896,9 +903,9 @@ At minimum that includes:
 - required GitHub workflows on the exact implementation checkpoint;
 - final review with no unresolved valid finding.
 
-The reviewed executable implementation checkpoint must pass every gate above.
-Only then may a separate documentation-only promotion record that evidence and
-receive its own final workflow/review gates before merge.
+The reviewed executable implementation checkpoint passed every gate above. This
+separate documentation-only promotion records that evidence and receives its own
+final workflow gates before merge.
 
 ## Explicitly deferred
 

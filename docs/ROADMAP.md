@@ -350,12 +350,11 @@ Direction:
 
 ### OH-017 — Platform and Organization administration
 
-Status: IN PROGRESS — issue #33 and ADR-0015 `DESIGNED`; implementation checkpoint
-`a1b0f4bb73fb866dbfc648ed33620df65ff4a1bc` passed `branch-policy`, `ci-build`
-and `platform-validation` on PR #35. Its two P2 review findings were addressed by
-`3cf2ded0ebb3883a95c6cac015e96d66ce92af42`; three subsequent P2 findings are
-under correction against integrated OH-016 baseline
-`pre-release@d4beb38d0d03f0b016e12ff7766c2117d0fad42d`.
+Status: COMPLETE — issue #33 and ADR-0015 `TESTED`; final executable checkpoint
+`be3b45ceb49575c9b75e641b8a5865cb471a7dd8` passed `branch-policy`, `ci-build`,
+`platform-validation` and a fresh Codex review with no major issues on PR #35.
+All five review findings were addressed and resolved against integrated OH-016
+baseline `pre-release@d4beb38d0d03f0b016e12ff7766c2117d0fad42d`.
 
 `Organization` is the canonical multi-Tenant business grouping for this slice;
 `Network` is not introduced as a second aggregate without an independent
