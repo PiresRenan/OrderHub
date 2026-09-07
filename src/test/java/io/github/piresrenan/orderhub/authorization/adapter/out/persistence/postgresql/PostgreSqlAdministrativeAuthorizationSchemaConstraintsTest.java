@@ -112,6 +112,27 @@ class PostgreSqlAdministrativeAuthorizationSchemaConstraintsTest {
     }
 
     @Test
+    void permissionCannotRemainWithoutAClassification() {
+
+        assertThatThrownBy(() ->
+                jdbcTemplate.update(
+                        """
+                        INSERT INTO access_control.permissions (
+                            code,
+                            persona,
+                            administrative_scope
+                        )
+                        VALUES (
+                            'INVALID_UNCLASSIFIED_PERMISSION',
+                            NULL,
+                            NULL
+                        )
+                        """))
+                .isInstanceOf(
+                        DataIntegrityViolationException.class);
+    }
+
+    @Test
     void platformGrantRejectsScopedResourceIdentity() {
 
         assertThatThrownBy(() ->

@@ -664,7 +664,9 @@ validation before invoking it.
 V29 and V30 add owner-local append-only evidence for Organization lifecycle,
 Organization/Tenant placement, and Tenant lifecycle respectively. V31 adds
 forward-only constraints binding each lifecycle action to its only valid
-destination state. Their repositories participate in caller-owned REQUIRED
+destination state. V32 makes the permission-classification invariant total by
+requiring exactly one non-null classification. Their repositories participate
+in caller-owned REQUIRED
 transactions. PostgreSQL integration tests prove that audit failure rolls back
 Organization create, Tenant create and placement mutation; lifecycle operations
 use the same transaction executors and repository propagation.
@@ -803,10 +805,12 @@ autonomous transaction mechanism.
 Executable migration REDs demonstrated the missing owner-local evidence state.
 V29 creates `organizations.administrative_audit_events`; V30 creates
 `tenants.administrative_audit_events`. Both are append-only, bounded and contain
-no cross-module foreign keys. V31 is the final OH-017 migration and tightens the
-published relations without rewriting V29/V30: `SUSPEND` evidence must end in
-`SUSPENDED`, while `RECOVER` evidence must end in `ACTIVE`, including
-`NO_CHANGE` records.
+no cross-module foreign keys. V31 tightens the published relations without
+rewriting V29/V30: `SUSPEND` evidence must end in `SUSPENDED`, while `RECOVER`
+evidence must end in `ACTIVE`, including `NO_CHANGE` records. V32 is a
+forward-only correction to the V27 permission-classification constraint: it
+explicitly requires exactly one non-null Tenant persona or administrative scope,
+so PostgreSQL's nullable `CHECK` semantics cannot admit an unclassified row.
 
 ## Initial implementation evidence
 
@@ -837,7 +841,7 @@ The aggregate OH-017 patch remained byte-equivalent through the rebase.
 At the local verification gate after applying the review corrections:
 
 ```text
-1152 tests
+1153 tests
 0 failures
 0 errors
 0 skipped
@@ -863,7 +867,7 @@ GitHub PR #35 verified that exact checkpoint with successful `branch-policy`,
 `ci-build` and `platform-validation` workflows. Automated review identified two
 valid P2 findings, addressed by `3cf2ded0ebb3883a95c6cac015e96d66ce92af42`.
 A fresh review of that checkpoint identified three further valid P2 findings,
-addressed by the final executable checkpoint:
+addressed by the next executable checkpoint:
 
 ```text
 be3b45ceb49575c9b75e641b8a5865cb471a7dd8
@@ -871,7 +875,9 @@ be3b45ceb49575c9b75e641b8a5865cb471a7dd8
 
 That exact checkpoint passed `branch-policy`, `ci-build` and
 `platform-validation`. Codex then completed a fresh review and reported no major
-issues; all five review threads are resolved.
+issues. The documentation promotion triggered a sixth valid P2 finding about
+nullable PostgreSQL `CHECK` semantics; V32 and its executable regression test
+close that invariant before the final review gate.
 
 ## Verification evidence for TESTED
 
