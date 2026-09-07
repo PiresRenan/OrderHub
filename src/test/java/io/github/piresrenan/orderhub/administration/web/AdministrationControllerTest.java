@@ -135,6 +135,20 @@ class AdministrationControllerTest {
     }
 
     @Test
+    void malformedPathAndJsonAreStableSanitizedClientErrors() throws Exception {
+        mvc.perform(authenticated(put("/platform/organizations/not-a-uuid/suspension")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("invalid-administration-request"));
+
+        mvc.perform(authenticated(post("/platform/organizations"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{not-json"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("invalid-administration-request"))
+                .andExpect(content().string(not(containsString("not-json"))));
+    }
+
+    @Test
     void exposesEveryRequiredMutationRoute() throws Exception {
         var organization = UUID.randomUUID();
         var destination = UUID.randomUUID();

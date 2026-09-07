@@ -87,6 +87,9 @@ public final class OrganizationAdministrationService
     public void moveTenant(UUID actor, UUID sourceId, UUID destinationId,
             UUID tenantId, UUID correlationId) {
         requirePlatform(actor, PermissionCode.PLATFORM_TENANTS_MANAGE);
+        if (Objects.equals(sourceId, destinationId)) {
+            throw new AdministrativeConflictException();
+        }
         requireTenant(tenantId);
         transactions.execute(() -> {
             var result = placements.move(tenantId, sourceId, destinationId);

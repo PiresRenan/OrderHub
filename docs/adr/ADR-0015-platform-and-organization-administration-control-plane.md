@@ -837,7 +837,7 @@ The aggregate OH-017 patch remained byte-equivalent through the rebase.
 At the local verification gate after applying the review corrections:
 
 ```text
-1149 tests
+1152 tests
 0 failures
 0 errors
 0 skipped
@@ -860,9 +860,11 @@ a1b0f4bb73fb866dbfc648ed33620df65ff4a1bc
 ```
 
 GitHub PR #35 verified that exact checkpoint with successful `branch-policy`,
-`ci-build` and `platform-validation` workflows. Automated review then identified
-two valid P2 findings; this ADR remains `DESIGNED` until their forward-only fixes
-and regression evidence pass a fresh Codex review with no unresolved finding.
+`ci-build` and `platform-validation` workflows. Automated review identified two
+valid P2 findings, addressed by `3cf2ded0ebb3883a95c6cac015e96d66ce92af42`.
+A fresh review of that checkpoint identified three further valid P2 findings;
+this ADR remains `DESIGNED` until their fixes and regression evidence pass a
+fresh Codex review with no unresolved finding.
 
 ## Verification required before TESTED
 

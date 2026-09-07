@@ -20,6 +20,7 @@ import io.github.piresrenan.orderhub.authorization.application.port.in.administr
 import io.github.piresrenan.orderhub.authorization.application.port.in.administration.MutateAdministrativeGrantUseCase;
 import io.github.piresrenan.orderhub.authorization.domain.model.AuthorizationDecision;
 import io.github.piresrenan.orderhub.organizations.application.port.in.administration.AdministrationAccessDeniedException;
+import io.github.piresrenan.orderhub.organizations.application.port.in.administration.AdministrativeConflictException;
 import io.github.piresrenan.orderhub.organizations.application.port.in.administration.OrganizationUnavailableException;
 import io.github.piresrenan.orderhub.organizations.application.port.out.OrganizationAdministrativeAuditRepository;
 import io.github.piresrenan.orderhub.organizations.application.port.out.OrganizationRepository;
@@ -111,6 +112,19 @@ class OrganizationAdministrationServiceTest {
         service.attachTenant(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
 
         verify(audit).append(any());
+    }
+
+    @Test
+    void rejectsMoveWhoseSourceAndDestinationAreIdenticalBeforeTargetProbes() {
+        var organizationId = UUID.randomUUID();
+        when(authorization.authorize(any())).thenReturn(AuthorizationDecision.ALLOW);
+
+        assertThatThrownBy(() -> service.moveTenant(
+                UUID.randomUUID(), organizationId, organizationId,
+                UUID.randomUUID(), UUID.randomUUID()))
+                .isInstanceOf(AdministrativeConflictException.class);
+
+        verifyNoInteractions(tenants, placements, audit);
     }
 
     @Test

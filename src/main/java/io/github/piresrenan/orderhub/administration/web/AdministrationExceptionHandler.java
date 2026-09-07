@@ -4,9 +4,11 @@ import java.net.URI;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import io.github.piresrenan.orderhub.organizations.application.port.in.administration.AdministrationAccessDeniedException;
 import io.github.piresrenan.orderhub.organizations.application.port.in.administration.AdministrativeConflictException;
@@ -52,7 +54,12 @@ public final class AdministrationExceptionHandler {
                 "Administrative operation conflicts with current state");
     }
 
-    @ExceptionHandler({IllegalArgumentException.class, MethodArgumentNotValidException.class})
+    @ExceptionHandler({
+        IllegalArgumentException.class,
+        MethodArgumentNotValidException.class,
+        MethodArgumentTypeMismatchException.class,
+        HttpMessageNotReadableException.class
+    })
     ProblemDetail invalid() {
         return problem(HttpStatus.BAD_REQUEST, "invalid-administration-request",
                 "Invalid administration request");

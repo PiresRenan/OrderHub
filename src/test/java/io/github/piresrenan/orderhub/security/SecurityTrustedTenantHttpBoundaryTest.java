@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
@@ -20,6 +21,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -32,6 +34,7 @@ import io.github.piresrenan.orderhub.security.application.model.TrustedTenantCon
 import io.github.piresrenan.orderhub.security.application.port.in.ResolveTrustedTenantContextQuery;
 import io.github.piresrenan.orderhub.security.application.port.in.ResolveTrustedTenantContextUseCase;
 import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
+import io.github.piresrenan.orderhub.tenants.application.port.in.operational.TenantOperationalStateUnavailableException;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolvedUserIdentity;
 
@@ -311,6 +314,28 @@ class SecurityTrustedTenantHttpBoundaryTest {
         verify(trustedTenants)
                 .resolve(
                         deniedQuery);
+    }
+
+    @Test
+    void mapsTenantOperationalStateFailureToStableInternalError() throws Exception {
+        var userId = UUID.randomUUID();
+        var tenantId = UUID.randomUUID();
+        stubAuthenticatedUser(userId);
+
+        when(trustedTenants.resolve(new ResolveTrustedTenantContextQuery(
+                new AuthenticatedUserPrincipal(userId), tenantId)))
+                .thenThrow(new TenantOperationalStateUnavailableException(
+                        new IllegalStateException("synthetic-internal-detail")));
+
+        mockMvc.perform(get(PROBE_PATH)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + ACCESS_TOKEN)
+                        .header(TENANT_HEADER, tenantId))
+                .andExpect(status().isInternalServerError())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("urn:orderhub:problem:internal-error"))
+                .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("synthetic-internal-detail"))));
     }
 
     private void stubAuthenticatedUser(
