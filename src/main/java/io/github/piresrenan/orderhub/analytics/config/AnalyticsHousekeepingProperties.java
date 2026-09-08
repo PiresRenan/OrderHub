@@ -20,14 +20,16 @@ public record AnalyticsHousekeepingProperties(
         @NotNull Duration fixedDelay) {
 
     @AssertTrue(message = "retention-window must be positive when housekeeping is enabled")
-    boolean isRetentionWindowValid() {
+    public boolean isRetentionWindowValid() {
         return !enabled || (retentionWindow != null
                 && !retentionWindow.isZero()
                 && !retentionWindow.isNegative());
     }
 
     @AssertTrue(message = "fixed-delay must be positive")
-    boolean isFixedDelayValid() {
-        return !fixedDelay.isZero() && !fixedDelay.isNegative();
+    public boolean isFixedDelayValid() {
+        return fixedDelay != null
+                && !fixedDelay.isZero()
+                && !fixedDelay.isNegative();
     }
 }
