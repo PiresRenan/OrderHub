@@ -1,6 +1,6 @@
 # ADR-0016 — Catalog and Inventory Administration
 
-Status: DESIGNED
+Status: TESTED
 
 ## Authority and problem
 
@@ -179,23 +179,39 @@ integrated parent/tree identity, close issue and remove the feature branch.
 
 ## Evidence ledger
 
-- Discovery complete; issue #36 created before implementation.
-- Baseline Maven Wrapper clean verify passed against the exact integrated authority:
-  1,154 tests, zero failures/errors/skips, on 2026-09-07 (5m46s).
-- Authorization, Catalog and Inventory foundations are published in PR #37. V33–V35
-  establish revisions and owner-local evidence. Category/price/assignment/discovery
-  regression on integrated checkpoint d4a31d9 passed 230 tests, zero failures/errors/skips.
-- GitHub review identified a real Catalog TRUNCATE gap in V33. An executable PostgreSQL
-  RED proved it; V35 adds the statement trigger forward-only. Accepted migrations remain
-  unchanged. A forced concurrent writer also proved inconsistent revision/hydration;
-  Product/Variant detail now stabilizes root reads, and Category detail uses one snapshot.
-- Owner-local HTTP composition and real JWT/Staff acceptance passed 26 targeted tests
-  including Modulith. Full clean verify passed 1,233 tests, zero failures/errors/skips,
-  on 2026-09-08. Final migration/Order-administration race acceptance and exact-HEAD
-  review/release gates remain pending; this is a checkpoint, not final acceptance.
+- Discovery completed before production implementation; issue #36 was created first.
+  Baseline `pre-release@35c389197d0ea73ae0182fda9f502425fb67eb91` passed Maven Wrapper
+  `clean verify` with 1,154 tests, zero failures/errors/skips.
+- Current Staff authorization, Catalog administration and Inventory administration were
+  developed through executable RED/GREEN checkpoints. Accepted migrations V1-V32 were
+  not rewritten. V33-V35 are forward-only OH-018 migrations.
+- Catalog uses resource-local revisions, explicit lifecycle/hierarchy/price commands,
+  bounded reads and owner-local atomic evidence. Inventory uses immutable Tenant-scoped
+  movement identity as both retry outcome and operational evidence; receipt/adjustment
+  arithmetic and policy/safety evidence share their authoritative transaction.
+- Real PostgreSQL concurrency acceptance covers Staff snapshot coherence, Category
+  hierarchy races, Catalog lifecycle versus Orders, receipt/adjustment/policy/safety
+  versus Orders, duplicate movement acquisition, stock arithmetic and rollback paths.
+  Migration acceptance proves empty/V32/V34 upgrade behavior and historical integrity.
+- Real signed-JWT HTTP acceptance proves trusted Tenant/Staff composition, independent
+  permissions, cross-Tenant isolation, CUSTOMER/Platform/Organization non-inheritance,
+  exact numeric transport, replay-after-reauthorization, bounded reads, sanitized
+  Problem Details and preserved framework 406/415 semantics.
+- Full Maven Wrapper `clean verify` passed with 1,233 tests at the substantive HTTP
+  checkpoint. Additional Order-race, migration, log-privacy and Unicode regressions were
+  added afterward; the exact functional candidate `94da972902ca426d9e14a1666469112f6dc86bc9`
+  then passed Branch Policy, CI (which executes full `clean verify`) and Platform
+  Validation with no failing check.
+- GitHub Codex review produced two material findings: Catalog evidence `TRUNCATE`
+  protection (P1) and UTF-16 versus Unicode-code-point HTTP validation (P2). Both were
+  reproduced, fixed minimally with regression evidence, and their threads resolved.
+  A third final exact-HEAD review was requested after those fixes but could not be
+  fulfilled because Codex review capacity was exhausted. This limitation is recorded
+  explicitly and is not represented as an approval. The project owner authorized the
+  documented fallback after exact-HEAD CI, resolved threads and an independent hostile
+  review found no additional blocker.
 - The concrete API, input limits, replay/precondition behavior and errors are documented
   in [the HTTP contract](../catalog-inventory-administration-http.md).
-- This ADR remains DESIGNED until the complete acceptance gate is proved.
 
 ## Explicitly deferred
 
