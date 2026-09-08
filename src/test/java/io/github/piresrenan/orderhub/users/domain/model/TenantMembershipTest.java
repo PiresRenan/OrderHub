@@ -10,12 +10,14 @@ import org.junit.jupiter.api.Test;
 class TenantMembershipTest {
 
     @Test
-    void createsMembershipBetweenUserAndTenant() {
-        // Why: membership must explicitly associate one internal User identity with
-        // one Tenant identity without introducing authorization semantics.
-        // Covers: valid TenantMembership creation.
-        // Prevents: hidden role, credential or Tenant-object coupling entering the
-        // membership model.
+    void createsActiveMembershipBetweenUserAndTenant() {
+        // Why: a newly established relationship must be immediately usable, and
+        // that starting lifecycle must be a deliberate domain decision rather
+        // than a persistence default.
+        // Covers: creation producing ACTIVE identity plus lifecycle state.
+        // Prevents: new memberships depending on a database default, or being
+        // created in a state that cannot participate in Tenant trust.
+
 
         var userId = UUID.randomUUID();
         var tenantId = UUID.randomUUID();
@@ -29,13 +31,20 @@ class TenantMembershipTest {
 
         assertThat(membership.tenantId())
                 .isEqualTo(tenantId);
+
+        assertThat(membership.status())
+                .isEqualTo(TenantMembershipStatus.ACTIVE);
+
+        assertThat(membership.isOperationallyActive())
+                .isTrue();
     }
 
     @Test
     void rejectsMissingUserId() {
         // Why: a membership without a User cannot represent a valid association.
-        // Covers: required userId invariant.
+        // Covers: required userId invariant on creation.
         // Prevents: orphan membership state on the User side.
+
 
         assertThatThrownBy(() ->
                 TenantMembership.create(
@@ -48,8 +57,9 @@ class TenantMembershipTest {
     @Test
     void rejectsMissingTenantId() {
         // Why: a membership without a Tenant cannot represent a valid association.
-        // Covers: required tenantId invariant.
+        // Covers: required tenantId invariant on creation.
         // Prevents: orphan membership state on the Tenant side.
+
 
         assertThatThrownBy(() ->
                 TenantMembership.create(
@@ -60,24 +70,40 @@ class TenantMembershipTest {
     }
 
     @Test
-    void rehydratesPersistedMembership() {
-        // Why: repository adapters need an explicit reconstruction contract for
-        // already persisted associations.
-        // Covers: TenantMembership rehydration.
-        // Prevents: persistence bypassing domain invariants during reads.
+    void strictlyRehydratesPersistedMembershipStatus() {
+        // Why: a relationship may be preserved for history while no longer being
+        // eligible to establish new Tenant trust, so reconstruction must report
+        // the persisted lifecycle exactly.
+        // Covers: SUSPENDED and TERMINATED rehydration and their non-operational
+        // answer.
+        // Prevents: a suspended or terminated relationship silently regaining
+        // operational authority through lenient reconstruction.
+
 
         var userId = UUID.randomUUID();
         var tenantId = UUID.randomUUID();
 
-        var membership = TenantMembership.rehydrate(
+        var suspended = TenantMembership.rehydrate(
                 userId,
-                tenantId);
+                tenantId,
+                TenantMembershipStatus.SUSPENDED);
 
-        assertThat(membership.userId())
-                .isEqualTo(userId);
+        var terminated = TenantMembership.rehydrate(
+                userId,
+                tenantId,
+                TenantMembershipStatus.TERMINATED);
 
-        assertThat(membership.tenantId())
-                .isEqualTo(tenantId);
+        assertThat(suspended.status())
+                .isEqualTo(TenantMembershipStatus.SUSPENDED);
+
+        assertThat(suspended.isOperationallyActive())
+                .isFalse();
+
+        assertThat(terminated.status())
+                .isEqualTo(TenantMembershipStatus.TERMINATED);
+
+        assertThat(terminated.isOperationallyActive())
+                .isFalse();
     }
 
     @Test
@@ -87,10 +113,12 @@ class TenantMembershipTest {
         // Covers: userId validation during reconstruction.
         // Prevents: corrupted persistence state entering the domain.
 
+
         assertThatThrownBy(() ->
                 TenantMembership.rehydrate(
                         null,
-                        UUID.randomUUID()))
+                        UUID.randomUUID(),
+                        TenantMembershipStatus.ACTIVE))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Membership user id is required");
     }
@@ -101,11 +129,30 @@ class TenantMembershipTest {
         // Covers: tenantId validation during reconstruction.
         // Prevents: corrupted membership rows becoming valid domain objects.
 
+
         assertThatThrownBy(() ->
                 TenantMembership.rehydrate(
                         UUID.randomUUID(),
-                        null))
+                        null,
+                        TenantMembershipStatus.ACTIVE))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Membership tenant id is required");
+    }
+
+    @Test
+    void rehydrationRejectsMissingStatus() {
+        // Why: lifecycle is what decides operational eligibility, so absent
+        // status is corrupt state rather than a defaultable value.
+        // Covers: mandatory status during reconstruction.
+        // Prevents: a missing persisted lifecycle being interpreted as ACTIVE.
+
+
+        assertThatThrownBy(() ->
+                TenantMembership.rehydrate(
+                        UUID.randomUUID(),
+                        UUID.randomUUID(),
+                        null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Membership status is required");
     }
 }

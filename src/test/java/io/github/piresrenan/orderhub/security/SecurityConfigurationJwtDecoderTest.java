@@ -21,7 +21,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 
-import io.github.piresrenan.orderhub.users.application.port.in.FindTenantMembershipUseCase;
+import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityUseCase;
 
 import com.nimbusds.jose.JWSAlgorithm;
@@ -257,7 +257,7 @@ class SecurityConfigurationJwtDecoderTest {
                                     "JWT decoder composition must not resolve external identity");
                         })
                 .withBean(
-                        FindTenantMembershipUseCase.class,
+                        IsTenantMembershipOperationallyActiveUseCase.class,
                         () -> query -> {
                             throw new AssertionError(
                                     "JWT decoder composition must not resolve tenant membership");

@@ -23,7 +23,7 @@ import io.github.piresrenan.orderhub.security.application.port.in.ResolveTrusted
 import io.github.piresrenan.orderhub.security.application.service.ResolveAuthenticatedUserService;
 import io.github.piresrenan.orderhub.security.application.service.ResolveTrustedTenantContextService;
 import io.github.piresrenan.orderhub.tenants.application.port.in.operational.FindTenantOperationalStateUseCase;
-import io.github.piresrenan.orderhub.users.application.port.in.FindTenantMembershipUseCase;
+import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityUseCase;
 
 /**
@@ -63,13 +63,13 @@ public class SecurityConfiguration {
      * <p>Security consumes only module-owned application contracts. The Tenant
      * aggregate and Tenant persistence internals never cross this boundary.
      *
-     * @param memberships Users-owned Tenant membership lookup boundary
+     * @param memberships Users-owned membership eligibility boundary
      * @param tenantOperationalStates Tenants-owned operational-state boundary
      * @return trusted Tenant-context resolution use case
      */
     @Bean
     ResolveTrustedTenantContextUseCase resolveTrustedTenantContextUseCase(
-            FindTenantMembershipUseCase memberships,
+            IsTenantMembershipOperationallyActiveUseCase memberships,
             FindTenantOperationalStateUseCase tenantOperationalStates) {
 
         return new ResolveTrustedTenantContextService(

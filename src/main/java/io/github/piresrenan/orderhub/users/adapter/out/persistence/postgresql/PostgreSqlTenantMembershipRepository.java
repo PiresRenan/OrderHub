@@ -10,6 +10,7 @@ import io.github.piresrenan.orderhub.users.application.port.out.TenantMembership
 import io.github.piresrenan.orderhub.users.application.port.out.TenantMembershipPersistenceException;
 import io.github.piresrenan.orderhub.users.application.port.out.TenantMembershipRepository;
 import io.github.piresrenan.orderhub.users.domain.model.TenantMembership;
+import io.github.piresrenan.orderhub.users.domain.model.TenantMembershipStatus;
 
 /**
  * PostgreSQL implementation of the TenantMembership persistence boundary.
@@ -25,16 +26,18 @@ public final class PostgreSqlTenantMembershipRepository
     private static final String INSERT_MEMBERSHIP = """
             INSERT INTO users.tenant_memberships (
                 user_id,
-                tenant_id
+                tenant_id,
+                status
             )
-            VALUES (?, ?)
+            VALUES (?, ?, ?)
             ON CONFLICT (tenant_id, user_id) DO NOTHING
             """;
 
     private static final String FIND_MEMBERSHIP = """
             SELECT
                 user_id,
-                tenant_id
+                tenant_id,
+                status
             FROM users.tenant_memberships
             WHERE user_id = ?
               AND tenant_id = ?
@@ -54,12 +57,14 @@ public final class PostgreSqlTenantMembershipRepository
     }
 
     /**
-     * Persists one User/Tenant membership atomically.
+     * Persists one User/Tenant membership and its explicit lifecycle state
+     * atomically.
      *
      * <p>
      * PostgreSQL resolves concurrent attempts against the durable unique
      * constraint. A zero update count therefore represents the exact
-     * User/Tenant pair already being present.
+     * User/Tenant pair already being present, and the stored lifecycle of that
+     * existing pair is never overwritten here.
      * </p>
      *
      * @param membership valid membership requested for persistence
@@ -75,7 +80,8 @@ public final class PostgreSqlTenantMembershipRepository
             var insertedRows = jdbcTemplate.update(
                     INSERT_MEMBERSHIP,
                     membership.userId(),
-                    membership.tenantId());
+                    membership.tenantId(),
+                    membership.status().name());
 
             if (insertedRows == 0) {
                 throw new TenantMembershipAlreadyExistsException();
@@ -94,10 +100,17 @@ public final class PostgreSqlTenantMembershipRepository
      * Retrieves one exact User/Tenant membership pair and reconstructs its
      * domain representation.
      *
+     * <p>
+     * The persisted lifecycle value is mapped strictly, so an unrecognized
+     * status is reported as a persistence failure instead of being silently
+     * interpreted as operational.
+     * </p>
+     *
      * @param userId internal User identifier
      * @param tenantId Tenant identifier
      * @return matching membership when present, otherwise empty
      * @throws TenantMembershipPersistenceException when PostgreSQL access fails
+     *                                              or persisted state is invalid
      */
     @Override
     public Optional<TenantMembership> find(
@@ -114,12 +127,15 @@ public final class PostgreSqlTenantMembershipRepository
                                                     UUID.class),
                                             resultSet.getObject(
                                                     "tenant_id",
-                                                    UUID.class)),
+                                                    UUID.class),
+                                            TenantMembershipStatus.valueOf(
+                                                    resultSet.getString(
+                                                            "status"))),
                             userId,
                             tenantId)
                     .stream()
                     .findFirst();
-        } catch (DataAccessException exception) {
+        } catch (DataAccessException | IllegalArgumentException exception) {
             throw new TenantMembershipPersistenceException(
                     exception);
         }

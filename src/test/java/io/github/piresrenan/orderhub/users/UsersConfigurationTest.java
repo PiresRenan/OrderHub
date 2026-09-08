@@ -13,13 +13,13 @@ import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.Po
 import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.PostgreSqlUserRepository;
 import io.github.piresrenan.orderhub.users.application.port.in.CreateUserUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.EstablishTenantMembershipUseCase;
-import io.github.piresrenan.orderhub.users.application.port.in.FindTenantMembershipUseCase;
+import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveUseCase;
 import io.github.piresrenan.orderhub.users.application.port.out.TenantMembershipRepository;
 import io.github.piresrenan.orderhub.users.application.port.out.UserIdGenerator;
 import io.github.piresrenan.orderhub.users.application.port.out.UserRepository;
 import io.github.piresrenan.orderhub.users.application.service.CreateUserService;
 import io.github.piresrenan.orderhub.users.application.service.EstablishTenantMembershipService;
-import io.github.piresrenan.orderhub.users.application.service.FindTenantMembershipService;
+import io.github.piresrenan.orderhub.users.application.service.IsTenantMembershipOperationallyActiveService;
 import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.PostgreSqlExternalIdentityBindingRepository;
 import io.github.piresrenan.orderhub.users.application.port.in.BindExternalIdentityUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityUseCase;
@@ -58,8 +58,8 @@ class UsersConfigurationTest {
                         assertThat(context.getBean(EstablishTenantMembershipUseCase.class))
                                         .isInstanceOf(EstablishTenantMembershipService.class);
 
-                        assertThat(context.getBean(FindTenantMembershipUseCase.class))
-                                        .isInstanceOf(FindTenantMembershipService.class);
+                        assertThat(context.getBean(IsTenantMembershipOperationallyActiveUseCase.class))
+                                        .isInstanceOf(IsTenantMembershipOperationallyActiveService.class);
 
                         assertThat(context.getBean(UserIdGenerator.class))
                                         .isNotNull();

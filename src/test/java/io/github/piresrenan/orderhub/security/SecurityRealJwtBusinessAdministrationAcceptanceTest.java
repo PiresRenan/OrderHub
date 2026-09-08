@@ -305,6 +305,30 @@ class SecurityRealJwtBusinessAdministrationAcceptanceTest {
                 .andExpect(status().isForbidden());
     }
 
+    @ParameterizedTest
+    @CsvSource({"SUSPENDED", "TERMINATED"})
+    void nonOperationalPersistedMembershipStopsEstablishingTenantTrust(String nonOperationalStatus) throws Exception {
+        // Why: a relationship kept for history must stop producing new Tenant trust,
+        // and that must hold through the real composition rather than only in unit doubles.
+        // Covers: real PostgreSQL membership row -> repository -> Users operational-membership
+        // capability -> trusted-tenant resolution -> HTTP, before and after the lifecycle change.
+        // Prevents: a suspended or terminated membership retaining authority, and denial being
+        // mistakenly attributed to a deleted row, an inactive Tenant or a missing permission.
+        var actor = member();
+        grantStaff(actor, "CATALOG_MANAGE");
+        mvc.perform(as(actor, post("/catalog/products")).content(productBody(UUID.randomUUID())))
+                .andExpect(status().isCreated());
+        jdbc.update("UPDATE users.tenant_memberships SET status=? WHERE tenant_id=? AND user_id=?",
+                nonOperationalStatus, actor.tenantId(), actor.userId());
+        mvc.perform(as(actor, post("/catalog/products")).content(productBody(UUID.randomUUID())))
+                .andExpect(status().isForbidden());
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM users.tenant_memberships WHERE tenant_id=? AND user_id=?",
+                String.class, actor.tenantId(), actor.userId())).isEqualTo(nonOperationalStatus);
+        assertThat(jdbc.queryForObject("SELECT status FROM tenants.tenants WHERE id=?",
+                String.class, actor.tenantId())).isEqualTo("ACTIVE");
+    }
+
     @Test
     void permissionInAnotherTenantCannotBeUsedEvenWithMembershipInBoth() throws Exception {
         // Why: membership in multiple Tenants must not make a role global.
@@ -313,7 +337,7 @@ class SecurityRealJwtBusinessAdministrationAcceptanceTest {
         var actor = member();
         grantStaff(actor, "CATALOG_MANAGE");
         var foreign = member();
-        jdbc.update("INSERT INTO users.tenant_memberships(user_id,tenant_id) VALUES (?,?)",
+        jdbc.update("INSERT INTO users.tenant_memberships(user_id,tenant_id,status) VALUES (?,?,'ACTIVE')",
                 actor.userId(), foreign.tenantId());
         mvc.perform(as(new Actor(actor.userId(), foreign.tenantId()), post("/catalog/products"))
                 .content(productBody(UUID.randomUUID()))).andExpect(status().isForbidden());
@@ -440,7 +464,7 @@ class SecurityRealJwtBusinessAdministrationAcceptanceTest {
         jdbc.update("INSERT INTO users.users(id) VALUES (?)", actor.userId());
         jdbc.update("INSERT INTO users.external_identity_bindings(issuer,subject,user_id) VALUES (?,?,?)",
                 ISSUER, actor.userId().toString(), actor.userId());
-        jdbc.update("INSERT INTO users.tenant_memberships(user_id,tenant_id) VALUES (?,?)",
+        jdbc.update("INSERT INTO users.tenant_memberships(user_id,tenant_id,status) VALUES (?,?,'ACTIVE')",
                 actor.userId(), actor.tenantId());
         return actor;
     }

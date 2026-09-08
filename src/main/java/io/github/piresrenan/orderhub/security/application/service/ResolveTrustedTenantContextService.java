@@ -8,21 +8,26 @@ import io.github.piresrenan.orderhub.security.application.port.in.ResolveTrusted
 import io.github.piresrenan.orderhub.tenants.application.port.in.operational.FindTenantOperationalStateQuery;
 import io.github.piresrenan.orderhub.tenants.application.port.in.operational.FindTenantOperationalStateUseCase;
 import io.github.piresrenan.orderhub.tenants.application.port.in.operational.TenantOperationalState;
-import io.github.piresrenan.orderhub.users.application.port.in.FindTenantMembershipQuery;
-import io.github.piresrenan.orderhub.users.application.port.in.FindTenantMembershipUseCase;
+import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveQuery;
+import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveUseCase;
 
 /**
- * Derives trusted Tenant authority from an authenticated internal User,
- * exact Tenant membership and Tenant operational state.
+ * Derives trusted Tenant authority from an authenticated internal User, an
+ * operationally active exact Tenant membership and Tenant operational state.
+ *
+ * <p>
+ * Membership lifecycle policy stays inside Users and Tenant lifecycle policy
+ * stays inside Tenants. Security composes only the two fail-closed answers.
+ * </p>
  */
 public final class ResolveTrustedTenantContextService
         implements ResolveTrustedTenantContextUseCase {
 
-    private final FindTenantMembershipUseCase memberships;
+    private final IsTenantMembershipOperationallyActiveUseCase memberships;
     private final FindTenantOperationalStateUseCase tenantOperationalStates;
 
     public ResolveTrustedTenantContextService(
-            FindTenantMembershipUseCase memberships,
+            IsTenantMembershipOperationallyActiveUseCase memberships,
             FindTenantOperationalStateUseCase tenantOperationalStates) {
 
         if (memberships == null) {
@@ -35,11 +40,8 @@ public final class ResolveTrustedTenantContextService
                     "Tenant operational-state boundary is required");
         }
 
-        this.memberships =
-                memberships;
-
-        this.tenantOperationalStates =
-                tenantOperationalStates;
+        this.memberships = memberships;
+        this.tenantOperationalStates = tenantOperationalStates;
     }
 
     @Override
@@ -47,13 +49,12 @@ public final class ResolveTrustedTenantContextService
             ResolveTrustedTenantContextQuery query) {
 
         var membershipQuery =
-                new FindTenantMembershipQuery(
+                new IsTenantMembershipOperationallyActiveQuery(
                         query.authenticatedPrincipal().userId(),
                         query.requestedTenantId());
 
-        if (memberships
-                .find(membershipQuery)
-                .isEmpty()) {
+        if (!memberships.isOperationallyActive(
+                membershipQuery)) {
 
             return Optional.empty();
         }

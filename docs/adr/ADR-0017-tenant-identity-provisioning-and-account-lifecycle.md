@@ -93,7 +93,7 @@ Provider issuer/subject values never become authorization roles or Tenant author
 - `workforce` owns StaffProfile and organizational/authority lifecycle;
 - `customers` owns CustomerProfile and Customer↔User account relationship;
 - `authorization` owns business/administrative permission decisions and delegation constraints;
-- `security` consumes authoritative identity/membership state to establish trust but does not become provisioning storage;
+- `security` consumes authoritative identity plus a narrow Users-owned operational-membership predicate to establish trust, and does not consume membership state or become provisioning storage;
 - `tenants` owns Tenant operational lifecycle;
 - HTTP adapters remain thin and do not own cross-module policy.
 
@@ -212,11 +212,59 @@ Public errors do not reveal raw external subject identifiers, invitation secrets
 
 Observability uses low-cardinality operation/outcome/reason dimensions; User/Tenant/Customer/Staff/invitation/external-subject identifiers are not metric labels.
 
+## Executable decision checkpoint — TenantMembership lifecycle foundation
+
+The first OH-019 PostgreSQL/Flyway RED proved that accepted V35 cannot represent
+a membership that remains historically present while becoming ineligible for new
+Tenant trust: `users.tenant_memberships` contained only `(user_id, tenant_id)`.
+
+That evidence authorizes V36 and freezes only the minimum lifecycle foundation:
+
+- lifecycle state belongs on the existing TenantMembership relationship rather
+  than a second aggregate because the proven requirement is operational state of
+  that exact relationship;
+- the persisted vocabulary is `ACTIVE`, `SUSPENDED`, `TERMINATED`;
+- newly established and pre-V36 memberships are `ACTIVE`;
+- only `ACTIVE` membership is eligible to participate in new
+  `TrustedTenantContext` establishment;
+- `SUSPENDED` and `TERMINATED` preserve relationship/history while denying new
+  trust;
+- roles, permissions, StaffProfile, CustomerProfile and Tenant operational state
+  remain separate;
+- V36 adds only the bounded status state and PostgreSQL check constraint; it does
+  not add timestamps, versions, invitation state or authorization data;
+- this checkpoint does not yet admit transition/recovery semantics. Whether
+  suspension may recover, whether termination is irreversible and how concurrent
+  lifecycle mutations are serialized require their own executable transition RED.
+
+The original schema RED turned GREEN, and its temporary test name has been
+replaced by permanent V35 -> V36 migration, persistence and Security
+regressions.
+
+## Executable decision checkpoint — Users operational-membership boundary
+
+Spring Modulith proved that calling `TenantMembership.isOperationallyActive()`
+from `security` crossed a non-exposed `users` domain boundary. That evidence
+authorizes the following boundary and changes no trust rule:
+
+- `users` owns membership lifecycle interpretation, including which states
+  remain operational;
+- `security` consumes a narrow Users-owned operational-membership eligibility
+  capability rather than membership state;
+- that capability accepts only an internal `userId` and a `tenantId`, and
+  returns no `TenantMembership` or other Users domain type;
+- `FindTenantMembershipUseCase`, whose contract returned the domain model, was
+  retired from this cross-module path;
+- fail-closed trust semantics are unchanged: an absent membership, a
+  non-operational membership, an unknown Tenant and a non-`ACTIVE` Tenant each
+  deny trusted Tenant context, and Tenant state is still not probed once
+  membership has already denied.
+
 ## Open design questions requiring executable evidence
 
 The following are deliberately not frozen before TDD/discovery:
 
-1. exact TenantMembership lifecycle vocabulary and persistence representation;
+1. exact TenantMembership lifecycle transition commands, whether recovery/reactivation is admitted at all, and the concurrency semantics of those transitions;
 2. whether Staff provisioning requires a durable invitation aggregate or a smaller provisioning-intent model;
 3. invitation/bootstrap credential lifetime and replay result semantics;
 4. exact Customer linking proof mechanism;

@@ -14,8 +14,7 @@ import io.github.piresrenan.orderhub.security.application.port.in.ResolveTrusted
 import io.github.piresrenan.orderhub.tenants.application.port.in.operational.FindTenantOperationalStateUseCase;
 import io.github.piresrenan.orderhub.tenants.application.port.in.operational.TenantOperationalState;
 import io.github.piresrenan.orderhub.tenants.application.port.in.operational.TenantOperationalStateUnavailableException;
-import io.github.piresrenan.orderhub.users.application.port.in.FindTenantMembershipUseCase;
-import io.github.piresrenan.orderhub.users.domain.model.TenantMembership;
+import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveUseCase;
 
 class ResolveTrustedTenantOperationalStateTest {
 
@@ -28,12 +27,9 @@ class ResolveTrustedTenantOperationalStateTest {
         var tenantId =
                 UUID.randomUUID();
 
-        FindTenantMembershipUseCase memberships =
+        IsTenantMembershipOperationallyActiveUseCase memberships =
                 query ->
-                        Optional.of(
-                                TenantMembership.create(
-                                        query.userId(),
-                                        query.tenantId()));
+                        true;
 
         FindTenantOperationalStateUseCase tenantStates =
                 query ->
@@ -69,12 +65,9 @@ class ResolveTrustedTenantOperationalStateTest {
         var tenantId =
                 UUID.randomUUID();
 
-        FindTenantMembershipUseCase memberships =
+        IsTenantMembershipOperationallyActiveUseCase memberships =
                 query ->
-                        Optional.of(
-                                TenantMembership.create(
-                                        query.userId(),
-                                        query.tenantId()));
+                        true;
 
         FindTenantOperationalStateUseCase tenantStates =
                 query ->
@@ -97,12 +90,9 @@ class ResolveTrustedTenantOperationalStateTest {
     @Test
     void deniesTrustedContextWhenTenantNoLongerExists() {
 
-        FindTenantMembershipUseCase memberships =
+        IsTenantMembershipOperationallyActiveUseCase memberships =
                 query ->
-                        Optional.of(
-                                TenantMembership.create(
-                                        query.userId(),
-                                        query.tenantId()));
+                        true;
 
         FindTenantOperationalStateUseCase tenantStates =
                 query ->
@@ -127,9 +117,9 @@ class ResolveTrustedTenantOperationalStateTest {
         var operationalLookupAttempted =
                 new AtomicBoolean();
 
-        FindTenantMembershipUseCase memberships =
+        IsTenantMembershipOperationallyActiveUseCase memberships =
                 query ->
-                        Optional.empty();
+                        false;
 
         FindTenantOperationalStateUseCase tenantStates =
                 query -> {
@@ -164,12 +154,9 @@ class ResolveTrustedTenantOperationalStateTest {
                         new IllegalStateException(
                                 "synthetic-internal-detail"));
 
-        FindTenantMembershipUseCase memberships =
+        IsTenantMembershipOperationallyActiveUseCase memberships =
                 query ->
-                        Optional.of(
-                                TenantMembership.create(
-                                        query.userId(),
-                                        query.tenantId()));
+                        true;
 
         FindTenantOperationalStateUseCase tenantStates =
                 query -> {
@@ -193,9 +180,9 @@ class ResolveTrustedTenantOperationalStateTest {
     @Test
     void rejectsMissingTenantOperationalStateBoundary() {
 
-        FindTenantMembershipUseCase memberships =
+        IsTenantMembershipOperationallyActiveUseCase memberships =
                 query ->
-                        Optional.empty();
+                        false;
 
         assertThatThrownBy(() ->
                 new ResolveTrustedTenantContextService(

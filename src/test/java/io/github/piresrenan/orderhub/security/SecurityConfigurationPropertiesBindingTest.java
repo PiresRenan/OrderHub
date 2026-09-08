@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import io.github.piresrenan.orderhub.security.adapter.in.authentication.jwt.JwtResourceServerProperties;
-import io.github.piresrenan.orderhub.users.application.port.in.FindTenantMembershipUseCase;
+import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityUseCase;
 import io.github.piresrenan.orderhub.tenants.application.port.in.operational.FindTenantOperationalStateUseCase;
 import io.github.piresrenan.orderhub.tenants.application.port.in.operational.TenantOperationalState;
@@ -38,7 +38,7 @@ class SecurityConfigurationPropertiesBindingTest {
                                         "JWT properties binding must not resolve external identity");
                             })
                     .withBean(
-                            FindTenantMembershipUseCase.class,
+                            IsTenantMembershipOperationallyActiveUseCase.class,
                             () -> query -> {
                                 throw new AssertionError(
                                         "JWT properties binding must not resolve tenant membership");

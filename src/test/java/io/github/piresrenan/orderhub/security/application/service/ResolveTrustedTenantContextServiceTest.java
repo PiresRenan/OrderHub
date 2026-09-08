@@ -12,9 +12,8 @@ import org.junit.jupiter.api.Test;
 import io.github.piresrenan.orderhub.security.application.model.AuthenticatedUserPrincipal;
 import io.github.piresrenan.orderhub.security.application.port.in.ResolveTrustedTenantContextQuery;
 import io.github.piresrenan.orderhub.tenants.application.port.in.operational.TenantOperationalState;
-import io.github.piresrenan.orderhub.users.application.port.in.FindTenantMembershipQuery;
-import io.github.piresrenan.orderhub.users.application.port.in.FindTenantMembershipUseCase;
-import io.github.piresrenan.orderhub.users.domain.model.TenantMembership;
+import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveQuery;
+import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveUseCase;
 
 class ResolveTrustedTenantContextServiceTest {
 
@@ -22,19 +21,16 @@ class ResolveTrustedTenantContextServiceTest {
     void resolvesTrustedTenantWhenExactMembershipExists() {
         // Why: requested Tenant authority becomes trusted only after proving that
         // the authenticated internal User belongs to that exact Tenant.
-        // Covers: successful membership lookup and projection into the minimal
-        // TrustedTenantContext.
+        // Covers: successful membership verification and projection into the
+        // minimal TrustedTenantContext.
         // Prevents: trusting X-Tenant-Id merely because it was supplied by the
         // caller.
 
         var userId = UUID.randomUUID();
         var tenantId = UUID.randomUUID();
 
-        FindTenantMembershipUseCase memberships =
-                query -> Optional.of(
-                        TenantMembership.create(
-                                query.userId(),
-                                query.tenantId()));
+        IsTenantMembershipOperationallyActiveUseCase memberships =
+                query -> true;
 
         var service =
                 new ResolveTrustedTenantContextService(
@@ -62,23 +58,20 @@ class ResolveTrustedTenantContextServiceTest {
         // pair rather than either identifier independently.
         // Covers: construction of the Users membership query from the internal
         // principal and requested Tenant selector.
-        // Prevents: looking up a membership for the wrong User, a fallback
+        // Prevents: asking about a membership for the wrong User, a fallback
         // Tenant or an incompletely scoped identity.
 
         var userId = UUID.randomUUID();
         var tenantId = UUID.randomUUID();
 
         var captured =
-                new AtomicReference<FindTenantMembershipQuery>();
+                new AtomicReference<IsTenantMembershipOperationallyActiveQuery>();
 
-        FindTenantMembershipUseCase memberships =
+        IsTenantMembershipOperationallyActiveUseCase memberships =
                 query -> {
                     captured.set(query);
 
-                    return Optional.of(
-                            TenantMembership.create(
-                                    query.userId(),
-                                    query.tenantId()));
+                    return true;
                 };
 
         var service =
@@ -107,13 +100,13 @@ class ResolveTrustedTenantContextServiceTest {
     void returnsEmptyWhenAuthenticatedUserHasNoRequestedMembership() {
         // Why: authentication alone must not grant authority inside an arbitrary
         // Tenant.
-        // Covers: missing exact membership as an application-level access
-        // resolution failure.
+        // Covers: a negative Users membership answer as an application-level
+        // access resolution failure.
         // Prevents: authenticated callers crossing Tenant boundaries by changing
         // only the requested Tenant selector.
 
-        FindTenantMembershipUseCase memberships =
-                query -> Optional.empty();
+        IsTenantMembershipOperationallyActiveUseCase memberships =
+                query -> false;
 
         var service =
                 new ResolveTrustedTenantContextService(
@@ -143,19 +136,9 @@ class ResolveTrustedTenantContextServiceTest {
         var authorizedTenantId = UUID.randomUUID();
         var otherTenantId = UUID.randomUUID();
 
-        FindTenantMembershipUseCase memberships =
-                query -> {
-                    if (query.userId().equals(userId)
-                            && query.tenantId().equals(authorizedTenantId)) {
-
-                        return Optional.of(
-                                TenantMembership.create(
-                                        userId,
-                                        authorizedTenantId));
-                    }
-
-                    return Optional.empty();
-                };
+        IsTenantMembershipOperationallyActiveUseCase memberships =
+                query -> query.userId().equals(userId)
+                        && query.tenantId().equals(authorizedTenantId);
 
         var service =
                 new ResolveTrustedTenantContextService(

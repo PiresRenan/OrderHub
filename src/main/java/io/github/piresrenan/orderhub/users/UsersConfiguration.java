@@ -10,7 +10,7 @@ import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.Po
 import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.PostgreSqlUserRepository;
 import io.github.piresrenan.orderhub.users.application.port.in.CreateUserUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.EstablishTenantMembershipUseCase;
-import io.github.piresrenan.orderhub.users.application.port.in.FindTenantMembershipUseCase;
+import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveUseCase;
 import io.github.piresrenan.orderhub.users.application.port.out.TenantMembershipRepository;
 import io.github.piresrenan.orderhub.users.application.port.out.UserIdGenerator;
 import io.github.piresrenan.orderhub.users.application.port.out.UserRepository;
@@ -18,7 +18,7 @@ import io.github.piresrenan.orderhub.users.application.port.in.UserExistenceUseC
 import io.github.piresrenan.orderhub.users.application.service.UserExistenceService;
 import io.github.piresrenan.orderhub.users.application.service.CreateUserService;
 import io.github.piresrenan.orderhub.users.application.service.EstablishTenantMembershipService;
-import io.github.piresrenan.orderhub.users.application.service.FindTenantMembershipService;
+import io.github.piresrenan.orderhub.users.application.service.IsTenantMembershipOperationallyActiveService;
 import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.PostgreSqlExternalIdentityBindingRepository;
 import io.github.piresrenan.orderhub.users.application.port.in.BindExternalIdentityUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityUseCase;
@@ -123,16 +123,23 @@ public class UsersConfiguration {
         }
 
         /**
-         * Composes the exact-pair TenantMembership query use case.
+         * Composes the exact-pair TenantMembership operational eligibility use
+         * case.
+         *
+         * <p>
+         * Publishes the Users-owned operational-membership eligibility boundary
+         * without exposing TenantMembership domain state. The domain model and
+         * its lifecycle vocabulary stay inside Users.
+         * </p>
          *
          * @param tenantMembershipRepository membership persistence boundary
-         * @return configured membership query use case
+         * @return configured membership eligibility use case
          */
         @Bean
-        FindTenantMembershipUseCase findTenantMembershipUseCase(
+        IsTenantMembershipOperationallyActiveUseCase isTenantMembershipOperationallyActiveUseCase(
                         TenantMembershipRepository tenantMembershipRepository) {
 
-                return new FindTenantMembershipService(
+                return new IsTenantMembershipOperationallyActiveService(
                                 tenantMembershipRepository);
         }
 

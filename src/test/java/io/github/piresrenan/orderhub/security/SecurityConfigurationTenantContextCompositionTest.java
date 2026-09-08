@@ -13,8 +13,8 @@ import io.github.piresrenan.orderhub.security.application.model.AuthenticatedUse
 import io.github.piresrenan.orderhub.security.application.port.in.ResolveTrustedTenantContextQuery;
 import io.github.piresrenan.orderhub.security.application.port.in.ResolveTrustedTenantContextUseCase;
 import io.github.piresrenan.orderhub.security.application.service.ResolveTrustedTenantContextService;
-import io.github.piresrenan.orderhub.users.application.port.in.FindTenantMembershipQuery;
-import io.github.piresrenan.orderhub.users.application.port.in.FindTenantMembershipUseCase;
+import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveQuery;
+import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityUseCase;
 import io.github.piresrenan.orderhub.tenants.application.port.in.operational.FindTenantOperationalStateUseCase;
 import io.github.piresrenan.orderhub.tenants.application.port.in.operational.TenantOperationalState;
@@ -34,7 +34,8 @@ class SecurityConfigurationTenantContextCompositionTest {
     void composesTrustedTenantResolverFromUsersMembershipBoundary() {
         // Why: HTTP adapters must eventually derive trusted Tenant context through
         // Security's application boundary rather than querying Users directly.
-        // Covers: FindTenantMembershipUseCase -> ResolveTrustedTenantContextUseCase
+        // Covers: IsTenantMembershipOperationallyActiveUseCase ->
+        // ResolveTrustedTenantContextUseCase
         // production composition and propagation of internal User + requested
         // Tenant identifiers.
         // Prevents: web adapters bypassing Security application logic or gaining
@@ -47,14 +48,14 @@ class SecurityConfigurationTenantContextCompositionTest {
                 UUID.randomUUID();
 
         var observedMembershipQuery =
-                new AtomicReference<FindTenantMembershipQuery>();
+                new AtomicReference<IsTenantMembershipOperationallyActiveQuery>();
 
-        FindTenantMembershipUseCase memberships =
+        IsTenantMembershipOperationallyActiveUseCase memberships =
                 query -> {
                     observedMembershipQuery.set(
                             query);
 
-                    return Optional.empty();
+                    return false;
                 };
 
         ResolveExternalIdentityUseCase externalIdentities =
@@ -73,7 +74,7 @@ class SecurityConfigurationTenantContextCompositionTest {
                         ResolveExternalIdentityUseCase.class,
                         () -> externalIdentities)
                 .withBean(
-                        FindTenantMembershipUseCase.class,
+                        IsTenantMembershipOperationallyActiveUseCase.class,
                         () -> memberships)
                 .withPropertyValues(
                         "orderhub.security.jwt.issuer="
@@ -110,7 +111,7 @@ class SecurityConfigurationTenantContextCompositionTest {
 
                     assertThat(observedMembershipQuery)
                             .hasValue(
-                                    new FindTenantMembershipQuery(
+                                    new IsTenantMembershipOperationallyActiveQuery(
                                             userId,
                                             tenantId));
                 });
