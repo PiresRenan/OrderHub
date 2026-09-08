@@ -22,6 +22,7 @@ public final class PostgreSqlInventoryPolicyRepository
                 policy
             FROM inventory.tenant_policies
             WHERE tenant_id = ?
+            FOR SHARE
             """;
 
     private final JdbcTemplate jdbcTemplate;
