@@ -7,7 +7,7 @@ import org.springframework.modulith.NamedInterface;
 /**
  * Framework-neutral Tenant-scoped permission decision request.
  */
-@NamedInterface("customer-owned-resource")
+@NamedInterface({"customer-owned-resource", "tenant-authorization"})
 public record TenantAuthorizationRequest(
         UUID userId,
         AuthorizationPersona persona,

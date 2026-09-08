@@ -1,4 +1,4 @@
-﻿# OrderHub Engineering Roadmap
+# OrderHub Engineering Roadmap
 
 This roadmap records the current engineering direction for OrderHub after OH-012.
 It is an architectural planning baseline, not a promise to introduce a technology
@@ -406,34 +406,39 @@ access.
 
 ### OH-018 — Catalog and Inventory administration
 
-Status: PLANNED — depends on OH-013 and the relevant Tenant administration
-surface.
+Status: COMPLETE — issue #36 and ADR-0016 `TESTED`; final functional candidate
+`94da972902ca426d9e14a1666469112f6dc86bc9` passed Branch Policy, full CI
+(`clean verify`) and Platform Validation after the final Unicode regression.
+Two material GitHub Codex findings were reproduced and resolved with executable
+regressions. A final exact-HEAD review request could not run because Codex review
+capacity was exhausted; this is recorded as an external limitation rather than an
+approval, and the owner-authorized fallback used resolved threads, exact-HEAD CI
+and independent hostile review before governance promotion.
 
-Expose controlled administration capabilities such as:
+Delivered controlled administration capabilities include:
 
-- create/update Catalog products and variants;
-- Category management;
-- pricing/base-price management;
-- Inventory receipt;
-- auditable Inventory adjustment;
-- safety-stock management;
+- create/update and lifecycle administration for Catalog products and variants;
+- Category creation, metadata and hierarchy management;
+- product Category assignments and bounded Catalog discovery;
+- exact base-price management with explicit currency and integer minor units;
+- Inventory receipt through durable auditable movement identity;
+- signed auditable Inventory adjustment without direct `set quantity` mutation;
+- durable retry/replay protection scoped by Tenant + operation identity;
+- safety-stock desired-state management;
 - Inventory oversell-policy management (`DENY` / `ALLOW_BACKORDER`);
-- later warehouse/location administration when that domain exists.
+- owner-local append-only Catalog/Inventory evidence in authoritative transactions;
+- real Staff/Tenant authorization composition with independent permissions;
+- bounded owner-local HTTP and sanitized RFC 9457-style Problem Details;
+- PostgreSQL concurrency evidence against the existing atomic Order workflow;
+- forward-only V33-V35 migrations and upgrade/integrity acceptance.
 
-Representative permissions include system-owned capabilities such as
+Representative permissions remain system-owned capabilities such as
 `CATALOG_*`, `INVENTORY_RECEIVE`, `INVENTORY_ADJUST` and
-`INVENTORY_POLICY_MANAGE`; exact codes are defined/versioned by the authorization
-catalog rather than invented by Tenant custom roles.
+`INVENTORY_POLICY_MANAGE`; Tenant custom roles do not invent equivalent authority.
 
 Inventory changes are represented as auditable movements/adjustments rather than
-untraceable `set quantity` operations.
-
-Administrative write operations require explicit permissions and produce an
-audit trail.
-
-The Inventory Policy administration requirement identified after OH-012 is
-preserved here explicitly; it is a consumer of the authorization foundation,
-not a substitute for it.
+untraceable `set quantity` operations. Warehouse/location administration remains
+future scope until that domain exists.
 
 ## Operational data lifecycle and housekeeping - planned
 

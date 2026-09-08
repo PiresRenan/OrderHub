@@ -23,9 +23,27 @@ import io.github.piresrenan.orderhub.workforce.application.service.PrivilegedPos
 import io.github.piresrenan.orderhub.workforce.application.service.PrivilegedWorkforceMutationAuthorizationService;
 import io.github.piresrenan.orderhub.workforce.application.service.ResolveWorkforceAuthorityChangeAnalyticsSourceService;
 import io.github.piresrenan.orderhub.workforce.application.service.WorkforceAuditRecorder;
+import io.github.piresrenan.orderhub.authorization.application.port.in.current.AuthorizeCurrentTenantActionUseCase;
+import io.github.piresrenan.orderhub.workforce.adapter.out.persistence.postgresql.PostgreSqlWorkforcePermissionEnvelopeRepository;
+import io.github.piresrenan.orderhub.workforce.application.port.in.authorization.AuthorizeStaffTenantActionUseCase;
+import io.github.piresrenan.orderhub.workforce.application.port.out.WorkforcePermissionEnvelopeRepository;
+import io.github.piresrenan.orderhub.workforce.application.service.StaffTenantAuthorizationService;
 
 @Configuration(proxyBeanMethods = false)
 public class WorkforceConfiguration {
+
+    /** Exposes only workforce-owned lookup to the current-authority application service. */
+    @Bean
+    WorkforcePermissionEnvelopeRepository workforcePermissionEnvelopeRepository(JdbcTemplate jdbcTemplate) {
+        return new PostgreSqlWorkforcePermissionEnvelopeRepository(jdbcTemplate);
+    }
+
+    /** Composes the narrow Staff facade without importing authorization persistence. */
+    @Bean
+    AuthorizeStaffTenantActionUseCase authorizeStaffTenantActionUseCase(
+            AuthorizeCurrentTenantActionUseCase authorization, WorkforcePermissionEnvelopeRepository envelopes) {
+        return new StaffTenantAuthorizationService(authorization, envelopes);
+    }
 
     @Bean
     WorkforceAuditRepository workforceAuditRepository(

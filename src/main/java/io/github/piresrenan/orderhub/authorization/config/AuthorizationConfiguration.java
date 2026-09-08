@@ -1,6 +1,7 @@
 package io.github.piresrenan.orderhub.authorization.config;
 
 import java.util.UUID;
+import java.util.List;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,9 +20,31 @@ import io.github.piresrenan.orderhub.authorization.application.port.out.Authoriz
 import io.github.piresrenan.orderhub.authorization.application.service.AdministrativeAuthorizationService;
 import io.github.piresrenan.orderhub.authorization.application.service.AuditedAdministrativeGrantMutationService;
 import io.github.piresrenan.orderhub.authorization.application.service.CustomerOwnedResourceAuthorizationService;
+import io.github.piresrenan.orderhub.authorization.application.port.in.current.AuthorizeCurrentTenantActionUseCase;
+import io.github.piresrenan.orderhub.authorization.application.service.DurableTenantAuthorizationService;
+import io.github.piresrenan.orderhub.authorization.adapter.out.persistence.postgresql.PostgreSqlRoleAssignmentRepository;
+import io.github.piresrenan.orderhub.authorization.adapter.out.persistence.postgresql.PostgreSqlRoleDefinitionRepository;
+import io.github.piresrenan.orderhub.authorization.adapter.out.persistence.postgresql.PostgreSqlUserPermissionOverrideRepository;
+import io.github.piresrenan.orderhub.authorization.adapter.out.persistence.postgresql.PostgreSqlAuthorizationDecisionReadTransaction;
+import io.github.piresrenan.orderhub.authorization.adapter.out.observability.MicrometerAuthorizationDecisionObserver;
+import io.github.piresrenan.orderhub.authorization.domain.constraint.AuthorizationConstraint;
+import io.micrometer.core.instrument.MeterRegistry;
 
 @Configuration(proxyBeanMethods = false)
 public class AuthorizationConfiguration {
+
+    /** Composes the current-ceiling entry using the existing snapshot, repositories and evaluator. */
+    @Bean
+    AuthorizeCurrentTenantActionUseCase authorizeCurrentTenantActionUseCase(
+            JdbcTemplate jdbcTemplate, PlatformTransactionManager transactionManager,
+            MeterRegistry meterRegistry, List<AuthorizationConstraint> constraints) {
+        return new DurableTenantAuthorizationService(
+                new PostgreSqlRoleAssignmentRepository(jdbcTemplate),
+                new PostgreSqlRoleDefinitionRepository(jdbcTemplate),
+                new PostgreSqlUserPermissionOverrideRepository(jdbcTemplate), constraints,
+                new PostgreSqlAuthorizationDecisionReadTransaction(transactionManager),
+                new MicrometerAuthorizationDecisionObserver(meterRegistry));
+    }
 
     @Bean
     AuthorizeCustomerOwnedResourceActionUseCase authorizeCustomerOwnedResourceActionUseCase() {

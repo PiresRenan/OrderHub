@@ -7,6 +7,9 @@ import java.util.List;
 import io.github.piresrenan.orderhub.authorization.application.observability.AuthorizationDecisionObservation;
 import io.github.piresrenan.orderhub.authorization.application.observability.AuthorizationDecisionReason;
 import io.github.piresrenan.orderhub.authorization.application.port.in.AuthorizeTenantActionUseCase;
+import io.github.piresrenan.orderhub.authorization.application.port.in.current.AuthorizeCurrentTenantActionUseCase;
+import io.github.piresrenan.orderhub.authorization.application.port.in.current.CurrentPermissionEnvelopeSource;
+import io.github.piresrenan.orderhub.authorization.application.port.in.current.TenantAuthorizationUnavailableException;
 import io.github.piresrenan.orderhub.authorization.application.port.out.AuthorizationDecisionObserver;
 import io.github.piresrenan.orderhub.authorization.application.port.out.AuthorizationDecisionReadTransaction;
 import io.github.piresrenan.orderhub.authorization.application.port.out.AuthorizationPersistenceException;
@@ -26,7 +29,7 @@ import io.github.piresrenan.orderhub.authorization.domain.service.ScopedAuthoriz
  * one Tenant-scoped STAFF decision.
  */
 public final class DurableTenantAuthorizationService
-        implements AuthorizeTenantActionUseCase {
+        implements AuthorizeTenantActionUseCase, AuthorizeCurrentTenantActionUseCase {
 
     private static final AuthorizationDecisionObserver NOOP_OBSERVER =
             observation -> {
@@ -323,6 +326,40 @@ public final class DurableTenantAuthorizationService
                 actorEnvelope,
                 overrides,
                 constraints);
+    }
+
+    /**
+     * Extends the existing coherent kernel snapshot to include the owner-resolved
+     * current ceiling. Unlike the legacy pre-resolved-envelope entry, this
+     * administration contract keeps technical uncertainty distinct from DENY.
+     */
+    @Override
+    public AuthorizationDecision authorizeCurrent(
+            TenantAuthorizationRequest request,
+            CurrentPermissionEnvelopeSource envelopeSource) {
+
+        if (request == null || envelopeSource == null) {
+            throw new IllegalArgumentException("Authorization request and current ceiling source are required");
+        }
+        if (request.persona() != AuthorizationPersona.STAFF
+                || !request.permission().supports(AuthorizationPersona.STAFF)) {
+            return observed(request, AuthorizationDecision.DENY,
+                    AuthorizationDecisionReason.UNSUPPORTED_PERSONA);
+        }
+        try {
+            var decision = readTransaction.execute(() -> {
+                var envelope = envelopeSource.resolve(request.userId(), request.scope().tenantId());
+                if (envelope == null) {
+                    throw new IllegalStateException("Current permission envelope is unavailable");
+                }
+                return authorizeWithinSnapshot(request, envelope);
+            });
+            return observed(request, decision, decision == AuthorizationDecision.ALLOW
+                    ? AuthorizationDecisionReason.ELIGIBLE : AuthorizationDecisionReason.POLICY_DENIED);
+        } catch (RuntimeException exception) {
+            observed(request, AuthorizationDecision.DENY, AuthorizationDecisionReason.PERSISTENCE_FAILURE);
+            throw new TenantAuthorizationUnavailableException(exception);
+        }
     }
 
     private AuthorizationDecision observed(
