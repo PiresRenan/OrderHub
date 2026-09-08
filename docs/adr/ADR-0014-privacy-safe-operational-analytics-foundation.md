@@ -487,7 +487,8 @@ publication left `FAILED` by a projection failure is republished on the next
 startup. No custom scheduler, recovery table, retry queue, administrative
 endpoint or outbox exists.
 
-**Binding precondition on enabling retention.**
+**Binding precondition on enabling retention (resolved provisionally by
+ADR-0018).**
 
 Analytical retention is deliberately not wired in this slice: no policy catalog,
 retention service or purge schedule is instantiated, because the effective
@@ -513,9 +514,12 @@ available remedy carries a decision this slice must not make implicitly:
   analytics operate the shared integration registry, crossing a boundary this
   ADR forbids.
 
-Until one of those is chosen, retention stays unwired and the interaction stays
-unreachable. This is recorded as a precondition rather than resolved, because
-resolving it silently would decide the retention window as a side effect.
+ADR-0018 chooses the first remedy without inventing a retention duration:
+retention remains opt-in and requires the duration from deployment policy; once
+enabled, ingestion applies that same owner policy and acknowledges an
+already-expired replay without recreating the fact. The post-OH-019 integration
+must requalify this provisional resolution before this section is considered
+finally accepted.
 
 **Review history.**
 

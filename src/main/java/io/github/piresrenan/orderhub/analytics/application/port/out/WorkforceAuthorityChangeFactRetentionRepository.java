@@ -47,4 +47,9 @@ public interface WorkforceAuthorityChangeFactRetentionRepository {
     int deleteExpired(
             UUID tenantId,
             Instant occurredAtOrBefore);
+
+    /** Removes at most {@code batchSize} expired facts across all Tenants. */
+    int deleteExpired(
+            Instant occurredAtOrBefore,
+            int batchSize);
 }

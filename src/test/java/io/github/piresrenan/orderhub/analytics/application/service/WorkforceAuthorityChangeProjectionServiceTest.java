@@ -3,6 +3,10 @@ package io.github.piresrenan.orderhub.analytics.application.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Instant;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.ZoneOffset;
+import java.util.Map;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -13,6 +17,9 @@ import org.junit.jupiter.api.Test;
 import io.github.piresrenan.orderhub.analytics.application.port.out.AnalyticalSubjectPseudonymRepository;
 import io.github.piresrenan.orderhub.analytics.application.port.out.WorkforceAuthorityChangeFactRepository;
 import io.github.piresrenan.orderhub.analytics.domain.model.AnalyticalSubjectKey;
+import io.github.piresrenan.orderhub.analytics.domain.model.AnalyticalFactType;
+import io.github.piresrenan.orderhub.analytics.domain.model.AnalyticalRetentionPolicy;
+import io.github.piresrenan.orderhub.analytics.domain.model.AnalyticalRetentionPolicyCatalog;
 import io.github.piresrenan.orderhub.analytics.domain.model.WorkforceAuthorityChangeFact;
 import io.github.piresrenan.orderhub.workforce.application.model.WorkforceAuditActionType;
 import io.github.piresrenan.orderhub.workforce.application.model.WorkforceAuditOutcome;
@@ -32,6 +39,29 @@ import io.github.piresrenan.orderhub.workforce.application.port.in.WorkforceAuth
  * </p>
  */
 class WorkforceAuthorityChangeProjectionServiceTest {
+
+    @Test
+    void ignoresAnAlreadyExpiredReplayBeforePersistingAnything() {
+        var tenantId = UUID.randomUUID();
+        var eventId = UUID.randomUUID();
+        var pseudonyms = new RecordingPseudonymRepository();
+        var facts = new CapturingFactRepository();
+        var sourceTime = Instant.parse("2026-01-01T00:00:00Z");
+        var service = new WorkforceAuthorityChangeProjectionService(
+                sourceOf(tenantId, UUID.randomUUID(), UUID.randomUUID()),
+                pseudonyms,
+                facts,
+                new AnalyticalRetentionPolicyCatalog(Map.of(
+                        AnalyticalFactType.WORKFORCE_AUTHORITY_CHANGE,
+                        new AnalyticalRetentionPolicy(Duration.ofDays(30)))),
+                Clock.fixed(sourceTime.plus(Duration.ofDays(30)),
+                        ZoneOffset.UTC));
+
+        assertThat(service.project(tenantId, eventId))
+                .isEqualTo(WorkforceAuthorityChangeProjectionResult.IGNORED);
+        assertThat(pseudonyms.resolutionOrder).isEmpty();
+        assertThat(facts.captured).isNull();
+    }
 
     @Test
     void resolvesBothSubjectsInOneGlobalOrderWhicheverActed() {

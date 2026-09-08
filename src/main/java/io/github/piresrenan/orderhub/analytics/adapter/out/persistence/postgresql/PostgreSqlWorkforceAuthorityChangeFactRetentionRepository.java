@@ -56,10 +56,39 @@ public final class PostgreSqlWorkforceAuthorityChangeFactRetentionRepository
      */
     private static final String DELETE_EXPIRED_FACTS =
             """
-            DELETE FROM analytics.workforce_authority_change_facts
-            WHERE tenant_id = ?
-              AND fact_type = ?
-              AND occurred_at <= ?
+            WITH candidates AS (
+                SELECT tenant_id, source_event_id, fact_type
+                FROM analytics.workforce_authority_change_facts
+                WHERE tenant_id = ?
+                  AND fact_type = ?
+                  AND occurred_at <= ?
+                ORDER BY occurred_at, tenant_id, source_event_id
+                LIMIT 1000
+                FOR UPDATE
+            )
+            DELETE FROM analytics.workforce_authority_change_facts AS facts
+            USING candidates
+            WHERE facts.tenant_id = candidates.tenant_id
+              AND facts.source_event_id = candidates.source_event_id
+              AND facts.fact_type = candidates.fact_type
+            """;
+
+    private static final String DELETE_EXPIRED_FACT_BATCH =
+            """
+            WITH candidates AS (
+                SELECT tenant_id, source_event_id, fact_type
+                FROM analytics.workforce_authority_change_facts
+                WHERE fact_type = ?
+                  AND occurred_at <= ?
+                ORDER BY occurred_at, tenant_id, source_event_id
+                LIMIT ?
+                FOR UPDATE SKIP LOCKED
+            )
+            DELETE FROM analytics.workforce_authority_change_facts AS facts
+            USING candidates
+            WHERE facts.tenant_id = candidates.tenant_id
+              AND facts.source_event_id = candidates.source_event_id
+              AND facts.fact_type = candidates.fact_type
             """;
 
     private final JdbcTemplate jdbcTemplate;
@@ -98,6 +127,34 @@ public final class PostgreSqlWorkforceAuthorityChangeFactRetentionRepository
                     Timestamp.from(
                             occurredAtOrBefore));
 
+        } catch (DataAccessException exception) {
+            throw new WorkforceAuthorityChangeFactPersistenceException(
+                    "Failed to purge expired workforce analytical facts",
+                    exception);
+        }
+    }
+
+    @Override
+    public int deleteExpired(
+            Instant occurredAtOrBefore,
+            int batchSize) {
+
+        if (occurredAtOrBefore == null) {
+            throw new IllegalArgumentException(
+                    "Occurrence time cutoff is required");
+        }
+
+        if (batchSize < 1 || batchSize > 1000) {
+            throw new IllegalArgumentException(
+                    "Batch size must be between 1 and 1000");
+        }
+
+        try {
+            return jdbcTemplate.update(
+                    DELETE_EXPIRED_FACT_BATCH,
+                    AnalyticalFactType.WORKFORCE_AUTHORITY_CHANGE.name(),
+                    Timestamp.from(occurredAtOrBefore),
+                    batchSize);
         } catch (DataAccessException exception) {
             throw new WorkforceAuthorityChangeFactPersistenceException(
                     "Failed to purge expired workforce analytical facts",

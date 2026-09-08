@@ -1,11 +1,14 @@
 package io.github.piresrenan.orderhub.analytics.application.service;
 
+import java.time.Clock;
 import java.util.Optional;
 import java.util.UUID;
 
 import io.github.piresrenan.orderhub.analytics.application.port.out.AnalyticalSubjectPseudonymRepository;
 import io.github.piresrenan.orderhub.analytics.application.port.out.WorkforceAuthorityChangeFactRepository;
 import io.github.piresrenan.orderhub.analytics.domain.model.AnalyticalSubjectKey;
+import io.github.piresrenan.orderhub.analytics.domain.model.AnalyticalFactType;
+import io.github.piresrenan.orderhub.analytics.domain.model.AnalyticalRetentionPolicyCatalog;
 import io.github.piresrenan.orderhub.analytics.domain.model.WorkforceAuthorityChangeAction;
 import io.github.piresrenan.orderhub.analytics.domain.model.WorkforceAuthorityChangeFact;
 import io.github.piresrenan.orderhub.analytics.domain.model.WorkforceAuthorityChangeOutcome;
@@ -40,11 +43,25 @@ public final class WorkforceAuthorityChangeProjectionService {
 
     private final WorkforceAuthorityChangeFactRepository factRepository;
 
+    private final AnalyticalRetentionPolicyCatalog retentionPolicies;
+
+    private final Clock clock;
+
     public WorkforceAuthorityChangeProjectionService(
             ResolveWorkforceAuthorityChangeAnalyticsSourceUseCase
                     sourceResolver,
             AnalyticalSubjectPseudonymRepository pseudonymRepository,
             WorkforceAuthorityChangeFactRepository factRepository) {
+
+        this(sourceResolver, pseudonymRepository, factRepository, null, null);
+    }
+
+    public WorkforceAuthorityChangeProjectionService(
+            ResolveWorkforceAuthorityChangeAnalyticsSourceUseCase sourceResolver,
+            AnalyticalSubjectPseudonymRepository pseudonymRepository,
+            WorkforceAuthorityChangeFactRepository factRepository,
+            AnalyticalRetentionPolicyCatalog retentionPolicies,
+            Clock clock) {
 
         if (sourceResolver == null) {
             throw new IllegalArgumentException(
@@ -62,9 +79,17 @@ public final class WorkforceAuthorityChangeProjectionService {
                     "Workforce authority change fact repository is required");
         }
 
+
+        if ((retentionPolicies == null) != (clock == null)) {
+            throw new IllegalArgumentException(
+                    "Retention policies and clock must be supplied together");
+        }
+
         this.sourceResolver = sourceResolver;
         this.pseudonymRepository = pseudonymRepository;
         this.factRepository = factRepository;
+        this.retentionPolicies = retentionPolicies;
+        this.clock = clock;
     }
 
     /**
@@ -111,6 +136,13 @@ public final class WorkforceAuthorityChangeProjectionService {
                         source.action());
 
         if (analyticalAction.isEmpty()) {
+            return WorkforceAuthorityChangeProjectionResult.IGNORED;
+        }
+
+        if (retentionPolicies != null
+                && retentionPolicies.policyFor(
+                        AnalyticalFactType.WORKFORCE_AUTHORITY_CHANGE)
+                        .isExpired(source.occurredAt(), clock.instant())) {
             return WorkforceAuthorityChangeProjectionResult.IGNORED;
         }
 

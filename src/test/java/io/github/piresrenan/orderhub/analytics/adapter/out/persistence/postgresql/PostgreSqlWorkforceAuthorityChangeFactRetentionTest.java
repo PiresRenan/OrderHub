@@ -175,6 +175,107 @@ class PostgreSqlWorkforceAuthorityChangeFactRetentionTest {
     }
 
     @Test
+    void globallyDeletesNoMoreThanTheRequestedBatch() {
+        for (int index = 0; index < 3; index++) {
+            factRepository.append(
+                    new WorkforceAuthorityChangeFact(
+                            UUID.randomUUID(),
+                            index % 2 == 0 ? TENANT_A : TENANT_B,
+                            ACTOR_SUBJECT,
+                            AFFECTED_SUBJECT,
+                            WorkforceAuthorityChangeAction.PRIVILEGED_MUTATION,
+                            WorkforceAuthorityChangeOutcome.APPLIED,
+                            REASON_CODE,
+                            CUTOFF.minusSeconds(index + 1L)));
+        }
+
+        assertThat(retentionService.purgeExpired(REFERENCE_TIME, 2))
+                .isEqualTo(2);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM analytics.workforce_authority_change_facts",
+                Integer.class))
+                .isEqualTo(1);
+    }
+
+    @Test
+    void globalBatchSkipsLockedWorkAndRollbackMakesItRetryable()
+            throws SQLException {
+
+        var firstEvent = UUID.randomUUID();
+        var secondEvent = UUID.randomUUID();
+        factRepository.append(fact(firstEvent, CUTOFF.minusSeconds(2)));
+        factRepository.append(fact(secondEvent, CUTOFF.minusSeconds(1)));
+
+        try (var locker = DriverManager.getConnection(
+                POSTGRES.getJdbcUrl(), POSTGRES.getUsername(),
+                POSTGRES.getPassword())) {
+            locker.setAutoCommit(false);
+            try (var statement = locker.prepareStatement(
+                    """
+                    SELECT tenant_id
+                    FROM analytics.workforce_authority_change_facts
+                    WHERE source_event_id = ?
+                    FOR UPDATE
+                    """)) {
+                statement.setObject(1, firstEvent);
+                statement.executeQuery().close();
+            }
+
+            assertThat(retentionService.purgeExpired(REFERENCE_TIME, 1))
+                    .as("A worker must skip a row locked by another instance")
+                    .isEqualTo(1);
+            assertThat(storedEventIds()).containsExactly(firstEvent);
+
+            locker.rollback();
+        }
+
+        try (var cleanup = dedicatedConnection()) {
+            assertThat(retentionServiceOn(cleanup)
+                    .purgeExpired(REFERENCE_TIME, 1))
+                    .as("The cleanup executes inside the caller transaction")
+                    .isEqualTo(1);
+            assertThat(storedEventIds())
+                    .as("Another connection cannot observe an uncommitted delete")
+                    .containsExactly(firstEvent);
+            cleanup.rollback();
+        }
+
+        assertThat(storedEventIds())
+                .as("A rolled-back cleanup restores the selected batch")
+                .containsExactly(firstEvent);
+        assertThat(retentionService.purgeExpired(REFERENCE_TIME, 1))
+                .as("The restored batch remains retryable")
+                .isEqualTo(1);
+        assertThat(storedEventIds()).isEmpty();
+
+        assertThat(jdbcTemplate.queryForObject(
+                """
+                SELECT indexdef
+                FROM pg_indexes
+                WHERE schemaname = 'analytics'
+                  AND indexname = 'ix_analytics_workforce_fact_retention'
+                """, String.class))
+                .contains("fact_type, occurred_at, tenant_id, source_event_id");
+    }
+
+    private WorkforceAuthorityChangeFact fact(UUID eventId, Instant occurredAt) {
+        return new WorkforceAuthorityChangeFact(
+                eventId, TENANT_A, ACTOR_SUBJECT, AFFECTED_SUBJECT,
+                WorkforceAuthorityChangeAction.PRIVILEGED_MUTATION,
+                WorkforceAuthorityChangeOutcome.APPLIED,
+                REASON_CODE, occurredAt);
+    }
+
+    private java.util.List<UUID> storedEventIds() {
+        return jdbcTemplate.queryForList(
+                """
+                SELECT source_event_id
+                FROM analytics.workforce_authority_change_facts
+                ORDER BY occurred_at
+                """, UUID.class);
+    }
+
+    @Test
     void deletesOnlyExpiredFactsForTheTenantAtTheInclusivePolicyBoundary() {
         // Why: retention is only meaningful if analytics can actually remove
         // its own expired derivatives, and only safe if removal is bounded by
