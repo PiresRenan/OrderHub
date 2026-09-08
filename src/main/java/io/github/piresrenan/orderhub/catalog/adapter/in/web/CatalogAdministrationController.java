@@ -117,10 +117,11 @@ public final class CatalogAdministrationController {
         try { return number.longValueExact(); }
         catch(ArithmeticException exception) { throw new IllegalArgumentException("Invalid integer"); }
     }
-    record ProductCreate(@NotNull UUID id,@NotNull @Size(max=160) String name,@NotNull String slug,@Size(max=4000) String description,String brand) {
+    // Application metadata owns Unicode code-point limits; @Size would count UTF-16 units.
+    record ProductCreate(@NotNull UUID id,@NotNull String name,@NotNull String slug,String description,String brand) {
         CatalogProductMetadata metadata() { return new CatalogProductMetadata(name,slug,description,brand); }
     }
-    record ProductUpdate(@NotNull BigDecimal expectedRevision,@NotNull @Size(max=160) String name,@NotNull String slug,@Size(max=4000) String description,String brand) {
+    record ProductUpdate(@NotNull BigDecimal expectedRevision,@NotNull String name,@NotNull String slug,String description,String brand) {
         CatalogProductMetadata metadata() { return new CatalogProductMetadata(name,slug,description,brand); }
     }
     record RevisionRequest(@NotNull BigDecimal expectedRevision) {}
@@ -133,8 +134,8 @@ public final class CatalogAdministrationController {
             @NotNull @Size(max=50) List<@NotNull ProductVariantAttribute> attributes) {
         CatalogVariantMetadata metadata() { return new CatalogVariantMetadata(sku,displayName,gtin,mpn,attributes); }
     }
-    record CategoryCreate(@NotNull UUID id,UUID parentCategoryId,@NotNull @Size(max=160) String name,@NotNull String slug,@Size(max=4000) String description) {}
-    record CategoryUpdate(@NotNull BigDecimal expectedRevision,@NotNull @Size(max=160) String name,@NotNull String slug,@Size(max=4000) String description) {}
+    record CategoryCreate(@NotNull UUID id,UUID parentCategoryId,@NotNull String name,@NotNull String slug,String description) {}
+    record CategoryUpdate(@NotNull BigDecimal expectedRevision,@NotNull String name,@NotNull String slug,String description) {}
     record ReparentRequest(@NotNull BigDecimal expectedRevision,UUID parentCategoryId) {}
     record PriceRequest(@NotNull BigDecimal expectedRevision,@NotNull BigDecimal minorUnits) {}
     record ProductView(UUID id,String name,String slug,String description,String brand,List<UUID> categoryIds,ProductStatus status,long revision) {

@@ -77,9 +77,10 @@ export. Movement UUID order is deterministic rather than chronological. Catalog 
 use summaries or flat Category nodes, never recursive trees or per-item attribute loads.
 
 Authorization precedes sensitive reads. Denied callers receive 403 for both absent
-and existing targets. Authorized foreign targets behave as absent (404). Missing and
-unavailable inventory positions share that result; quantity/precondition/operation
-conflicts are 409. Invalid input is 400; missing authentication is 401. Technical
+and existing targets. Authorized foreign targets behave as absent (404). Missing positions
+on reads or safety-stock changes return 404. Adjustments without a mutable position,
+and quantity/precondition/operation conflicts, return 409. Invalid input is 400;
+missing authentication is 401. Technical
 uncertainty is a sanitized 500, never a false permission denial. Framework statuses,
 including 406 and 415, retain their meaning. Errors use `application/problem+json`,
 stable codes and fixed messages without SQL, raw exception text, credentials or bodies.

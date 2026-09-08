@@ -62,6 +62,25 @@ class SecurityRealJwtBusinessAdministrationAcceptanceTest {
     @Autowired private MockMvc mvc;
     @Autowired private JdbcTemplate jdbc;
 
+    /** Why: supplementary Unicode characters occupy two UTF-16 units but one contract code point.
+     * Covers: exact and over-limit Product/Category names and descriptions on create and metadata update.
+     * Prevents: transport rejecting domain-valid text or accepting genuinely overlong metadata. */
+    @ParameterizedTest
+    @CsvSource({"products,160,1","products,1,4000","categories,160,1","categories,1,4000"})
+    void catalogTextLimitsCountCodePoints(String resource,int nameLength,int descriptionLength) throws Exception {
+        var actor=member(); grantStaff(actor,"CATALOG_MANAGE");
+        var id=UUID.randomUUID(); var name="😀".repeat(nameLength); var description="😀".repeat(descriptionLength);
+        var input="\"name\":\"%s\",\"slug\":\"unicode\",\"description\":\"%s\"".formatted(name,description);
+        mvc.perform(as(actor,post("/catalog/"+resource)).content("{\"id\":\""+id+"\","+input+"}"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.name").value(name));
+        mvc.perform(as(actor,put("/catalog/"+resource+"/"+id+"/metadata")).content("{\"expectedRevision\":1,"+input+"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.revision").value(2));
+        var tooLongName=nameLength==160?name+"😀":name;
+        var tooLongDescription=descriptionLength==4000?description+"😀":description;
+        var over="{\"expectedRevision\":2,\"name\":\"%s\",\"slug\":\"unicode\",\"description\":\"%s\"}".formatted(tooLongName,tooLongDescription);
+        mvc.perform(as(actor,put("/catalog/"+resource+"/"+id+"/metadata")).content(over)).andExpect(status().isBadRequest());
+    }
+
     /** Why: sanitized responses alone do not prove application logging privacy.
      * Covers: authenticated invalid business input with distinctive credential and payload markers.
      * Prevents: owner error handlers logging bearer credentials, internal actors or raw bodies. */
