@@ -62,6 +62,24 @@ class SecurityRealJwtBusinessAdministrationAcceptanceTest {
     @Autowired private MockMvc mvc;
     @Autowired private JdbcTemplate jdbc;
 
+    /** Why: sanitized responses alone do not prove application logging privacy.
+     * Covers: authenticated invalid business input with distinctive credential and payload markers.
+     * Prevents: owner error handlers logging bearer credentials, internal actors or raw bodies. */
+    @Test
+    @org.junit.jupiter.api.extension.ExtendWith(org.springframework.boot.test.system.OutputCaptureExtension.class)
+    void rejectedBusinessInputDoesNotEnterApplicationLogs(org.springframework.boot.test.system.CapturedOutput output) throws Exception {
+        var actor=member(); grantStaff(actor,"CATALOG_MANAGE");
+        var secret="synthetic-private-catalog-"+UUID.randomUUID();
+        var token=RealJwtTestSupport.signedToken(KEY,ISSUER,actor.userId().toString(),AUDIENCE,
+                Instant.now().plusSeconds(300),Instant.now().minusSeconds(30));
+        var body="{\"id\":\"%s\",\"name\":\"%s\",\"slug\":\"/invalid\"}".formatted(UUID.randomUUID(),secret);
+        var response=mvc.perform(post("/catalog/products").header("Authorization","Bearer "+token)
+                .header("X-Tenant-Id",actor.tenantId()).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isBadRequest()).andReturn().getResponse();
+        assertSanitized(response.getContentAsString(),secret);
+        assertThat(output.getAll()).doesNotContain(token,secret,actor.userId().toString(),actor.tenantId().toString());
+    }
+
     /** Why: transport must expose the governed lifecycle and classifications without generic saves.
      * Covers: real Category assignment, Product/Variant transitions, stale metadata and foreign reads.
      * Prevents: thin route mappings bypassing ownership or application preconditions. */
