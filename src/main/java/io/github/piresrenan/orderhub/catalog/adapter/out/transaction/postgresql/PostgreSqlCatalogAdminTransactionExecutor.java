@@ -6,6 +6,7 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.transaction.TransactionException;
 import org.springframework.transaction.support.TransactionOperations;
 import io.github.piresrenan.orderhub.catalog.application.port.in.administration.CatalogAdminUnavailableException;
+import io.github.piresrenan.orderhub.catalog.application.port.in.administration.CatalogAdminConflictException;
 import io.github.piresrenan.orderhub.catalog.application.port.out.CatalogAdminTransactionExecutor;
 import io.github.piresrenan.orderhub.catalog.application.port.out.CatalogPersistenceException;
 
@@ -19,7 +20,11 @@ public final class PostgreSqlCatalogAdminTransactionExecutor implements CatalogA
     /** Rolls back all participant writes on failure and exposes only a sanitized technical exception. */
     @Override public <T> T execute(Supplier<T> action) {
         try { return transactions.execute(status -> action.get()); }
-        catch (DataAccessException | TransactionException | CatalogPersistenceException exception) {
+        catch (CatalogPersistenceException exception) {
+            if(exception.getCause() instanceof org.springframework.dao.DuplicateKeyException) throw new CatalogAdminConflictException();
+            throw new CatalogAdminUnavailableException();
+        }
+        catch (DataAccessException | TransactionException exception) {
             throw new CatalogAdminUnavailableException();
         }
     }

@@ -37,6 +37,19 @@ public final class CatalogAdministrationService {
             old -> Product.rehydrate(old.id(),old.tenantId(),input.name(),input.slug(),input.description(),
                     input.brand(),old.categoryIds(),old.status())));
     }
+    /** Replaces a bounded set of classifications against the current Product revision. */
+    public CatalogRevision<Product> assignCategories(CatalogAdminContext actor, UUID id, long expected,
+            List<UUID> categoryIds) {
+        authorizer.require(actor,CatalogAdminPermission.MANAGE);
+        if(categoryIds==null || categoryIds.size()>100) throw new IllegalArgumentException("Invalid category assignments");
+        var requested=List.copyOf(categoryIds);
+        return transactions.execute(() -> mutateProduct(actor,id,expected,"PRODUCT_CATEGORIES_CHANGED",old -> {
+            for(var categoryId:requested) {
+                repository.category(actor.tenantId(),categoryId).orElseThrow(CatalogAdminNotFoundException::new);
+            }
+            return Product.rehydrate(old.id(),old.tenantId(),old.name(),old.slug(),old.description(),old.brand(),requested,old.status());
+        }));
+    }
     /** Requires a stable eligible Variant before Product activation. */
     public CatalogRevision<Product> activateProduct(CatalogAdminContext actor, UUID id, long expectedRevision) {
         authorizer.require(actor,CatalogAdminPermission.MANAGE);
