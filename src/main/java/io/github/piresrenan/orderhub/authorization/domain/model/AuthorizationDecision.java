@@ -6,6 +6,7 @@ import org.springframework.modulith.NamedInterface;
  * Framework-neutral result of an authorization policy evaluation.
  */
 @NamedInterface({
+    "policy-model",
     "customer-owned-resource",
     "administration"
 })

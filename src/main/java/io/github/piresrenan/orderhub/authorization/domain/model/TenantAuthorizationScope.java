@@ -12,7 +12,7 @@ import org.springframework.modulith.NamedInterface;
  * Organization/Network and Resource scopes remain future extensions.
  * </p>
  */
-@NamedInterface("customer-owned-resource")
+@NamedInterface({"customer-owned-resource", "tenant-authorization"})
 public record TenantAuthorizationScope(
         UUID tenantId) {
 
