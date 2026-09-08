@@ -182,7 +182,19 @@ integrated parent/tree identity, close issue and remove the feature branch.
 - Discovery complete; issue #36 created before implementation.
 - Baseline Maven Wrapper clean verify passed against the exact integrated authority:
   1,154 tests, zero failures/errors/skips, on 2026-09-07 (5m46s).
-- No OH-018 production or migration change has yet been validated.
+- Authorization, Catalog and Inventory foundations are published in PR #37. V33–V35
+  establish revisions and owner-local evidence. Category/price/assignment/discovery
+  regression on integrated checkpoint d4a31d9 passed 230 tests, zero failures/errors/skips.
+- GitHub review identified a real Catalog TRUNCATE gap in V33. An executable PostgreSQL
+  RED proved it; V35 adds the statement trigger forward-only. Accepted migrations remain
+  unchanged. A forced concurrent writer also proved inconsistent revision/hydration;
+  Product/Variant detail now stabilizes root reads, and Category detail uses one snapshot.
+- Owner-local HTTP composition and real JWT/Staff acceptance passed 26 targeted tests
+  including Modulith. Full clean verify passed 1,233 tests, zero failures/errors/skips,
+  on 2026-09-08. Final migration/Order-administration race acceptance and exact-HEAD
+  review/release gates remain pending; this is a checkpoint, not final acceptance.
+- The concrete API, input limits, replay/precondition behavior and errors are documented
+  in [the HTTP contract](../catalog-inventory-administration-http.md).
 - This ADR remains DESIGNED until the complete acceptance gate is proved.
 
 ## Explicitly deferred
