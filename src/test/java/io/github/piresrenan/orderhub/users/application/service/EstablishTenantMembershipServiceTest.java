@@ -12,6 +12,7 @@ import io.github.piresrenan.orderhub.users.application.port.in.EstablishTenantMe
 import io.github.piresrenan.orderhub.users.application.port.out.TenantMembershipAlreadyExistsException;
 import io.github.piresrenan.orderhub.users.application.port.out.TenantMembershipRepository;
 import io.github.piresrenan.orderhub.users.domain.model.TenantMembership;
+import io.github.piresrenan.orderhub.users.domain.model.TenantMembershipStatus;
 
 class EstablishTenantMembershipServiceTest {
 
@@ -19,9 +20,11 @@ class EstablishTenantMembershipServiceTest {
         void establishesAndPersistsMembership() {
                 // Why: membership establishment must pass through the domain model before
                 // durable persistence.
-                // Covers: valid User/Tenant association orchestration.
+                // Covers: valid User/Tenant association orchestration and the exact
+                // ACTIVE membership actually submitted for persistence.
                 // Prevents: application code persisting ad-hoc identity pairs without domain
-                // invariant enforcement.
+                // invariant enforcement, or the TenantMembership aggregate crossing the
+                // exposed Users API.
 
                 var userId = UUID.randomUUID();
                 var tenantId = UUID.randomUUID();
@@ -30,19 +33,19 @@ class EstablishTenantMembershipServiceTest {
                 var service = new EstablishTenantMembershipService(
                                 repository);
 
-                var membership = service.establish(
+                service.establish(
                                 new EstablishTenantMembershipCommand(
                                                 userId,
                                                 tenantId));
 
-                assertThat(membership.userId())
+                assertThat(repository.savedMembership.userId())
                                 .isEqualTo(userId);
 
-                assertThat(membership.tenantId())
+                assertThat(repository.savedMembership.tenantId())
                                 .isEqualTo(tenantId);
 
-                assertThat(repository.savedMembership)
-                                .isSameAs(membership);
+                assertThat(repository.savedMembership.status())
+                                .isEqualTo(TenantMembershipStatus.ACTIVE);
 
                 assertThat(repository.saveCount)
                                 .isEqualTo(1);

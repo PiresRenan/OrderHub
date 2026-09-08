@@ -260,6 +260,31 @@ authorizes the following boundary and changes no trust rule:
   deny trusted Tenant context, and Tenant state is still not probed once
   membership has already denied.
 
+## Executable decision checkpoint — Users exposed application API surface
+
+`users.application.port.in` is the framework-neutral cross-module application
+boundary; Users domain models remain internal to the module. An executable
+architecture rule over that package proved three legacy return-type leaks that
+predated the membership checkpoint, so the exposed contracts were corrected
+rather than the rule that guards them:
+
+- `CreateUser` exposes only an application-owned internal identity result,
+  because the identifier is generated inside Users and is genuinely new
+  information a caller cannot otherwise obtain;
+- membership establishment and external identity binding return no aggregate,
+  because their commands already carry every caller-known identity and
+  persistence contributes nothing further;
+- this prevents a future cross-module consumer from acquiring a hidden
+  `users.domain` dependency merely by calling an exposed Users contract;
+- Spring Modulith validates dependencies a consumer actually creates, while the
+  `users::api` rule guards the exposed surface before any consumer exists; the
+  two are complementary and neither replaces the other.
+
+Duplicate and persistence failure types still reside in the non-exposed Users
+output-port package. They appear in no exposed signature and no external
+consumer depends on them, so their public failure contract stays deferred until
+a provisioning orchestrator proves what it needs.
+
 ## Open design questions requiring executable evidence
 
 The following are deliberately not frozen before TDD/discovery:

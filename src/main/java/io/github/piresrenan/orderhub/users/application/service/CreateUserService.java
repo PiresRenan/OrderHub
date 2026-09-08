@@ -1,5 +1,6 @@
 package io.github.piresrenan.orderhub.users.application.service;
 
+import io.github.piresrenan.orderhub.users.application.port.in.CreatedUserIdentity;
 import io.github.piresrenan.orderhub.users.application.port.in.CreateUserUseCase;
 import io.github.piresrenan.orderhub.users.application.port.out.UserIdGenerator;
 import io.github.piresrenan.orderhub.users.application.port.out.UserRepository;
@@ -31,18 +32,23 @@ public final class CreateUserService implements CreateUserUseCase {
      *
      * <p>
      * Domain construction occurs before persistence so an invalid generated
-     * identity never crosses the repository boundary.
+     * identity never crosses the repository boundary. The identity returned to
+     * the caller is read from the persisted User, so no result is produced
+     * before persistence succeeds and the aggregate itself stays inside Users.
      * </p>
      *
-     * @return successfully created and persisted User
+     * @return internal identity of the successfully created and persisted User
      * @throws IllegalArgumentException when the generated identity violates the
      *                                  User invariant
      */
     @Override
-    public User create() {
+    public CreatedUserIdentity create() {
         var user = User.create(
                 userIdGenerator.generate());
 
-        return userRepository.save(user);
+        var persistedUser = userRepository.save(user);
+
+        return new CreatedUserIdentity(
+                persistedUser.id());
     }
 }

@@ -33,19 +33,18 @@ public final class EstablishTenantMembershipService
      * </p>
      *
      * @param command identities participating in the association
-     * @return successfully created and persisted TenantMembership
      * @throws IllegalArgumentException when membership domain invariants reject
      *                                  the supplied identities
      */
     @Override
-    public TenantMembership establish(
+    public void establish(
             EstablishTenantMembershipCommand command) {
 
         var membership = TenantMembership.create(
                 command.userId(),
                 command.tenantId());
 
-        return tenantMembershipRepository.save(
+        tenantMembershipRepository.save(
                 membership);
     }
 }

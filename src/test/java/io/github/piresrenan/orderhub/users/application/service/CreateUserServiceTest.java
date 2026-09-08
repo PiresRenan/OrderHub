@@ -18,9 +18,11 @@ class CreateUserServiceTest {
     void createsAndPersistsUser() {
         // Why: User creation must coordinate internal identity generation and
         // persistence without depending on authentication mechanisms.
-        // Covers: complete CreateUserService happy path.
+        // Covers: complete CreateUserService happy path, including the
+        // application-owned identity result matching the persisted aggregate.
         // Prevents: application code creating Users without crossing the persistence
-        // boundary or embedding credential-provider identity generation.
+        // boundary, embedding credential-provider identity generation, or receiving
+        // the User aggregate across the exposed Users API.
 
         var userId = UUID.randomUUID();
         var repository = new RecordingUserRepository();
@@ -31,13 +33,13 @@ class CreateUserServiceTest {
                 repository,
                 idGenerator);
 
-        var user = service.create();
+        var created = service.create();
 
-        assertThat(user.id())
+        assertThat(created.userId())
                 .isEqualTo(userId);
 
-        assertThat(repository.savedUser)
-                .isSameAs(user);
+        assertThat(repository.savedUser.id())
+                .isEqualTo(created.userId());
 
         assertThat(repository.saveCount)
                 .isEqualTo(1);
@@ -61,12 +63,12 @@ class CreateUserServiceTest {
                 new RecordingUserRepository(),
                 idGenerator);
 
-        var user = service.create();
+        var created = service.create();
 
         assertThat(calls)
                 .hasValue(1);
 
-        assertThat(user.id())
+        assertThat(created.userId())
                 .isEqualTo(generatedId);
     }
 
