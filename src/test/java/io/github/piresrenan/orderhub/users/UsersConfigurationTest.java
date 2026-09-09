@@ -2,12 +2,16 @@ package io.github.piresrenan.orderhub.users;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Objects;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.jdbc.support.JdbcTransactionManager;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.PostgreSqlTenantMembershipRepository;
 import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.PostgreSqlUserRepository;
@@ -138,6 +142,29 @@ class UsersConfigurationTest {
 
                         return new JdbcTemplate(
                                         dataSource);
+                }
+
+                /**
+                 * Supplies the non-connecting transaction demarcation the Users
+                 * composition root requires.
+                 *
+                 * <p>
+                 * The manager is built over the DataSource already held by the
+                 * composition-only JdbcTemplate, so no additional infrastructure is
+                 * introduced. No transaction is ever started because this test only
+                 * verifies Spring composition.
+                 * </p>
+                 *
+                 * @param jdbcTemplate composition-only JDBC dependency
+                 * @return transaction manager suitable for composition-only verification
+                 */
+                @Bean
+                PlatformTransactionManager transactionManager(
+                                JdbcTemplate jdbcTemplate) {
+
+                        return new JdbcTransactionManager(
+                                        Objects.requireNonNull(
+                                                        jdbcTemplate.getDataSource()));
                 }
         }
 }

@@ -5,6 +5,7 @@ import java.util.UUID;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.PostgreSqlTenantMembershipRepository;
 import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.PostgreSqlUserRepository;
@@ -27,6 +28,10 @@ import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalId
 import io.github.piresrenan.orderhub.users.application.port.out.ExternalIdentityBindingRepository;
 import io.github.piresrenan.orderhub.users.application.service.BindExternalIdentityService;
 import io.github.piresrenan.orderhub.users.application.service.ResolveExternalIdentityService;
+import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.PostgreSqlExternalIdentitySerializationCoordinator;
+import io.github.piresrenan.orderhub.users.application.port.in.ResolveOrCreateExternalUserUseCase;
+import io.github.piresrenan.orderhub.users.application.port.out.ExternalIdentityUserProvisioningCoordinator;
+import io.github.piresrenan.orderhub.users.application.service.ResolveOrCreateExternalUserService;
 
 /**
  * Spring composition root for the Users application module.
@@ -193,6 +198,51 @@ public class UsersConfiguration {
 
                 return new ResolveExternalIdentityService(
                                 externalIdentityBindingRepository);
+        }
+
+        /**
+         * Composes the PostgreSQL serialization scope used while provisioning the
+         * internal User for one exact external identity.
+         *
+         * @param jdbcTemplate       JDBC infrastructure supplied by Spring
+         * @param transactionManager transaction demarcation supplied by Spring
+         * @return external identity provisioning coordinator backed by PostgreSQL
+         */
+        @Bean
+        ExternalIdentityUserProvisioningCoordinator externalIdentityUserProvisioningCoordinator(
+                        JdbcTemplate jdbcTemplate,
+                        PlatformTransactionManager transactionManager) {
+
+                return new PostgreSqlExternalIdentitySerializationCoordinator(
+                                jdbcTemplate,
+                                transactionManager);
+        }
+
+        /**
+         * Composes the external identity resolve-or-create application use case.
+         *
+         * @param externalIdentityUserProvisioningCoordinator serialized
+         *                                                    provisioning scope
+         * @param resolveExternalIdentityUseCase              external identity
+         *                                                    resolution boundary
+         * @param createUserUseCase                           User creation
+         *                                                    boundary
+         * @param bindExternalIdentityUseCase                 external identity
+         *                                                    binding boundary
+         * @return configured resolve-or-create use case
+         */
+        @Bean
+        ResolveOrCreateExternalUserUseCase resolveOrCreateExternalUserUseCase(
+                        ExternalIdentityUserProvisioningCoordinator externalIdentityUserProvisioningCoordinator,
+                        ResolveExternalIdentityUseCase resolveExternalIdentityUseCase,
+                        CreateUserUseCase createUserUseCase,
+                        BindExternalIdentityUseCase bindExternalIdentityUseCase) {
+
+                return new ResolveOrCreateExternalUserService(
+                                externalIdentityUserProvisioningCoordinator,
+                                resolveExternalIdentityUseCase,
+                                createUserUseCase,
+                                bindExternalIdentityUseCase);
         }
 
         @Bean
