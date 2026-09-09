@@ -1,5 +1,9 @@
 package io.github.piresrenan.orderhub.workforce.config;
 
+import java.security.SecureRandom;
+import java.time.Clock;
+
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -8,11 +12,14 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import io.github.piresrenan.orderhub.workforce.adapter.out.notification.spring.SpringWorkforceAuthorityChangeAuditNotificationPublisher;
+import io.github.piresrenan.orderhub.workforce.adapter.out.persistence.postgresql.PostgreSqlStaffProvisioningIntentRepository;
 import io.github.piresrenan.orderhub.workforce.adapter.out.persistence.postgresql.PostgreSqlWorkforceAuditRepository;
 import io.github.piresrenan.orderhub.workforce.adapter.out.persistence.postgresql.PostgreSqlWorkforceAuthorityChangeAnalyticsSourceRepository;
 import io.github.piresrenan.orderhub.workforce.adapter.out.persistence.postgresql.PostgreSqlWorkforcePositionChangeRepository;
 import io.github.piresrenan.orderhub.workforce.adapter.out.transaction.spring.SpringWorkforceTransactionExecutor;
+import io.github.piresrenan.orderhub.workforce.application.port.in.IssueStaffProvisioningIntentUseCase;
 import io.github.piresrenan.orderhub.workforce.application.port.in.ResolveWorkforceAuthorityChangeAnalyticsSourceUseCase;
+import io.github.piresrenan.orderhub.workforce.application.port.out.StaffProvisioningIntentRepository;
 import io.github.piresrenan.orderhub.workforce.application.port.out.WorkforceAuditRepository;
 import io.github.piresrenan.orderhub.workforce.application.port.out.WorkforceAuthorityChangeAnalyticsSourceRepository;
 import io.github.piresrenan.orderhub.workforce.application.port.out.WorkforceAuthorityChangeAuditNotificationPublisher;
@@ -22,6 +29,7 @@ import io.github.piresrenan.orderhub.workforce.application.service.AuditedWorkfo
 import io.github.piresrenan.orderhub.workforce.application.service.PrivilegedPositionChangeExecutionService;
 import io.github.piresrenan.orderhub.workforce.application.service.PrivilegedWorkforceMutationAuthorizationService;
 import io.github.piresrenan.orderhub.workforce.application.service.ResolveWorkforceAuthorityChangeAnalyticsSourceService;
+import io.github.piresrenan.orderhub.workforce.application.service.StaffProvisioningIssuanceService;
 import io.github.piresrenan.orderhub.workforce.application.service.WorkforceAuditRecorder;
 import io.github.piresrenan.orderhub.authorization.application.port.in.current.AuthorizeCurrentTenantActionUseCase;
 import io.github.piresrenan.orderhub.workforce.adapter.out.persistence.postgresql.PostgreSqlWorkforcePermissionEnvelopeRepository;
@@ -30,8 +38,38 @@ import io.github.piresrenan.orderhub.workforce.application.port.out.WorkforcePer
 import io.github.piresrenan.orderhub.workforce.application.service.StaffTenantAuthorizationService;
 
 @Configuration(proxyBeanMethods = false)
+@EnableConfigurationProperties(StaffProvisioningProperties.class)
 public class WorkforceConfiguration {
 
+    /**
+     * Exposes the workforce-owned Staff provisioning intent persistence port.
+     */
+    @Bean
+    StaffProvisioningIntentRepository staffProvisioningIntentRepository(
+            JdbcTemplate jdbcTemplate) {
+
+        return new PostgreSqlStaffProvisioningIntentRepository(
+                jdbcTemplate);
+    }
+
+    /**
+     * Composes one singleton issuance use case with explicit UTC time,
+     * cryptographic entropy and externally validated credential lifetime.
+     *
+     * <p>Clock and entropy remain composition-owned implementation details
+     * rather than global container services.</p>
+     */
+    @Bean
+    IssueStaffProvisioningIntentUseCase issueStaffProvisioningIntentUseCase(
+            StaffProvisioningIntentRepository repository,
+            StaffProvisioningProperties properties) {
+
+        return new StaffProvisioningIssuanceService(
+                repository,
+                Clock.systemUTC(),
+                properties.intentTtl(),
+                new SecureRandom());
+    }
     /** Exposes only workforce-owned lookup to the current-authority application service. */
     @Bean
     WorkforcePermissionEnvelopeRepository workforcePermissionEnvelopeRepository(JdbcTemplate jdbcTemplate) {
