@@ -5,11 +5,22 @@ import java.util.Optional;
 import java.util.UUID;
 
 import io.github.piresrenan.orderhub.workforce.application.model.ConsumedStaffProvisioningIntent;
+import io.github.piresrenan.orderhub.workforce.application.model.NewStaffProvisioningIntent;
+import io.github.piresrenan.orderhub.workforce.application.model.StaffProvisioningIntentCreation;
 
 /**
  * Workforce persistence authority for one-time Staff provisioning intents.
  */
 public interface StaffProvisioningIntentRepository {
+
+    /**
+     * Establishes one durable Staff provisioning intent.
+     *
+     * <p>This primitive persists only the digest of the one-time credential.
+     * Retry/replay conflict semantics are refined by subsequent evidence.</p>
+     */
+    StaffProvisioningIntentCreation create(
+            NewStaffProvisioningIntent intent);
 
     /**
      * Consumes one still-pending, non-expired intent identified by secret digest.

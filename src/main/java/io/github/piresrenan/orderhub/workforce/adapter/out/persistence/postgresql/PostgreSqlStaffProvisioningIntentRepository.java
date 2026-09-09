@@ -1,6 +1,7 @@
 package io.github.piresrenan.orderhub.workforce.adapter.out.persistence.postgresql;
 
 import java.time.OffsetDateTime;
+import java.util.Arrays;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -8,6 +9,8 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import io.github.piresrenan.orderhub.workforce.application.model.ConsumedStaffProvisioningIntent;
+import io.github.piresrenan.orderhub.workforce.application.model.NewStaffProvisioningIntent;
+import io.github.piresrenan.orderhub.workforce.application.model.StaffProvisioningIntentCreation;
 import io.github.piresrenan.orderhub.workforce.application.port.out.StaffProvisioningIntentPersistenceException;
 import io.github.piresrenan.orderhub.workforce.application.port.out.StaffProvisioningIntentRepository;
 
@@ -37,6 +40,129 @@ public final class PostgreSqlStaffProvisioningIntentRepository
                 jdbcTemplate;
     }
 
+    @Override
+    public StaffProvisioningIntentCreation create(
+            NewStaffProvisioningIntent intent) {
+
+        if (intent == null) {
+            throw new IllegalArgumentException(
+                    "Staff provisioning intent is required");
+        }
+
+        try {
+
+            var createdIntentIds =
+                    jdbcTemplate.query(
+                            """
+                            INSERT INTO workforce.staff_provisioning_intents (
+                                intent_id,
+                                tenant_id,
+                                secret_digest,
+                                issued_by_user_id,
+                                department_id,
+                                position_id,
+                                initial_role_code,
+                                operation_id,
+                                request_fingerprint,
+                                expires_at,
+                                correlation_id
+                            )
+                            VALUES (
+                                ?,
+                                ?,
+                                ?,
+                                ?,
+                                ?,
+                                ?,
+                                ?,
+                                ?,
+                                ?,
+                                ?,
+                                ?
+                            )
+                            ON CONFLICT (
+                                tenant_id,
+                                operation_id
+                            )
+                            DO NOTHING
+                            RETURNING intent_id
+                            """,
+                            (resultSet, rowNumber) ->
+                                    resultSet.getObject(
+                                            "intent_id",
+                                            UUID.class),
+                            intent.intentId(),
+                            intent.tenantId(),
+                            intent.secretDigest(),
+                            intent.issuedByUserId(),
+                            intent.departmentId(),
+                            intent.positionId(),
+                            intent.initialRoleCode(),
+                            intent.operationId(),
+                            intent.requestFingerprint(),
+                            intent.expiresAt(),
+                            intent.correlationId());
+
+            if (createdIntentIds.size() > 1) {
+                throw new StaffProvisioningIntentPersistenceException(
+                        "Staff provisioning intent creation returned "
+                                + "multiple durable rows",
+                        null);
+            }
+
+            if (createdIntentIds.size() == 1) {
+
+                return new StaffProvisioningIntentCreation.Created(
+                        createdIntentIds.getFirst());
+            }
+
+            var persisted =
+                    jdbcTemplate.query(
+                            """
+                            SELECT
+                                intent_id,
+                                request_fingerprint
+                            FROM workforce.staff_provisioning_intents
+                            WHERE tenant_id = ?
+                              AND operation_id = ?
+                            """,
+                            (resultSet, rowNumber) ->
+                                    new PersistedCreationIdentity(
+                                            resultSet.getObject(
+                                                    "intent_id",
+                                                    UUID.class),
+                                            resultSet.getBytes(
+                                                    "request_fingerprint")),
+                            intent.tenantId(),
+                            intent.operationId());
+
+            if (persisted.size() != 1) {
+                throw new StaffProvisioningIntentPersistenceException(
+                        "Staff provisioning intent operation conflict "
+                                + "did not resolve to exactly one durable row",
+                        null);
+            }
+
+            var existing =
+                    persisted.getFirst();
+
+            if (!Arrays.equals(
+                    existing.requestFingerprint(),
+                    intent.requestFingerprint())) {
+
+                return new StaffProvisioningIntentCreation.FingerprintConflict();
+            }
+
+            return new StaffProvisioningIntentCreation.Replay(
+                    existing.intentId());
+
+        } catch (DataAccessException exception) {
+
+            throw new StaffProvisioningIntentPersistenceException(
+                    "Failed to create Staff provisioning intent",
+                    exception);
+        }
+    }
     @Override
     public Optional<ConsumedStaffProvisioningIntent> consumePending(
             byte[] secretDigest,
@@ -160,6 +286,32 @@ public final class PostgreSqlStaffProvisioningIntentRepository
             throw new StaffProvisioningIntentPersistenceException(
                     "Failed to cancel Staff provisioning intent",
                     exception);
+        }
+    }
+
+    private record PersistedCreationIdentity(
+            UUID intentId,
+            byte[] requestFingerprint) {
+
+        private PersistedCreationIdentity {
+
+            if (intentId == null) {
+                throw new IllegalArgumentException(
+                        "Persisted provisioning intent ID is required");
+            }
+
+            requestFingerprint =
+                    requestFingerprint == null
+                            ? null
+                            : requestFingerprint.clone();
+        }
+
+        @Override
+        public byte[] requestFingerprint() {
+
+            return requestFingerprint == null
+                    ? null
+                    : requestFingerprint.clone();
         }
     }
 
