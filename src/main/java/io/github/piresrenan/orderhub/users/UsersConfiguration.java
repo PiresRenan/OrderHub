@@ -10,6 +10,7 @@ import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.Po
 import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.PostgreSqlUserRepository;
 import io.github.piresrenan.orderhub.users.application.port.in.CreateUserUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.EstablishTenantMembershipUseCase;
+import io.github.piresrenan.orderhub.users.application.port.in.EnsureActiveTenantMembershipUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveUseCase;
 import io.github.piresrenan.orderhub.users.application.port.out.TenantMembershipRepository;
 import io.github.piresrenan.orderhub.users.application.port.out.UserIdGenerator;
@@ -18,6 +19,7 @@ import io.github.piresrenan.orderhub.users.application.port.in.UserExistenceUseC
 import io.github.piresrenan.orderhub.users.application.service.UserExistenceService;
 import io.github.piresrenan.orderhub.users.application.service.CreateUserService;
 import io.github.piresrenan.orderhub.users.application.service.EstablishTenantMembershipService;
+import io.github.piresrenan.orderhub.users.application.service.EnsureActiveTenantMembershipService;
 import io.github.piresrenan.orderhub.users.application.service.IsTenantMembershipOperationallyActiveService;
 import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.PostgreSqlExternalIdentityBindingRepository;
 import io.github.piresrenan.orderhub.users.application.port.in.BindExternalIdentityUseCase;
@@ -119,6 +121,26 @@ public class UsersConfiguration {
                         TenantMembershipRepository tenantMembershipRepository) {
 
                 return new EstablishTenantMembershipService(
+                                tenantMembershipRepository);
+        }
+
+        /**
+         * Composes the Users-owned desired-state TenantMembership use case.
+         *
+         * <p>
+         * The application service remains framework-neutral while this composition
+         * root supplies the owner-local persistence boundary required to establish
+         * or reconcile one operational User/Tenant membership.
+         * </p>
+         *
+         * @param tenantMembershipRepository membership persistence boundary
+         * @return configured ensure-active membership use case
+         */
+        @Bean
+        EnsureActiveTenantMembershipUseCase ensureActiveTenantMembershipUseCase(
+                        TenantMembershipRepository tenantMembershipRepository) {
+
+                return new EnsureActiveTenantMembershipService(
                                 tenantMembershipRepository);
         }
 
