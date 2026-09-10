@@ -36,6 +36,15 @@ import io.github.piresrenan.orderhub.authorization.adapter.out.persistence.postg
 @Configuration(proxyBeanMethods = false)
 public class AuthorizationConfiguration {
 
+    @Bean
+    io.github.piresrenan.orderhub.authorization.application.port.in.provisioning.ColdStartStaffAuthorizationUseCase coldStartStaffAuthorizationUseCase(
+            JdbcTemplate jdbc) {
+        return new io.github.piresrenan.orderhub.authorization.application.service.ColdStartStaffAuthorizationService(
+                new io.github.piresrenan.orderhub.authorization.adapter.out.persistence.postgresql.PostgreSqlColdStartStaffAuthorizationRepository(jdbc),
+                new PostgreSqlRoleDefinitionRepository(jdbc), new PostgreSqlRoleAssignmentRepository(jdbc),
+                new io.github.piresrenan.orderhub.authorization.adapter.out.persistence.postgresql.PostgreSqlStaffProvisioningAuthorizationRepository(jdbc));
+    }
+
     /** Composes initial-role policy and evidence without suspending the caller's mutation transaction. */
     @Bean
     StaffProvisioningAuthorizationUseCase staffProvisioningAuthorizationUseCase(

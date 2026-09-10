@@ -19,6 +19,7 @@ import io.github.piresrenan.orderhub.workforce.application.port.out.StaffProvisi
 import io.github.piresrenan.orderhub.workforce.application.service.StaffProvisioningIssuanceService;
 import io.github.piresrenan.orderhub.workforce.application.port.in.ConsumeStaffProvisioningUseCase;
 import io.github.piresrenan.orderhub.authorization.application.port.in.provisioning.StaffProvisioningAuthorizationUseCase;
+import io.github.piresrenan.orderhub.authorization.application.port.in.provisioning.ColdStartStaffAuthorizationUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveOrCreateExternalUserUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.EnsureActiveTenantMembershipUseCase;
@@ -141,6 +142,8 @@ class StaffProvisioningRuntimeCompositionTest {
 
         context.registerBean(StaffProvisioningAuthorizationUseCase.class,
                 () -> unsupportedProxy(StaffProvisioningAuthorizationUseCase.class));
+        context.registerBean(ColdStartStaffAuthorizationUseCase.class,
+                () -> unsupportedProxy(ColdStartStaffAuthorizationUseCase.class));
         context.registerBean(IsTenantMembershipOperationallyActiveUseCase.class,
                 () -> unsupportedProxy(IsTenantMembershipOperationallyActiveUseCase.class));
         context.registerBean(ResolveOrCreateExternalUserUseCase.class,

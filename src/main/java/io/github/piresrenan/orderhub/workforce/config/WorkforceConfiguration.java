@@ -59,6 +59,20 @@ import io.github.piresrenan.orderhub.tenants.application.port.in.operational.Fin
 @EnableConfigurationProperties(StaffProvisioningProperties.class)
 public class WorkforceConfiguration {
 
+    @Bean
+    io.github.piresrenan.orderhub.workforce.application.service.ColdStartStaffProvisioningService coldStartStaffProvisioningService(
+            io.github.piresrenan.orderhub.authorization.application.port.in.provisioning.ColdStartStaffAuthorizationUseCase authorization,
+            StaffProvisioningFactsRepository facts, FindTenantOperationalStateUseCase tenants, IssueStaffProvisioningIntentUseCase primitive,
+            StaffProvisioningEvidenceRepository evidence, PlatformTransactionManager manager, JdbcTemplate jdbc,
+            StaffProvisioningIntentRepository intents) {
+        var transaction = new TransactionTemplate(manager);
+        transaction.setTimeout(15);
+        return new io.github.piresrenan.orderhub.workforce.application.service.ColdStartStaffProvisioningService(authorization,
+                new io.github.piresrenan.orderhub.workforce.adapter.out.persistence.postgresql.PostgreSqlColdStartStaffRepository(jdbc),
+                facts, tenants, primitive, evidence, new SpringWorkforceTransactionExecutor(transaction), intents,
+                new PostgreSqlStaffProvisioningClock(jdbc));
+    }
+
     /** Joins current authorization, the published primitive and owner-local evidence. */
     @Bean
     ManageStaffProvisioningUseCase staffProvisioningAdministrationService(
@@ -96,8 +110,10 @@ public class WorkforceConfiguration {
     @Bean
     StaffProvisioningCompletion staffProvisioningCompletion(StaffProvisioningFactsRepository facts,
             StaffProvisioningAuthorizationUseCase authorization, IsTenantMembershipOperationallyActiveUseCase memberships,
-            FindTenantOperationalStateUseCase tenants, StaffProvisioningEvidenceRepository evidence) {
-        return new AuthorizedStaffProvisioningCompletion(facts, authorization, memberships, tenants, evidence);
+            FindTenantOperationalStateUseCase tenants, StaffProvisioningEvidenceRepository evidence,
+            io.github.piresrenan.orderhub.workforce.application.service.ColdStartStaffProvisioningService coldStart) {
+        return new io.github.piresrenan.orderhub.workforce.application.service.ColdStartAwareStaffProvisioningCompletion(
+                new AuthorizedStaffProvisioningCompletion(facts, authorization, memberships, tenants, evidence), coldStart, evidence);
     }
 
     /**

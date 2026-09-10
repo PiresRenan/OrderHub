@@ -202,8 +202,53 @@ V1-V37 migrations remain byte-identical to the starting authority.
 
 ## Next required work
 
-1. Decide and prove explicit one-time Tenant cold start, including the metadata
-   required by a freshly created Tenant with no existing Staff configuration.
+### Explicit first-Staff ceremony, in progress
+
+The normal Staff checkpoint was published as
+`ee10b3f47cb9b901f84d4ec57728f25f670ecf4c`, tree
+`4562d1955564891aae4b0b72e0cd8a318c0a7c32`. The remote feature branch matched it
+and the worktree was clean immediately afterward; pre-release stayed unchanged.
+
+- Three full-runtime REDs established the missing first-Staff contract against
+  a genuinely empty Tenant, an actor without Platform authority and historical
+  INACTIVE Staff. Existing Workforce/Authorization tables suffice; no migration
+  beyond published V40 is introduced by this ceremony.
+- Merely accepting preconfigured department/position/role selectors would leave
+  a newly created Tenant unusable. The explicit ceremony therefore prepares
+  owner-local initial governance placement and creates the Tenant-owned
+  `INITIAL_TENANT_GOVERNANCE_V1` role only when assigning the first Staff.
+  Its 17 STAFF permissions are an explicit versioned set, not an enumeration of
+  future permissions, and include no Platform or Customer permissions. Existing
+  metadata is validated, never silently overwritten or clipped.
+- `PLATFORM_TENANTS_MANAGE` is checked before Tenant/target access. Its real
+  grant row is held FOR SHARE through the outer transaction. No Staff actor is
+  fabricated to pass normal RoleDelegationPolicy.
+- The existing workforce governance Tenant lock serializes first-Staff attempts.
+  Any Staff row, including INACTIVE history, or prior cold-start consumption
+  evidence closes this path. Immutable COLD_START_ISSUED attribution selects the
+  explicit mode; a failed normal authorization check never falls back to it.
+- Platform cancellation is limited to cold-start proofs before any Staff exists.
+  After bootstrap, normal Tenant authority can clean up remaining proofs;
+  Platform cannot continue managing private Staff through this contract.
+- The initial composed regression passed 24 / 0 / 0 / 0, then the expanded owner
+  transaction/normal-provisioning/modularity regression passed 31 / 0 / 0 / 0.
+  The final focused cold-start suite passed 12 / 0 / 0 / 0, including 32 rounds
+  of competing first-Staff proofs and 32 consumption/cancellation races.
+- Real audit INSERT failures roll back prepared metadata/issuance or
+  role creation/User/membership/Staff/consumption as applicable. A real grant
+  revoker waits for the outer transaction; a revoked grant prevents later
+  consumption. Altered placement ceilings deny without repair.
+- These tests use trusted synthetic issuer/subject facts. They do not claim
+  cryptographic JWT/bootstrap-adapter qualification, which remains pending.
+
+- Full `clean verify` completed successfully on 2026-09-10 at 00:10:24 -03:00:
+  1,425 tests / 0 failures / 0 errors / 0 skipped (7:48 minutes).
+  Log: `%TEMP%/oh019-cold-start-clean-verify.log`. Published migrations V1-V40
+  remain unchanged and `git diff --check` passes.
+
+### Remaining capabilities
+
+1. Publish the qualified first-Staff checkpoint.
 2. Add the verified bootstrap/HTTP adapters and their adversarial qualification.
 3. Complete Customer proof/linking; external link/unlink/migration; operational
    membership/trusted-context lifecycle; minimal real-JWT HTTP adapters.
