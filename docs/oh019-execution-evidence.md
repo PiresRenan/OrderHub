@@ -248,7 +248,8 @@ and the worktree was clean immediately afterward; pre-release stayed unchanged.
 
 ### Remaining capabilities
 
-1. Publish the qualified first-Staff checkpoint.
+1. First-Staff checkpoint published as `7bbfe7664ab9c213f5a6f3c7ec28eb4ad54288b2`
+   (tree `8dab044bcfa1082d76b7c188df51462ae106bca4`); remote confirmed.
 2. Add the verified bootstrap/HTTP adapters and their adversarial qualification.
 3. Complete Customer proof/linking; external link/unlink/migration; operational
    membership/trusted-context lifecycle; minimal real-JWT HTTP adapters.
@@ -258,3 +259,77 @@ and the worktree was clean immediately afterward; pre-release stayed unchanged.
 This normal Staff checkpoint does not claim OH-019 completion. No PR has been
 created, no GitHub review requested, and no merge or issue closure performed by
 this run.
+
+### Customer proof foundation, in progress
+
+- Re-read ADR-0013 and OH-015 issue #30, including its coordination and final
+  integration comments. Exact `(tenantId, customerId, userId)` cardinality is
+  preserved; Customer UUID knowledge remains only a selector, never proof.
+- Three PostgreSQL RED tests established the missing Customer proof schema.
+  V41 adds a same-Customer/Tenant foreign key, digest-only credential column,
+  bounded lifetime and operation/digest uniqueness. V1-V40 are unchanged.
+- The three new checks passed. The original V17 schema contract initially
+  rejected the added table because it enumerated the entire schema. Its exact
+  assertions now target the original two tables on the latest migrated schema;
+  new proof state has separate checks. Combined regression: 4 tests / 0 failures
+  / 0 errors / 0 skipped, completed 2026-09-10 06:46:31 -03:00.
+- Logs: `%TEMP%/oh019-customer-proof-schema-red.log`,
+  `%TEMP%/oh019-customer-proof-schema-green.log` (historical enumeration failure),
+  and `%TEMP%/oh019-customer-proof-schema-qualified.log`.
+- The executable runtime RED failed for the absent Customer linking API.
+  Production composition now exposes the narrow `account-linking` contract:
+  issue, consume and cancel. It accepts internal authenticated User IDs, not
+  provider selectors; cryptographic JWT/HTTP qualification remains pending.
+- Issuance requires current active Tenant, operational issuer membership and
+  workforce-bounded `TENANT_MEMBERS_MANAGE` before Customer lookup. This is an
+  explicit Tenant account-administration permission, not Customer ownership
+  inferred from being Staff elsewhere. Consumption revalidates its original
+  issuer; cancellation revalidates after a possible proof-row wait.
+- Authority uses the existing Staff read-decision contract: it is a current,
+  point-in-time decision, not a promise to cancel already-started operations
+  when later authority revocation commits.
+- Secrets have 256 random bits, canonical unpadded Base64URL encoding, a
+  15-minute issued lifetime and SHA-256 digest-only storage. Issued result
+  `toString()` redacts its credential. Operation replay returns only proof ID;
+  incompatible Customer/issuer reuse denies. A lost successful issuance
+  response requires cancellation and a new operation, never secret recovery.
+- Consumption selects the Customer only from the proof, not another request
+  Customer ID. It joins one REQUIRED physical transaction for terminal proof
+  transition, Users-owned ensure-active membership, exact Customer binding and
+  mandatory owner-local evidence. It neither creates User identity nor grants
+  Staff/roles; non-operational membership is never implicitly reactivated.
+- PostgreSQL handles one-winner proof transitions. A row trigger rechecks the
+  deadline after lock acquisition. Independent proofs for the same exact tuple
+  converge without imposing global cardinality or removing existing owners.
+  Evidence is append-only and contains only internal attribution identifiers.
+- The owner adapter rejects autocommit and transactions bound to a different
+  DataSource. Real audit INSERT rejection rolls back issuance, cancellation,
+  or consumption/membership/binding and permits the specified retry.
+- Initial runtime/schema/modularity regression: 9 / 0 / 0 / 0. The expanded
+  suite exposed two test-fixture errors while adding artificial audit CHECKs
+  over prior rows; `NOT VALID` now leaves prior evidence intact while enforcing
+  rejection for new writes. These were fixture errors, not product failures.
+- Final targeted/broader regression passed 50 / 0 / 0 / 0, including Customer
+  upgrade/schema, modularity, normal Staff and first-Staff suites. Four Customer
+  concurrency cases each ran 32 rounds: same-proof consumers, consume/cancel,
+  duplicate issuance, and independent proofs for the same User. Expiry during
+  an observed PostgreSQL lock wait leaves proof, binding and membership intact.
+- Upgrade from V40 preserves historical Customer bindings and all accepted
+  migration checksums. The first full `clean verify` ran 1,444 tests with zero
+  assertion failures and seven setup errors in two historical fixture cleanup
+  methods: they truncated CustomerProfile without the new referencing proof
+  table. Both fixture TRUNCATE lists now include that table; production FK and
+  append-only evidence protections are preserved. Both focused fixture checks
+  passed (3 and 4 tests). Final full `clean verify` then passed 1,444 / 0 / 0 / 0
+  in 7:39 minutes, completed 2026-09-10 12:11:24 -03:00. The exact Customer
+  manifest was reviewed, `git diff --check` passed and V1-V40 are unchanged.
+  Two newly prepared, untracked external-lifecycle test sources belong to the
+  next capability; they were neither compiled in this run nor included in this
+  checkpoint's manifest.
+  Logs: `%TEMP%/oh019-customer-link-runtime-red.log`,
+  `%TEMP%/oh019-customer-link-runtime-green.log`,
+  `%TEMP%/oh019-customer-link-adversarial.log`,
+  `%TEMP%/oh019-customer-link-qualified.log`,
+  `%TEMP%/oh019-customer-link-regression.log`,
+  `%TEMP%/oh019-customer-link-clean-verify.log`.
+  Final passing log: `%TEMP%/oh019-customer-link-clean-verify-final.log`.

@@ -97,6 +97,7 @@ class PostgreSqlCustomerAccountBindingRepositoryTest {
 
         jdbcTemplate.update("""
                 TRUNCATE TABLE
+                    customers.account_link_proofs,
                     customers.customer_account_bindings,
                     customers.customer_profiles
                 """);
