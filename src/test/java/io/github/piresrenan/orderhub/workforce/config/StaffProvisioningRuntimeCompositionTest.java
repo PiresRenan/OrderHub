@@ -17,6 +17,12 @@ import io.github.piresrenan.orderhub.authorization.application.port.in.current.A
 import io.github.piresrenan.orderhub.workforce.application.port.in.IssueStaffProvisioningIntentUseCase;
 import io.github.piresrenan.orderhub.workforce.application.port.out.StaffProvisioningIntentRepository;
 import io.github.piresrenan.orderhub.workforce.application.service.StaffProvisioningIssuanceService;
+import io.github.piresrenan.orderhub.workforce.application.port.in.ConsumeStaffProvisioningUseCase;
+import io.github.piresrenan.orderhub.authorization.application.port.in.provisioning.StaffProvisioningAuthorizationUseCase;
+import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveUseCase;
+import io.github.piresrenan.orderhub.users.application.port.in.ResolveOrCreateExternalUserUseCase;
+import io.github.piresrenan.orderhub.users.application.port.in.EnsureActiveTenantMembershipUseCase;
+import io.github.piresrenan.orderhub.tenants.application.port.in.operational.FindTenantOperationalStateUseCase;
 
 class StaffProvisioningRuntimeCompositionTest {
 
@@ -31,6 +37,10 @@ class StaffProvisioningRuntimeCompositionTest {
                         "30m")) {
 
             context.refresh();
+            assertThat(context.getBeansOfType(ConsumeStaffProvisioningUseCase.class).values())
+                    .singleElement().isNotNull();
+            assertThat(context.getBeansOfType(io.github.piresrenan.orderhub.workforce.application.port.in.ManageStaffProvisioningUseCase.class).values())
+                    .singleElement().isNotNull();
 
             var repositories =
                     context.getBeansOfType(
@@ -128,6 +138,17 @@ class StaffProvisioningRuntimeCompositionTest {
 
         var context =
                 new AnnotationConfigApplicationContext();
+
+        context.registerBean(StaffProvisioningAuthorizationUseCase.class,
+                () -> unsupportedProxy(StaffProvisioningAuthorizationUseCase.class));
+        context.registerBean(IsTenantMembershipOperationallyActiveUseCase.class,
+                () -> unsupportedProxy(IsTenantMembershipOperationallyActiveUseCase.class));
+        context.registerBean(ResolveOrCreateExternalUserUseCase.class,
+                () -> unsupportedProxy(ResolveOrCreateExternalUserUseCase.class));
+        context.registerBean(EnsureActiveTenantMembershipUseCase.class,
+                () -> unsupportedProxy(EnsureActiveTenantMembershipUseCase.class));
+        context.registerBean(FindTenantOperationalStateUseCase.class,
+                () -> unsupportedProxy(FindTenantOperationalStateUseCase.class));
 
         context.registerBean(
                 JdbcTemplate.class,

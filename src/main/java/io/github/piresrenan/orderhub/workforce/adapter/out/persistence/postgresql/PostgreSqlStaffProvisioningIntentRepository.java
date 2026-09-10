@@ -3,6 +3,7 @@ package io.github.piresrenan.orderhub.workforce.adapter.out.persistence.postgres
 import java.time.OffsetDateTime;
 import java.util.Arrays;
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.dao.DataAccessException;
@@ -50,6 +51,16 @@ public final class PostgreSqlStaffProvisioningIntentRepository
         }
 
         try {
+
+            // Recognizing an already committed operation must not wait for an
+            // unrelated terminal UPDATE of its intent. Waiting in the unique
+            // index while holding issuer authority locks inverts consumption's
+            // intent-before-authority order. This is issuance replay only;
+            // consumption remains a single conditional UPDATE RETURNING.
+            var existingOperation = findCreationIdentity(intent.tenantId(), intent.operationId());
+            if (!existingOperation.isEmpty()) {
+                return recognizeCreationReplay(existingOperation, intent.requestFingerprint());
+            }
 
             var createdIntentIds =
                     jdbcTemplate.query(
@@ -116,45 +127,8 @@ public final class PostgreSqlStaffProvisioningIntentRepository
                         createdIntentIds.getFirst());
             }
 
-            var persisted =
-                    jdbcTemplate.query(
-                            """
-                            SELECT
-                                intent_id,
-                                request_fingerprint
-                            FROM workforce.staff_provisioning_intents
-                            WHERE tenant_id = ?
-                              AND operation_id = ?
-                            """,
-                            (resultSet, rowNumber) ->
-                                    new PersistedCreationIdentity(
-                                            resultSet.getObject(
-                                                    "intent_id",
-                                                    UUID.class),
-                                            resultSet.getBytes(
-                                                    "request_fingerprint")),
-                            intent.tenantId(),
-                            intent.operationId());
-
-            if (persisted.size() != 1) {
-                throw new StaffProvisioningIntentPersistenceException(
-                        "Staff provisioning intent operation conflict "
-                                + "did not resolve to exactly one durable row",
-                        null);
-            }
-
-            var existing =
-                    persisted.getFirst();
-
-            if (!Arrays.equals(
-                    existing.requestFingerprint(),
-                    intent.requestFingerprint())) {
-
-                return new StaffProvisioningIntentCreation.FingerprintConflict();
-            }
-
-            return new StaffProvisioningIntentCreation.Replay(
-                    existing.intentId());
+            return recognizeCreationReplay(findCreationIdentity(intent.tenantId(), intent.operationId()),
+                    intent.requestFingerprint());
 
         } catch (DataAccessException exception) {
 
@@ -287,6 +261,28 @@ public final class PostgreSqlStaffProvisioningIntentRepository
                     "Failed to cancel Staff provisioning intent",
                     exception);
         }
+    }
+
+    private List<PersistedCreationIdentity> findCreationIdentity(UUID tenantId, UUID operationId) {
+        return jdbcTemplate.query("""
+                SELECT intent_id, request_fingerprint
+                FROM workforce.staff_provisioning_intents
+                WHERE tenant_id = ? AND operation_id = ?
+                """, (row, index) -> new PersistedCreationIdentity(row.getObject("intent_id", UUID.class),
+                        row.getBytes("request_fingerprint")), tenantId, operationId);
+    }
+
+    private StaffProvisioningIntentCreation recognizeCreationReplay(List<PersistedCreationIdentity> persisted,
+            byte[] fingerprint) {
+        if (persisted.size() != 1) {
+            throw new StaffProvisioningIntentPersistenceException(
+                    "Staff provisioning intent operation conflict did not resolve to exactly one durable row", null);
+        }
+        var existing = persisted.getFirst();
+        if (!Arrays.equals(existing.requestFingerprint(), fingerprint)) {
+            return new StaffProvisioningIntentCreation.FingerprintConflict();
+        }
+        return new StaffProvisioningIntentCreation.Replay(existing.intentId());
     }
 
     private record PersistedCreationIdentity(

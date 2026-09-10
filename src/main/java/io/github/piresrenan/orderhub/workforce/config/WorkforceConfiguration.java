@@ -13,11 +13,14 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import io.github.piresrenan.orderhub.workforce.adapter.out.notification.spring.SpringWorkforceAuthorityChangeAuditNotificationPublisher;
 import io.github.piresrenan.orderhub.workforce.adapter.out.persistence.postgresql.PostgreSqlStaffProvisioningIntentRepository;
+import io.github.piresrenan.orderhub.workforce.adapter.out.persistence.postgresql.PostgreSqlStaffProvisioningClock;
 import io.github.piresrenan.orderhub.workforce.adapter.out.persistence.postgresql.PostgreSqlWorkforceAuditRepository;
 import io.github.piresrenan.orderhub.workforce.adapter.out.persistence.postgresql.PostgreSqlWorkforceAuthorityChangeAnalyticsSourceRepository;
 import io.github.piresrenan.orderhub.workforce.adapter.out.persistence.postgresql.PostgreSqlWorkforcePositionChangeRepository;
 import io.github.piresrenan.orderhub.workforce.adapter.out.transaction.spring.SpringWorkforceTransactionExecutor;
 import io.github.piresrenan.orderhub.workforce.application.port.in.IssueStaffProvisioningIntentUseCase;
+import io.github.piresrenan.orderhub.workforce.application.port.in.ManageStaffProvisioningUseCase;
+import io.github.piresrenan.orderhub.workforce.application.service.StaffProvisioningAdministrationService;
 import io.github.piresrenan.orderhub.workforce.application.port.in.ResolveWorkforceAuthorityChangeAnalyticsSourceUseCase;
 import io.github.piresrenan.orderhub.workforce.application.port.out.StaffProvisioningIntentRepository;
 import io.github.piresrenan.orderhub.workforce.application.port.out.WorkforceAuditRepository;
@@ -36,10 +39,81 @@ import io.github.piresrenan.orderhub.workforce.adapter.out.persistence.postgresq
 import io.github.piresrenan.orderhub.workforce.application.port.in.authorization.AuthorizeStaffTenantActionUseCase;
 import io.github.piresrenan.orderhub.workforce.application.port.out.WorkforcePermissionEnvelopeRepository;
 import io.github.piresrenan.orderhub.workforce.application.service.StaffTenantAuthorizationService;
+import io.github.piresrenan.orderhub.workforce.application.port.in.ConsumeStaffProvisioningUseCase;
+import io.github.piresrenan.orderhub.workforce.application.port.out.StaffMaterializationRepository;
+import io.github.piresrenan.orderhub.workforce.application.port.out.StaffProvisioningCompletion;
+import io.github.piresrenan.orderhub.workforce.application.port.out.StaffProvisioningEvidenceRepository;
+import io.github.piresrenan.orderhub.workforce.application.port.out.StaffProvisioningFactsRepository;
+import io.github.piresrenan.orderhub.workforce.adapter.out.persistence.postgresql.PostgreSqlStaffMaterializationRepository;
+import io.github.piresrenan.orderhub.workforce.adapter.out.persistence.postgresql.PostgreSqlStaffProvisioningEvidenceRepository;
+import io.github.piresrenan.orderhub.workforce.adapter.out.persistence.postgresql.PostgreSqlStaffProvisioningFactsRepository;
+import io.github.piresrenan.orderhub.workforce.application.service.StaffProvisioningConsumptionService;
+import io.github.piresrenan.orderhub.workforce.application.service.AuthorizedStaffProvisioningCompletion;
+import io.github.piresrenan.orderhub.authorization.application.port.in.provisioning.StaffProvisioningAuthorizationUseCase;
+import io.github.piresrenan.orderhub.users.application.port.in.ResolveOrCreateExternalUserUseCase;
+import io.github.piresrenan.orderhub.users.application.port.in.EnsureActiveTenantMembershipUseCase;
+import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveUseCase;
+import io.github.piresrenan.orderhub.tenants.application.port.in.operational.FindTenantOperationalStateUseCase;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(StaffProvisioningProperties.class)
 public class WorkforceConfiguration {
+
+    /** Joins current authorization, the published primitive and owner-local evidence. */
+    @Bean
+    ManageStaffProvisioningUseCase staffProvisioningAdministrationService(
+            StaffProvisioningFactsRepository facts, StaffProvisioningAuthorizationUseCase authorization,
+            IsTenantMembershipOperationallyActiveUseCase memberships, FindTenantOperationalStateUseCase tenants,
+            StaffProvisioningEvidenceRepository evidence, IssueStaffProvisioningIntentUseCase primitive,
+            StaffProvisioningIntentRepository intents, PlatformTransactionManager manager, JdbcTemplate jdbc,
+            AuthorizeStaffTenantActionUseCase readAuthority) {
+        var transaction = new TransactionTemplate(manager);
+        transaction.setTimeout(15);
+        return new StaffProvisioningAdministrationService(
+                facts, authorization, memberships, tenants, evidence, primitive, intents,
+                new SpringWorkforceTransactionExecutor(transaction), new PostgreSqlStaffProvisioningClock(jdbc), readAuthority);
+    }
+
+    /** Supplies only workforce-owned Staff materialization persistence. */
+    @Bean
+    StaffMaterializationRepository staffMaterializationRepository(JdbcTemplate jdbc) {
+        return new PostgreSqlStaffMaterializationRepository(jdbc);
+    }
+
+    /** Supplies locked current workforce placement facts to the provisioning policy. */
+    @Bean
+    StaffProvisioningFactsRepository staffProvisioningFactsRepository(JdbcTemplate jdbc) {
+        return new PostgreSqlStaffProvisioningFactsRepository(jdbc);
+    }
+
+    /** Supplies append-only attribution joined to the provisioned relationship. */
+    @Bean
+    StaffProvisioningEvidenceRepository staffProvisioningEvidenceRepository(JdbcTemplate jdbc) {
+        return new PostgreSqlStaffProvisioningEvidenceRepository(jdbc);
+    }
+
+    /** Composes normal Tenant authority, optional role delegation and required evidence. */
+    @Bean
+    StaffProvisioningCompletion staffProvisioningCompletion(StaffProvisioningFactsRepository facts,
+            StaffProvisioningAuthorizationUseCase authorization, IsTenantMembershipOperationallyActiveUseCase memberships,
+            FindTenantOperationalStateUseCase tenants, StaffProvisioningEvidenceRepository evidence) {
+        return new AuthorizedStaffProvisioningCompletion(facts, authorization, memberships, tenants, evidence);
+    }
+
+    /**
+     * Bounds the complete provisioning transaction to 15 seconds. REQUIRED joins
+     * an existing physical transaction; no inner capability commits independently.
+     */
+    @Bean
+    ConsumeStaffProvisioningUseCase consumeStaffProvisioningUseCase(StaffProvisioningIntentRepository intents,
+            ResolveOrCreateExternalUserUseCase users, EnsureActiveTenantMembershipUseCase memberships,
+            StaffMaterializationRepository staff, StaffProvisioningCompletion completion,
+            PlatformTransactionManager transactionManager, JdbcTemplate jdbc) {
+        var transaction = new TransactionTemplate(transactionManager);
+        transaction.setTimeout(15);
+        return new StaffProvisioningConsumptionService(intents, users, memberships, staff, completion,
+                new SpringWorkforceTransactionExecutor(transaction), new PostgreSqlStaffProvisioningClock(jdbc));
+    }
 
     /**
      * Exposes the workforce-owned Staff provisioning intent persistence port.
