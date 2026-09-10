@@ -73,6 +73,8 @@ class StaffProvisioningConsumptionTransactionTest {
         context = new AnnotationConfigApplicationContext();
         context.registerBean(JdbcTemplate.class, () -> jdbc);
         context.registerBean(PlatformTransactionManager.class, () -> manager);
+        context.registerBean(io.github.piresrenan.orderhub.users.application.port.out.TrustedExternalIdentityProviders.class,
+                () -> issuer -> { throw new AssertionError("Transaction-only fixture must not execute provider trust"); });
         context.register(UsersConfiguration.class);
         context.refresh();
         users = context.getBean(ResolveOrCreateExternalUserUseCase.class);

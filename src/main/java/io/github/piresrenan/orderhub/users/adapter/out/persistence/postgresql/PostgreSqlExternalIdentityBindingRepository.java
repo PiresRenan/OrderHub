@@ -47,6 +47,7 @@ public final class PostgreSqlExternalIdentityBindingRepository
                         FROM users.external_identity_bindings
                         WHERE issuer = ?
                           AND subject = ?
+                          AND active
                         """;
 
         private final JdbcTemplate jdbcTemplate;

@@ -144,6 +144,11 @@ class ExternalIdentityResolveOrCreateRuntimeCompositionTest {
     @Configuration(proxyBeanMethods = false)
     static class TestInfrastructureConfiguration {
 
+        @Bean
+        io.github.piresrenan.orderhub.users.application.port.out.TrustedExternalIdentityProviders trustedProviders() {
+            return issuer -> { throw new AssertionError("Composition must not evaluate provider trust"); };
+        }
+
         /**
          * Provides the synthetic composition-only DataSource.
          *

@@ -333,3 +333,70 @@ this run.
   `%TEMP%/oh019-customer-link-regression.log`,
   `%TEMP%/oh019-customer-link-clean-verify.log`.
   Final passing log: `%TEMP%/oh019-customer-link-clean-verify-final.log`.
+
+### External identity lifecycle, in progress
+
+- Customer checkpoint was committed and pushed normally as
+  `d25469ca502728ba6c800bbe92b39e3ecb5d54a7`, tree
+  `487f194637e9ef1b5e6a11930700d63436c3cfde`; remote confirmed. V1-V41 are now
+  published and unchanged. No PR/review/merge or issue closure has occurred.
+- Runtime/schema RED: missing lifecycle API and missing binding lifecycle
+  columns; a second schema RED established the absent digest-only proof table.
+  V42 adds opaque binding IDs, active state, immutable owner/pair checks,
+  one-time link proofs and append-only Users evidence. Existing identities,
+  Customer references, suspended membership and accepted checksums survive the
+  V41 upgrade without normalization or reassignment.
+- Linking preserves one User and joins the published exact-pair advisory lock.
+  Unlink retains the binding and owner but removes it from ordinary identity
+  resolution. Re-linking requires a new proof and independent identity
+  verification. First-sighting of a revoked pair cannot commit a replacement
+  User: the retained uniqueness conflict rolls the whole attempt back.
+- All lifecycle writes/evidence use one REQUIRED physical transaction. The
+  existing User row uses FOR NO KEY UPDATE to serialize link/unlink without
+  conflicting with legacy binding INSERT foreign-key KEY SHARE checks. No
+  JVM-local correctness lock or cross-module SQL was introduced.
+- Last-path removal is denied. The remaining path must be locally active and
+  have a currently configured trusted issuer; an active row at a retired
+  provider is insufficient. This checks application-controlled usability, not
+  remote provider account suspension or availability. No orphan recovery API
+  was added.
+- A real signed-JWT RED rejected the additional configured provider. Security
+  now supports an explicit additional-issuer/JWK list using the same validation
+  policy/audience and configured decoder bean. Unknown issuer routing never
+  fetches an endpoint selected by the token. Primary trust cannot be shadowed,
+  incomplete additional configuration fails startup, and the Users trust port
+  reads the same server-owned issuer set. Initial crypto/modularity: 7 / 0 / 0 / 0.
+- Initial composed lifecycle run had 14 tests, with two isolated composition
+  fixture failures because its synthetic infrastructure omitted the new
+  mandatory provider-trust port. The fixture now supplies a non-executing test
+  implementation; no optional production fallback was added. Next run: 21 / 0 / 0 / 0.
+- Broad Users regression exposed 57 setup errors across seven old TRUNCATE
+  fixtures after the new same-owner FK. Their explicit cleanup lists now include
+  the mutable link-proof table while keeping evidence append-only. Corrected
+  Users/runtime/upgrade/crypto/modularity regression: 88 / 0 / 0 / 0.
+- Final composed regression passed 70 / 0 / 0 / 0, including normal Staff,
+  first-Staff and Customer. External lifecycle cases include five concurrency
+  scenarios, each with 32 rounds: competing owners for a pair, two unlinks,
+  same-proof competing identities, linking versus first-sighting, and provider
+  migration. Expiry during an observed PostgreSQL lock wait prevents linking.
+  Real audit failures roll back issue/cancel/link/unlink and allow valid retries.
+- Authentication resolution can see the old active row while unlink is
+  uncommitted; subsequent resolution after its commit denies the old identity.
+  Historical owner/binding rows remain. This does not retroactively stop a
+  previously authenticated in-flight request.
+- Application lifecycle tests use synthetic verified facts, not a public raw
+  issuer/subject claim API. Real bootstrap/HTTP acceptance and membership
+  operational administration remain pending. ADR-0017 remains DESIGNED.
+- The first full `clean verify` ran 1458 tests with zero assertion failures and
+  four composition errors: three additional isolated fixtures omitted the
+  mandatory trust port. Explicit non-executing test collaborators corrected the
+  setup; the affected composition/transaction suites passed 12 / 0 / 0 / 0.
+  Production trust remains mandatory. The fresh full `clean verify` passed
+  **1466 / 0 / 0 / 0**, independently totaled from Surefire XML, in 8:30 at
+  2026-09-10 17:15:42 -03:00 (`oh019-external-lifecycle-clean-verify-final.log`).
+  The 22-test increase over the published Customer checkpoint is 15 lifecycle,
+  four schema, one upgrade and two additional-provider trust cases.
+  Logs are in `%TEMP%` with prefixes
+  `oh019-external-lifecycle-` (red, schema-red, green, adversarial,
+  users-regression, qualified, final-regression, clean-verify) and
+  `oh019-additional-provider-trust-` (red, green).

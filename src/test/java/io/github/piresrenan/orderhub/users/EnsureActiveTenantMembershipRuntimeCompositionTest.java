@@ -56,6 +56,11 @@ class EnsureActiveTenantMembershipRuntimeCompositionTest {
     static class TestJdbcConfiguration {
 
         @Bean
+        io.github.piresrenan.orderhub.users.application.port.out.TrustedExternalIdentityProviders trustedProviders() {
+            return issuer -> { throw new AssertionError("Composition-only trust must not execute"); };
+        }
+
+        @Bean
         JdbcTemplate jdbcTemplate() {
 
             var dataSource =

@@ -25,6 +25,9 @@ import io.github.piresrenan.orderhub.security.application.service.ResolveTrusted
 import io.github.piresrenan.orderhub.tenants.application.port.in.operational.FindTenantOperationalStateUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityUseCase;
+import io.github.piresrenan.orderhub.users.application.port.out.TrustedExternalIdentityProviders;
+import io.github.piresrenan.orderhub.security.adapter.in.authentication.jwt.AdditionalJwtTrustProperties;
+import io.github.piresrenan.orderhub.security.adapter.in.authentication.jwt.ConfiguredIssuerJwtDecoder;
 
 /**
  * Spring composition root for the Security module.
@@ -34,7 +37,7 @@ import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalId
  */
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(
-        JwtResourceServerProperties.class)
+        {JwtResourceServerProperties.class, AdditionalJwtTrustProperties.class})
 public class SecurityConfiguration {
 
     /**
@@ -232,18 +235,40 @@ public class SecurityConfiguration {
      */
     @Bean
     JwtDecoder jwtDecoder(
-            JwtResourceServerProperties properties) {
+            JwtResourceServerProperties properties, AdditionalJwtTrustProperties additional) {
+
+        var primary = decoder(properties.issuer(), properties.audience(), properties.jwkSetUri());
+        if (additional.additionalIssuers().isEmpty()) { return primary; }
+        var decoders = new java.util.HashMap<String, JwtDecoder>();
+        decoders.put(properties.issuer(), primary);
+        for (var provider : additional.additionalIssuers()) {
+            if (decoders.containsKey(provider.issuer())) { throw new IllegalArgumentException("JWT trusted issuers must be unique"); }
+            decoders.put(provider.issuer(), decoder(provider.issuer(), properties.audience(), provider.jwkSetUri()));
+        }
+        return new ConfiguredIssuerJwtDecoder(decoders);
+    }
+
+    @Bean
+    TrustedExternalIdentityProviders trustedExternalIdentityProviders(JwtResourceServerProperties properties, AdditionalJwtTrustProperties additional) {
+        var issuers = new java.util.HashSet<String>();
+        issuers.add(properties.issuer());
+        additional.additionalIssuers().forEach(provider -> issuers.add(provider.issuer()));
+        var configured = java.util.Set.copyOf(issuers);
+        return configured::contains;
+    }
+
+    private JwtDecoder decoder(String issuer, String audience, String jwkSetUri) {
 
         var decoder =
                 NimbusJwtDecoder
                         .withJwkSetUri(
-                                properties.jwkSetUri())
+                                jwkSetUri)
                         .build();
 
         decoder.setJwtValidator(
                 new JwtValidationPolicy(
-                        properties.issuer(),
-                        properties.audience()));
+                        issuer,
+                        audience));
 
         return decoder;
     }

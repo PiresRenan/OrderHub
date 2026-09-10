@@ -119,6 +119,18 @@ Knowledge of Customer UUID, email-like data, JWT subject text or arbitrary provi
 
 The final proof mechanism must be the smallest one that can be securely tested. Customer linking never grants Staff authority.
 
+The implemented Customer contract uses a 256-bit one-time capability issued by
+current workforce-bounded `TENANT_MEMBERS_MANAGE` authority inside an active
+Tenant. Only its SHA-256 digest is stored. The 15-minute proof selects the
+Customer at consumption; a second caller-selected Customer ID is not accepted.
+The authenticated internal User, ensure-active membership, exact Customer binding
+and required evidence participate in one transaction. Suspended or terminated
+memberships are not reactivated. Independent authorized proofs preserve the
+existing exact-tuple cardinality and do not remove previous account bindings.
+Issuance replay returns only the proof identifier; losing the original response
+requires cancellation and a new operation. HTTP/JWT adapter qualification remains
+part of the final OH-019 gate, not implied by this application contract.
+
 ### External identity lifecycle preserves stable internal identity
 
 The system must support the operational semantics admitted by OH-019 for linking an additional external identity, unlinking, relinking/provider migration and recovery while preserving one stable internal User identity.
@@ -128,6 +140,41 @@ The persistent uniqueness of `(issuer, subject)` remains a correctness boundary.
 An external identity must not be reassigned to another User through stale writes, duplicate requests or races.
 
 Unlink/recovery rules must explicitly address the risk of leaving a User with no usable authentication path instead of treating deletion as a generic CRUD operation.
+
+The implementation in progress uses add-then-remove migration. A currently
+authenticated User obtains a one-time 256-bit, digest-only, 15-minute proof. A
+separately verified external identity consumes it and is linked to that same
+User. Existing ownership by another User denies and rolls back consumption.
+An unlinked binding retains its exact pair, internal owner and opaque binding
+identifier with `active = false`; it is not freed for reassignment. A new proof
+and renewed verification may reactivate only that original owner's binding.
+Ordinary first-sighting provisioning cannot reactivate a revoked binding or
+commit a replacement User for it.
+
+Link and unlink serialize on the existing User row with `FOR NO KEY UPDATE`.
+Link additionally joins the published exact-pair advisory scope, in pair-before-
+User order. The weaker User row lock remains compatible with binding INSERT
+foreign-key checks. Unlink denies removal when no other locally active binding
+has an issuer in the current server trust configuration. This does not claim to
+detect account suspension inside an external provider; provider availability and
+upstream account administration remain external facts. No last-path removal or
+privileged orphan-account recovery API is introduced.
+
+Security owns the issuer allowlist and supplies its boolean contract to Users.
+The primary issuer/JWK/audience properties retain their behavior. Optional
+`orderhub.security.jwt.additional-issuers[n].issuer` and
+`orderhub.security.jwt.additional-issuers[n].jwk-set-uri` allow an explicitly
+configured migration overlap. Each configured decoder applies the same
+`JwtValidationPolicy` and audience. The unverified issuer only selects a decoder
+from this fixed map; it never selects a network endpoint or establishes identity.
+Unknown issuers fail before key retrieval. No issuer discovery is added.
+
+Authentication resolution reads only active bindings. Its PostgreSQL statement
+snapshot is the boundary: resolution while unlink is uncommitted can still
+succeed, but a subsequent ordinary resolution after commit rejects the old pair.
+Already-started requests are not retroactively cancelled. Lifecycle transitions
+and append-only evidence share the caller's transaction, without storing issuer,
+subject, JWT or linking credentials in audit evidence.
 
 ### Membership lifecycle affects trust, not history
 

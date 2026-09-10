@@ -66,6 +66,7 @@ class PostgreSqlUserRepositoryTest {
 
                 jdbcTemplate.update("""
                                 TRUNCATE TABLE
+                                    users.external_identity_link_proofs,
                                     users.external_identity_bindings,
                                     users.tenant_memberships,
                                     users.users

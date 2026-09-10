@@ -6,6 +6,12 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import io.github.piresrenan.orderhub.users.application.port.in.ExternalIdentityLifecycleUseCase;
+import io.github.piresrenan.orderhub.users.application.port.out.TrustedExternalIdentityProviders;
+import io.github.piresrenan.orderhub.users.application.service.ExternalIdentityLifecycleService;
+import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.PostgreSqlExternalIdentityLifecycleRepository;
+import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.SpringExternalIdentityLifecycleTransaction;
 
 import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.PostgreSqlTenantMembershipRepository;
 import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.PostgreSqlUserRepository;
@@ -43,6 +49,18 @@ import io.github.piresrenan.orderhub.users.application.service.ResolveOrCreateEx
  */
 @Configuration(proxyBeanMethods = false)
 public class UsersConfiguration {
+
+        @Bean
+        ExternalIdentityLifecycleUseCase externalIdentityLifecycleUseCase(
+                        JdbcTemplate jdbc, PlatformTransactionManager manager, ExternalIdentityUserProvisioningCoordinator coordinator,
+                        TrustedExternalIdentityProviders providers) {
+                var transaction = new TransactionTemplate(manager);
+                transaction.setTimeout(15);
+                return new ExternalIdentityLifecycleService(
+                        new PostgreSqlExternalIdentityLifecycleRepository(jdbc),
+                        new SpringExternalIdentityLifecycleTransaction(transaction),
+                        coordinator, providers);
+        }
 
         /**
          * Composes the PostgreSQL implementation of the User persistence boundary.
