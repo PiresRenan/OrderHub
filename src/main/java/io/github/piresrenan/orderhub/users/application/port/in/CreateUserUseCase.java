@@ -1,13 +1,21 @@
 package io.github.piresrenan.orderhub.users.application.port.in;
 
-import io.github.piresrenan.orderhub.users.domain.model.User;
-
+/**
+ * Defines the application boundary for creating one new internally identified
+ * OrderHub User.
+ */
 public interface CreateUserUseCase {
 
     /**
-     * Creates one new internally identified User.
+     * Creates and persists one new internally identified User.
      *
-     * @return successfully created and persisted User aggregate
+     * <p>
+     * The caller receives only the internally generated identifier through an
+     * application-owned result. The User aggregate never crosses this
+     * boundary.
+     * </p>
+     *
+     * @return internal identity of the successfully created and persisted User
      */
-    User create();
+    CreatedUserIdentity create();
 }

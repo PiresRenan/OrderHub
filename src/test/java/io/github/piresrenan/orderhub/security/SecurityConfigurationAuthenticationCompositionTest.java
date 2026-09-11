@@ -14,7 +14,7 @@ import io.github.piresrenan.orderhub.security.adapter.in.authentication.jwt.Auth
 import io.github.piresrenan.orderhub.security.application.model.AuthenticatedUserPrincipal;
 import io.github.piresrenan.orderhub.security.application.port.in.ResolveAuthenticatedUserUseCase;
 import io.github.piresrenan.orderhub.security.application.service.ResolveAuthenticatedUserService;
-import io.github.piresrenan.orderhub.users.application.port.in.FindTenantMembershipUseCase;
+import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolvedUserIdentity;
 import io.github.piresrenan.orderhub.tenants.application.port.in.operational.FindTenantOperationalStateUseCase;
@@ -148,7 +148,7 @@ class SecurityConfigurationAuthenticationCompositionTest {
                         ResolveExternalIdentityUseCase.class,
                         () -> externalIdentities)
                 .withBean(
-                        FindTenantMembershipUseCase.class,
+                        IsTenantMembershipOperationallyActiveUseCase.class,
                         () -> query -> {
                             throw new AssertionError(
                                     "Authentication composition must not resolve tenant membership");

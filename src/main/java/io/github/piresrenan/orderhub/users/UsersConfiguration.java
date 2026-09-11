@@ -5,12 +5,20 @@ import java.util.UUID;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import io.github.piresrenan.orderhub.users.application.port.in.ExternalIdentityLifecycleUseCase;
+import io.github.piresrenan.orderhub.users.application.port.out.TrustedExternalIdentityProviders;
+import io.github.piresrenan.orderhub.users.application.service.ExternalIdentityLifecycleService;
+import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.PostgreSqlExternalIdentityLifecycleRepository;
+import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.SpringExternalIdentityLifecycleTransaction;
 
 import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.PostgreSqlTenantMembershipRepository;
 import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.PostgreSqlUserRepository;
 import io.github.piresrenan.orderhub.users.application.port.in.CreateUserUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.EstablishTenantMembershipUseCase;
-import io.github.piresrenan.orderhub.users.application.port.in.FindTenantMembershipUseCase;
+import io.github.piresrenan.orderhub.users.application.port.in.EnsureActiveTenantMembershipUseCase;
+import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveUseCase;
 import io.github.piresrenan.orderhub.users.application.port.out.TenantMembershipRepository;
 import io.github.piresrenan.orderhub.users.application.port.out.UserIdGenerator;
 import io.github.piresrenan.orderhub.users.application.port.out.UserRepository;
@@ -18,13 +26,18 @@ import io.github.piresrenan.orderhub.users.application.port.in.UserExistenceUseC
 import io.github.piresrenan.orderhub.users.application.service.UserExistenceService;
 import io.github.piresrenan.orderhub.users.application.service.CreateUserService;
 import io.github.piresrenan.orderhub.users.application.service.EstablishTenantMembershipService;
-import io.github.piresrenan.orderhub.users.application.service.FindTenantMembershipService;
+import io.github.piresrenan.orderhub.users.application.service.EnsureActiveTenantMembershipService;
+import io.github.piresrenan.orderhub.users.application.service.IsTenantMembershipOperationallyActiveService;
 import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.PostgreSqlExternalIdentityBindingRepository;
 import io.github.piresrenan.orderhub.users.application.port.in.BindExternalIdentityUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityUseCase;
 import io.github.piresrenan.orderhub.users.application.port.out.ExternalIdentityBindingRepository;
 import io.github.piresrenan.orderhub.users.application.service.BindExternalIdentityService;
 import io.github.piresrenan.orderhub.users.application.service.ResolveExternalIdentityService;
+import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.PostgreSqlExternalIdentitySerializationCoordinator;
+import io.github.piresrenan.orderhub.users.application.port.in.ResolveOrCreateExternalUserUseCase;
+import io.github.piresrenan.orderhub.users.application.port.out.ExternalIdentityUserProvisioningCoordinator;
+import io.github.piresrenan.orderhub.users.application.service.ResolveOrCreateExternalUserService;
 
 /**
  * Spring composition root for the Users application module.
@@ -36,6 +49,26 @@ import io.github.piresrenan.orderhub.users.application.service.ResolveExternalId
  */
 @Configuration(proxyBeanMethods = false)
 public class UsersConfiguration {
+
+        /** Exposes owner-local lifecycle mutation while requiring the coordinator transaction. */
+        @Bean
+        io.github.piresrenan.orderhub.users.application.port.in.TransitionTenantMembershipUseCase transitionTenantMembershipUseCase(JdbcTemplate jdbc) {
+                return new io.github.piresrenan.orderhub.users.application.service.TransitionTenantMembershipService(
+                        new io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.PostgreSqlTenantMembershipTransitionRepository(jdbc));
+        }
+
+        /** Composes proof consumption, exact-pair serialization and same-User lifecycle evidence. */
+        @Bean
+        ExternalIdentityLifecycleUseCase externalIdentityLifecycleUseCase(
+                        JdbcTemplate jdbc, PlatformTransactionManager manager, ExternalIdentityUserProvisioningCoordinator coordinator,
+                        TrustedExternalIdentityProviders providers) {
+                var transaction = new TransactionTemplate(manager);
+                transaction.setTimeout(15);
+                return new ExternalIdentityLifecycleService(
+                        new PostgreSqlExternalIdentityLifecycleRepository(jdbc),
+                        new SpringExternalIdentityLifecycleTransaction(transaction),
+                        coordinator, providers);
+        }
 
         /**
          * Composes the PostgreSQL implementation of the User persistence boundary.
@@ -123,16 +156,43 @@ public class UsersConfiguration {
         }
 
         /**
-         * Composes the exact-pair TenantMembership query use case.
+         * Composes the Users-owned desired-state TenantMembership use case.
+         *
+         * <p>
+         * The application service remains framework-neutral while this composition
+         * root supplies the owner-local persistence boundary required to establish
+         * or reconcile one operational User/Tenant membership.
+         * </p>
          *
          * @param tenantMembershipRepository membership persistence boundary
-         * @return configured membership query use case
+         * @return configured ensure-active membership use case
          */
         @Bean
-        FindTenantMembershipUseCase findTenantMembershipUseCase(
+        EnsureActiveTenantMembershipUseCase ensureActiveTenantMembershipUseCase(
                         TenantMembershipRepository tenantMembershipRepository) {
 
-                return new FindTenantMembershipService(
+                return new EnsureActiveTenantMembershipService(
+                                tenantMembershipRepository);
+        }
+
+        /**
+         * Composes the exact-pair TenantMembership operational eligibility use
+         * case.
+         *
+         * <p>
+         * Publishes the Users-owned operational-membership eligibility boundary
+         * without exposing TenantMembership domain state. The domain model and
+         * its lifecycle vocabulary stay inside Users.
+         * </p>
+         *
+         * @param tenantMembershipRepository membership persistence boundary
+         * @return configured membership eligibility use case
+         */
+        @Bean
+        IsTenantMembershipOperationallyActiveUseCase isTenantMembershipOperationallyActiveUseCase(
+                        TenantMembershipRepository tenantMembershipRepository) {
+
+                return new IsTenantMembershipOperationallyActiveService(
                                 tenantMembershipRepository);
         }
 
@@ -164,6 +224,51 @@ public class UsersConfiguration {
 
                 return new ResolveExternalIdentityService(
                                 externalIdentityBindingRepository);
+        }
+
+        /**
+         * Composes the PostgreSQL serialization scope used while provisioning the
+         * internal User for one exact external identity.
+         *
+         * @param jdbcTemplate       JDBC infrastructure supplied by Spring
+         * @param transactionManager transaction demarcation supplied by Spring
+         * @return external identity provisioning coordinator backed by PostgreSQL
+         */
+        @Bean
+        ExternalIdentityUserProvisioningCoordinator externalIdentityUserProvisioningCoordinator(
+                        JdbcTemplate jdbcTemplate,
+                        PlatformTransactionManager transactionManager) {
+
+                return new PostgreSqlExternalIdentitySerializationCoordinator(
+                                jdbcTemplate,
+                                transactionManager);
+        }
+
+        /**
+         * Composes the external identity resolve-or-create application use case.
+         *
+         * @param externalIdentityUserProvisioningCoordinator serialized
+         *                                                    provisioning scope
+         * @param resolveExternalIdentityUseCase              external identity
+         *                                                    resolution boundary
+         * @param createUserUseCase                           User creation
+         *                                                    boundary
+         * @param bindExternalIdentityUseCase                 external identity
+         *                                                    binding boundary
+         * @return configured resolve-or-create use case
+         */
+        @Bean
+        ResolveOrCreateExternalUserUseCase resolveOrCreateExternalUserUseCase(
+                        ExternalIdentityUserProvisioningCoordinator externalIdentityUserProvisioningCoordinator,
+                        ResolveExternalIdentityUseCase resolveExternalIdentityUseCase,
+                        CreateUserUseCase createUserUseCase,
+                        BindExternalIdentityUseCase bindExternalIdentityUseCase) {
+
+                return new ResolveOrCreateExternalUserService(
+                                externalIdentityUserProvisioningCoordinator,
+                                resolveExternalIdentityUseCase,
+                                createUserUseCase,
+                                bindExternalIdentityUseCase);
         }
 
         @Bean

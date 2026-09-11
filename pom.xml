@@ -43,6 +43,12 @@
         <!-- Spring Modulith release train; must stay aligned with the
              Spring Boot generation declared in <parent>. -->
         <spring-modulith.version>2.1.1</spring-modulith.version>
+
+        <!-- ArchUnit is not managed by the Spring Boot parent or the
+             Spring Modulith BOM. Pin the version currently resolved
+             through spring-modulith-core so the architecture test does
+             not silently depend on a transitive runtime artifact. -->
+        <archunit.version>1.4.2</archunit.version>
     </properties>
 
     <!-- ==================================================================
@@ -233,6 +239,20 @@
         <dependency>
             <groupId>org.springframework.modulith</groupId>
             <artifactId>spring-modulith-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            ArchUnit core, used directly by architecture contract tests that
+            assert module exposure rules Spring Modulith cannot express, such
+            as an exposed named interface staying free of its own module's
+            domain types. Declared explicitly because it would otherwise be
+            only a runtime-scoped transitive of spring-modulith-core.
+        -->
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit</artifactId>
+            <version>${archunit.version}</version>
             <scope>test</scope>
         </dependency>
 

@@ -17,6 +17,11 @@ import org.testcontainers.utility.DockerImageName;
 
 import io.github.piresrenan.orderhub.customers.application.port.out.CustomerAccountBindingRepository;
 
+/**
+ * Why: Customer identity and ownership must remain separate from Staff and arbitrary selectors.
+ * Covers: Customer schema, exact ownership and linking behavior exercised by this suite.
+ * Prevents: Account takeover, cross-Tenant ownership and regressions hidden by invalid cleanup fixtures.
+ */
 @Testcontainers
 class PostgreSqlCustomerAccountBindingRepositoryTest {
 
@@ -97,6 +102,7 @@ class PostgreSqlCustomerAccountBindingRepositoryTest {
 
         jdbcTemplate.update("""
                 TRUNCATE TABLE
+                    customers.account_link_proofs,
                     customers.customer_account_bindings,
                     customers.customer_profiles
                 """);

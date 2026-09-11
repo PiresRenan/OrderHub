@@ -28,11 +28,16 @@ import com.nimbusds.jose.jwk.RSAKey;
 
 import io.github.piresrenan.orderhub.security.support.RealJwtTestSupport;
 import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
-import io.github.piresrenan.orderhub.users.application.port.in.FindTenantMembershipUseCase;
+import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityQuery;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolvedUserIdentity;
 
+/**
+ * Why: Platform authority must come from current internal grants rather than JWT claims.
+ * Covers: Real JWT authentication and the Platform administration boundary.
+ * Prevents: Provider-claim escalation and regression from identity schema evolution.
+ */
 @SpringBootTest(properties = {
         "orderhub.security.jwt.issuer=https://issuer.example.test",
         "orderhub.security.jwt.audience=orderhub-api",
@@ -61,7 +66,7 @@ class RealJwtPlatformAdministrationAcceptanceTest {
     private ResolveExternalIdentityUseCase externalIdentities;
 
     @MockitoBean
-    private FindTenantMembershipUseCase memberships;
+    private IsTenantMembershipOperationallyActiveUseCase memberships;
 
     @BeforeEach
     void authenticateKnownInternalUserAndClearAuthority() {

@@ -21,7 +21,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 
-import io.github.piresrenan.orderhub.users.application.port.in.FindTenantMembershipUseCase;
+import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityUseCase;
 
 import com.nimbusds.jose.JWSAlgorithm;
@@ -241,6 +241,37 @@ class SecurityConfigurationJwtDecoderTest {
      *
      * @return isolated Security configuration context
      */
+    @Test
+    void explicitAdditionalProviderUsesTheSameSignatureIssuerAndAudienceValidation() {
+        contextRunner().withPropertyValues(
+                "orderhub.security.jwt.additional-issuers[0].issuer=" + OTHER_ISSUER,
+                "orderhub.security.jwt.additional-issuers[0].jwk-set-uri=" + jwkSetUri)
+                .run(context -> {
+                    var decoder = context.getBean(JwtDecoder.class);
+                    assertThat(decoder.decode(signedToken(trustedKeyPair, OTHER_ISSUER, AUDIENCE)).getSubject()).isEqualTo(SUBJECT);
+                    assertThat(decoder.decode(signedToken(trustedKeyPair, ISSUER, AUDIENCE)).getSubject()).isEqualTo(SUBJECT);
+                    assertThatThrownBy(() -> decoder.decode(signedToken(untrustedKeyPair, OTHER_ISSUER, AUDIENCE))).isInstanceOf(JwtException.class);
+                    assertThatThrownBy(() -> decoder.decode(signedToken(trustedKeyPair, OTHER_ISSUER, OTHER_AUDIENCE))).isInstanceOf(JwtException.class);
+                    var requests = jwkRequests.get();
+                    assertThatThrownBy(() -> decoder.decode(signedToken(trustedKeyPair, "https://unconfigured.example.test", AUDIENCE))).isInstanceOf(JwtException.class);
+                    assertThat(jwkRequests.get()).isEqualTo(requests);
+                    var providerTrust = context.getBean(io.github.piresrenan.orderhub.users.application.port.out.TrustedExternalIdentityProviders.class);
+                    assertThat(providerTrust.isTrusted(ISSUER)).isTrue();
+                    assertThat(providerTrust.isTrusted(OTHER_ISSUER)).isTrue();
+                    assertThat(providerTrust.isTrusted("https://unconfigured.example.test")).isFalse();
+                });
+    }
+
+    @Test
+    void additionalProviderCannotShadowPrimaryTrustOrOmitItsKeyEndpoint() {
+        contextRunner().withPropertyValues(
+                "orderhub.security.jwt.additional-issuers[0].issuer=" + ISSUER,
+                "orderhub.security.jwt.additional-issuers[0].jwk-set-uri=" + jwkSetUri)
+                .run(context -> assertThat(context).hasFailed());
+        contextRunner().withPropertyValues("orderhub.security.jwt.additional-issuers[0].issuer=" + OTHER_ISSUER)
+                .run(context -> assertThat(context).hasFailed());
+    }
+
     private ApplicationContextRunner contextRunner() {
         return new ApplicationContextRunner()
                 .withUserConfiguration(
@@ -257,7 +288,7 @@ class SecurityConfigurationJwtDecoderTest {
                                     "JWT decoder composition must not resolve external identity");
                         })
                 .withBean(
-                        FindTenantMembershipUseCase.class,
+                        IsTenantMembershipOperationallyActiveUseCase.class,
                         () -> query -> {
                             throw new AssertionError(
                                     "JWT decoder composition must not resolve tenant membership");

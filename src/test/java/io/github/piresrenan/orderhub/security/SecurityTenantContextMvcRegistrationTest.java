@@ -14,7 +14,7 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 
 import io.github.piresrenan.orderhub.security.adapter.in.web.TrustedTenantContextArgumentResolver;
 import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
-import io.github.piresrenan.orderhub.users.application.port.in.FindTenantMembershipUseCase;
+import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityUseCase;
 
 @SpringBootTest(properties = {
@@ -36,7 +36,7 @@ class SecurityTenantContextMvcRegistrationTest {
     private ResolveExternalIdentityUseCase externalIdentities;
 
     @MockitoBean
-    private FindTenantMembershipUseCase memberships;
+    private IsTenantMembershipOperationallyActiveUseCase memberships;
 
     @Test
     void registersTrustedTenantContextResolverWithSpringMvc() {

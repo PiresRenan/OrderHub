@@ -3,7 +3,6 @@ package io.github.piresrenan.orderhub.orders;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -37,13 +36,17 @@ import com.nimbusds.jose.jwk.RSAKey;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.github.piresrenan.orderhub.security.support.RealJwtTestSupport;
 import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
-import io.github.piresrenan.orderhub.users.application.port.in.FindTenantMembershipQuery;
-import io.github.piresrenan.orderhub.users.application.port.in.FindTenantMembershipUseCase;
+import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveQuery;
+import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityQuery;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolvedUserIdentity;
-import io.github.piresrenan.orderhub.users.domain.model.TenantMembership;
 
+/**
+ * Why: Order retry recovery must retain trusted identity and ownership boundaries.
+ * Covers: HTTP idempotency recovery with the current identity schema.
+ * Prevents: Cross-scope retry effects and invalid setup masking business failures.
+ */
 @SpringBootTest(properties = {
         "orderhub.security.jwt.issuer=https://issuer.idempotency.test",
         "orderhub.security.jwt.audience=orderhub-api",
@@ -110,7 +113,7 @@ class CreateOrderIdempotencyHttpRecoveryAcceptanceTest {
     private ResolveExternalIdentityUseCase externalIdentities;
 
     @MockitoBean
-    private FindTenantMembershipUseCase memberships;
+    private IsTenantMembershipOperationallyActiveUseCase memberships;
 
     @BeforeEach
     void resetState() {
@@ -143,17 +146,12 @@ class CreateOrderIdempotencyHttpRecoveryAcceptanceTest {
                                 new ResolvedUserIdentity(
                                         USER_ID)));
 
-        var membership =
-                mock(
-                        TenantMembership.class);
-
         doReturn(
-                Optional.of(
-                        membership))
+                true)
                 .when(
                         memberships)
-                .find(
-                        new FindTenantMembershipQuery(
+                .isOperationallyActive(
+                        new IsTenantMembershipOperationallyActiveQuery(
                                 USER_ID,
                                 TENANT_ID));
 

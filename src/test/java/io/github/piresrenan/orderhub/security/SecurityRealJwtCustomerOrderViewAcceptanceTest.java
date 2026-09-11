@@ -2,7 +2,6 @@ package io.github.piresrenan.orderhub.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -38,12 +37,11 @@ import io.github.piresrenan.orderhub.orders.domain.model.Order;
 import io.github.piresrenan.orderhub.orders.domain.model.OrderItem;
 import io.github.piresrenan.orderhub.security.support.RealJwtTestSupport;
 import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
-import io.github.piresrenan.orderhub.users.application.port.in.FindTenantMembershipQuery;
-import io.github.piresrenan.orderhub.users.application.port.in.FindTenantMembershipUseCase;
+import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveQuery;
+import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityQuery;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolvedUserIdentity;
-import io.github.piresrenan.orderhub.users.domain.model.TenantMembership;
 
 /**
  * Vertical acceptance evidence for Customer own-Order reads.
@@ -52,8 +50,13 @@ import io.github.piresrenan.orderhub.users.domain.model.TenantMembership;
  * JWT verification, MVC dispatch, Orders persistence, Customer account-binding
  * persistence, Customer authorization and ViewCustomerOrderService remain
  * production implementations. Only external identity resolution and Tenant
- * membership lookup use established Security test seams.
+ * membership eligibility use established Security test seams.
  * </p>
+ */
+/**
+ * Why: Customer identity and ownership must remain separate from Staff and arbitrary selectors.
+ * Covers: Customer schema, exact ownership and linking behavior exercised by this suite.
+ * Prevents: Account takeover, cross-Tenant ownership and regressions hidden by invalid cleanup fixtures.
  */
 @SpringBootTest(properties = {
         "orderhub.security.jwt.issuer=https://issuer.example.test",
@@ -93,13 +96,14 @@ class SecurityRealJwtCustomerOrderViewAcceptanceTest {
     private ResolveExternalIdentityUseCase externalIdentities;
 
     @MockitoBean
-    private FindTenantMembershipUseCase memberships;
+    private IsTenantMembershipOperationallyActiveUseCase memberships;
 
     @BeforeEach
     void cleanOwnedResourceState() {
 
         jdbcTemplate.update("""
                 TRUNCATE TABLE
+                    customers.account_link_proofs,
                     customers.customer_account_bindings,
                     customers.customer_profiles,
                     orders.order_items,
@@ -444,20 +448,15 @@ class SecurityRealJwtCustomerOrderViewAcceptanceTest {
             UUID userId,
             UUID tenantId) {
 
-                seedActiveTenant(
+        seedActiveTenant(
                 tenantId);
 
-var membership =
-                mock(
-                        TenantMembership.class);
-
         doReturn(
-                Optional.of(
-                        membership))
+                true)
                 .when(
                         memberships)
-                .find(
-                        new FindTenantMembershipQuery(
+                .isOperationallyActive(
+                        new IsTenantMembershipOperationallyActiveQuery(
                                 userId,
                                 tenantId));
     }

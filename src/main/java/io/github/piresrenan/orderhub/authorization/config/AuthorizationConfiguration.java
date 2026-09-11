@@ -29,9 +29,31 @@ import io.github.piresrenan.orderhub.authorization.adapter.out.persistence.postg
 import io.github.piresrenan.orderhub.authorization.adapter.out.observability.MicrometerAuthorizationDecisionObserver;
 import io.github.piresrenan.orderhub.authorization.domain.constraint.AuthorizationConstraint;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.github.piresrenan.orderhub.authorization.application.port.in.provisioning.StaffProvisioningAuthorizationUseCase;
+import io.github.piresrenan.orderhub.authorization.application.service.StaffProvisioningAuthorizationService;
+import io.github.piresrenan.orderhub.authorization.adapter.out.persistence.postgresql.PostgreSqlStaffProvisioningAuthorizationRepository;
 
 @Configuration(proxyBeanMethods = false)
 public class AuthorizationConfiguration {
+
+    /** Composes the explicit first-Staff policy over Authorization-owned repositories and evidence. */
+    @Bean
+    io.github.piresrenan.orderhub.authorization.application.port.in.provisioning.ColdStartStaffAuthorizationUseCase coldStartStaffAuthorizationUseCase(
+            JdbcTemplate jdbc) {
+        return new io.github.piresrenan.orderhub.authorization.application.service.ColdStartStaffAuthorizationService(
+                new io.github.piresrenan.orderhub.authorization.adapter.out.persistence.postgresql.PostgreSqlColdStartStaffAuthorizationRepository(jdbc),
+                new PostgreSqlRoleDefinitionRepository(jdbc), new PostgreSqlRoleAssignmentRepository(jdbc),
+                new io.github.piresrenan.orderhub.authorization.adapter.out.persistence.postgresql.PostgreSqlStaffProvisioningAuthorizationRepository(jdbc));
+    }
+
+    /** Composes initial-role policy and evidence without suspending the caller's mutation transaction. */
+    @Bean
+    StaffProvisioningAuthorizationUseCase staffProvisioningAuthorizationUseCase(
+            JdbcTemplate jdbc, List<AuthorizationConstraint> constraints) {
+        return new StaffProvisioningAuthorizationService(new PostgreSqlRoleAssignmentRepository(jdbc),
+                new PostgreSqlRoleDefinitionRepository(jdbc), new PostgreSqlUserPermissionOverrideRepository(jdbc),
+                new PostgreSqlStaffProvisioningAuthorizationRepository(jdbc), constraints);
+    }
 
     /** Composes the current-ceiling entry using the existing snapshot, repositories and evaluator. */
     @Bean
@@ -93,6 +115,7 @@ public class AuthorizationConfiguration {
     MutateAdministrativeGrantUseCase mutateAdministrativeGrantUseCase(
             AuditedAdministrativeGrantMutationService service) {
         return new MutateAdministrativeGrantUseCase() {
+            /** Joins the existing administrative audit boundary when granting durable authority. */
             @Override
             public void grant(UUID actorUserId,
                     io.github.piresrenan.orderhub.authorization.domain.model.AdministrativeGrant grant,
@@ -100,6 +123,7 @@ public class AuthorizationConfiguration {
                 service.grant(actorUserId, grant, correlationId);
             }
 
+            /** Joins the existing administrative audit boundary when revoking durable authority. */
             @Override
             public void revoke(UUID actorUserId,
                     io.github.piresrenan.orderhub.authorization.domain.model.AdministrativeGrant grant,

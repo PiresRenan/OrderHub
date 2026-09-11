@@ -36,12 +36,11 @@ public final class BindExternalIdentityService
      * </p>
      *
      * @param command complete external/internal identity association request
-     * @return successfully created and persisted binding
      * @throws IllegalArgumentException when the binding domain invariants reject
      *                                  the supplied identities
      */
     @Override
-    public ExternalIdentityBinding bind(
+    public void bind(
             BindExternalIdentityCommand command) {
 
         var binding = ExternalIdentityBinding.create(
@@ -49,7 +48,7 @@ public final class BindExternalIdentityService
                 command.subject(),
                 command.userId());
 
-        return externalIdentityBindingRepository.save(
+        externalIdentityBindingRepository.save(
                 binding);
     }
 }

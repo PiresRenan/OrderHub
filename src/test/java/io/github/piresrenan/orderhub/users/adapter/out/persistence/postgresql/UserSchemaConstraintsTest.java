@@ -65,6 +65,7 @@ class UserSchemaConstraintsTest {
 
                 jdbcTemplate.update("""
                                 TRUNCATE TABLE
+                                    users.external_identity_link_proofs,
                                     users.external_identity_bindings,
                                     users.tenant_memberships,
                                     users.users
@@ -112,12 +113,14 @@ class UserSchemaConstraintsTest {
                                 """
                                                 INSERT INTO users.tenant_memberships (
                                                     user_id,
-                                                    tenant_id
+                                                    tenant_id,
+                                                    status
                                                 )
-                                                VALUES (?, ?)
+                                                VALUES (?, ?, ?)
                                                 """,
                                 null,
-                                UUID.randomUUID()))
+                                UUID.randomUUID(),
+                                "ACTIVE"))
                                 .isInstanceOf(DataIntegrityViolationException.class);
         }
 
@@ -131,12 +134,14 @@ class UserSchemaConstraintsTest {
                                 """
                                                 INSERT INTO users.tenant_memberships (
                                                     user_id,
-                                                    tenant_id
+                                                    tenant_id,
+                                                    status
                                                 )
-                                                VALUES (?, ?)
+                                                VALUES (?, ?, ?)
                                                 """,
                                 UUID.randomUUID(),
-                                null))
+                                null,
+                                "ACTIVE"))
                                 .isInstanceOf(DataIntegrityViolationException.class);
         }
 
@@ -157,23 +162,27 @@ class UserSchemaConstraintsTest {
                                 """
                                                 INSERT INTO users.tenant_memberships (
                                                     user_id,
-                                                    tenant_id
+                                                    tenant_id,
+                                                    status
                                                 )
-                                                VALUES (?, ?)
+                                                VALUES (?, ?, ?)
                                                 """,
                                 userId,
-                                tenantId);
+                                tenantId,
+                                "ACTIVE");
 
                 assertThatThrownBy(() -> jdbcTemplate.update(
                                 """
                                                 INSERT INTO users.tenant_memberships (
                                                     user_id,
-                                                    tenant_id
+                                                    tenant_id,
+                                                    status
                                                 )
-                                                VALUES (?, ?)
+                                                VALUES (?, ?, ?)
                                                 """,
                                 userId,
-                                tenantId))
+                                tenantId,
+                                "ACTIVE"))
                                 .isInstanceOf(DataIntegrityViolationException.class);
         }
 
@@ -193,23 +202,27 @@ class UserSchemaConstraintsTest {
                                 """
                                                 INSERT INTO users.tenant_memberships (
                                                     user_id,
-                                                    tenant_id
+                                                    tenant_id,
+                                                    status
                                                 )
-                                                VALUES (?, ?)
+                                                VALUES (?, ?, ?)
                                                 """,
                                 userId,
-                                firstTenantId);
+                                firstTenantId,
+                                "ACTIVE");
 
                 jdbcTemplate.update(
                                 """
                                                 INSERT INTO users.tenant_memberships (
                                                     user_id,
-                                                    tenant_id
+                                                    tenant_id,
+                                                    status
                                                 )
-                                                VALUES (?, ?)
+                                                VALUES (?, ?, ?)
                                                 """,
                                 userId,
-                                secondTenantId);
+                                secondTenantId,
+                                "ACTIVE");
 
                 var count = jdbcTemplate.queryForObject(
                                 """
@@ -241,23 +254,27 @@ class UserSchemaConstraintsTest {
                                 """
                                                 INSERT INTO users.tenant_memberships (
                                                     user_id,
-                                                    tenant_id
+                                                    tenant_id,
+                                                    status
                                                 )
-                                                VALUES (?, ?)
+                                                VALUES (?, ?, ?)
                                                 """,
                                 firstUserId,
-                                tenantId);
+                                tenantId,
+                                "ACTIVE");
 
                 jdbcTemplate.update(
                                 """
                                                 INSERT INTO users.tenant_memberships (
                                                     user_id,
-                                                    tenant_id
+                                                    tenant_id,
+                                                    status
                                                 )
-                                                VALUES (?, ?)
+                                                VALUES (?, ?, ?)
                                                 """,
                                 secondUserId,
-                                tenantId);
+                                tenantId,
+                                "ACTIVE");
 
                 var count = jdbcTemplate.queryForObject(
                                 """
@@ -315,11 +332,41 @@ class UserSchemaConstraintsTest {
                                 """
                                                 INSERT INTO users.tenant_memberships (
                                                     user_id,
+                                                    tenant_id,
+                                                    status
+                                                )
+                                                VALUES (?, ?, ?)
+                                                """,
+                                unknownUserId,
+                                tenantId,
+                                "ACTIVE"))
+                                .isInstanceOf(DataIntegrityViolationException.class);
+        }
+
+        @Test
+        void rejectsMembershipWithoutExplicitLifecycleStatus() {
+                // Why: lifecycle decides whether a relationship may still establish
+                // Tenant trust, so it must be stated by whoever writes the row and can
+                // never be supplied silently by the database.
+                // Covers: an otherwise completely valid membership whose INSERT omits
+                // the status column entirely.
+                // Prevents: dropping NOT NULL or introducing DEFAULT 'ACTIVE', either of
+                // which would turn omission into authorization.
+
+                var userId = UUID.randomUUID();
+                var tenantId = UUID.randomUUID();
+
+                persistUser(userId);
+
+                assertThatThrownBy(() -> jdbcTemplate.update(
+                                """
+                                                INSERT INTO users.tenant_memberships (
+                                                    user_id,
                                                     tenant_id
                                                 )
                                                 VALUES (?, ?)
                                                 """,
-                                unknownUserId,
+                                userId,
                                 tenantId))
                                 .isInstanceOf(DataIntegrityViolationException.class);
         }

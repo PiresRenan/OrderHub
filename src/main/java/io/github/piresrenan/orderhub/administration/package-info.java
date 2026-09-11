@@ -3,6 +3,11 @@
         allowedDependencies = {
                 "organizations::administration",
                 "tenants::administration",
-                "security::api"
+                "security::api",
+                "users::api",
+                "workforce::staff-provisioning",
+                "workforce::membership-administration",
+                "customers::account-linking",
+                "authorization::staff-provisioning"
         })
 package io.github.piresrenan.orderhub.administration;

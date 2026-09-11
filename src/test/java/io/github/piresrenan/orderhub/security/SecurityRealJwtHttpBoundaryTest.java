@@ -33,7 +33,7 @@ import com.nimbusds.jose.jwk.RSAKey;
 
 import io.github.piresrenan.orderhub.security.support.RealJwtTestSupport;
 import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
-import io.github.piresrenan.orderhub.users.application.port.in.FindTenantMembershipUseCase;
+import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityQuery;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolvedUserIdentity;
@@ -75,7 +75,7 @@ class SecurityRealJwtHttpBoundaryTest {
     private ResolveExternalIdentityUseCase externalIdentities;
 
     @MockitoBean
-    private FindTenantMembershipUseCase memberships;
+    private IsTenantMembershipOperationallyActiveUseCase memberships;
 
     @Test
     void acceptsRealRs256JwtAndReachesApplicationAuthenticationBoundary()

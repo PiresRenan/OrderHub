@@ -2,24 +2,28 @@ package io.github.piresrenan.orderhub.users;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Objects;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.jdbc.support.JdbcTransactionManager;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.PostgreSqlTenantMembershipRepository;
 import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.PostgreSqlUserRepository;
 import io.github.piresrenan.orderhub.users.application.port.in.CreateUserUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.EstablishTenantMembershipUseCase;
-import io.github.piresrenan.orderhub.users.application.port.in.FindTenantMembershipUseCase;
+import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveUseCase;
 import io.github.piresrenan.orderhub.users.application.port.out.TenantMembershipRepository;
 import io.github.piresrenan.orderhub.users.application.port.out.UserIdGenerator;
 import io.github.piresrenan.orderhub.users.application.port.out.UserRepository;
 import io.github.piresrenan.orderhub.users.application.service.CreateUserService;
 import io.github.piresrenan.orderhub.users.application.service.EstablishTenantMembershipService;
-import io.github.piresrenan.orderhub.users.application.service.FindTenantMembershipService;
+import io.github.piresrenan.orderhub.users.application.service.IsTenantMembershipOperationallyActiveService;
 import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.PostgreSqlExternalIdentityBindingRepository;
 import io.github.piresrenan.orderhub.users.application.port.in.BindExternalIdentityUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityUseCase;
@@ -58,8 +62,8 @@ class UsersConfigurationTest {
                         assertThat(context.getBean(EstablishTenantMembershipUseCase.class))
                                         .isInstanceOf(EstablishTenantMembershipService.class);
 
-                        assertThat(context.getBean(FindTenantMembershipUseCase.class))
-                                        .isInstanceOf(FindTenantMembershipService.class);
+                        assertThat(context.getBean(IsTenantMembershipOperationallyActiveUseCase.class))
+                                        .isInstanceOf(IsTenantMembershipOperationallyActiveService.class);
 
                         assertThat(context.getBean(UserIdGenerator.class))
                                         .isNotNull();
@@ -108,6 +112,11 @@ class UsersConfigurationTest {
         @Configuration(proxyBeanMethods = false)
         static class TestJdbcConfiguration {
 
+                @Bean
+                io.github.piresrenan.orderhub.users.application.port.out.TrustedExternalIdentityProviders trustedProviders() {
+                        return issuer -> { throw new AssertionError("Composition-only trust must not execute"); };
+                }
+
                 /**
                  * Supplies a non-connecting JDBC dependency required only to prove Spring
                  * composition.
@@ -138,6 +147,29 @@ class UsersConfigurationTest {
 
                         return new JdbcTemplate(
                                         dataSource);
+                }
+
+                /**
+                 * Supplies the non-connecting transaction demarcation the Users
+                 * composition root requires.
+                 *
+                 * <p>
+                 * The manager is built over the DataSource already held by the
+                 * composition-only JdbcTemplate, so no additional infrastructure is
+                 * introduced. No transaction is ever started because this test only
+                 * verifies Spring composition.
+                 * </p>
+                 *
+                 * @param jdbcTemplate composition-only JDBC dependency
+                 * @return transaction manager suitable for composition-only verification
+                 */
+                @Bean
+                PlatformTransactionManager transactionManager(
+                                JdbcTemplate jdbcTemplate) {
+
+                        return new JdbcTransactionManager(
+                                        Objects.requireNonNull(
+                                                        jdbcTemplate.getDataSource()));
                 }
         }
 }

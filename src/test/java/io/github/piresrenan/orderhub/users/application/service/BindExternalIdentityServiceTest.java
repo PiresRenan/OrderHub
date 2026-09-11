@@ -18,9 +18,10 @@ class BindExternalIdentityServiceTest {
     void bindsExternalIdentityToInternalUser() {
         // Why: application callers need a framework-neutral orchestration boundary
         // for associating validated provider identity with an internal User.
-        // Covers: domain construction, exact identity propagation and one repository
-        // save.
-        // Prevents: security adapters constructing or persisting bindings directly.
+        // Covers: domain construction, exact identity propagation into the binding
+        // actually submitted for persistence, and one repository save.
+        // Prevents: security adapters constructing or persisting bindings directly, or
+        // the ExternalIdentityBinding aggregate crossing the exposed Users API.
 
         var issuer = "https://issuer.example.test";
         var subject = "synthetic-subject-001";
@@ -30,23 +31,20 @@ class BindExternalIdentityServiceTest {
 
         var service = new BindExternalIdentityService(repository);
 
-        var result = service.bind(
+        service.bind(
                 new BindExternalIdentityCommand(
                         issuer,
                         subject,
                         userId));
 
-        assertThat(result.issuer())
+        assertThat(repository.savedBinding.issuer())
                 .isEqualTo(issuer);
 
-        assertThat(result.subject())
+        assertThat(repository.savedBinding.subject())
                 .isEqualTo(subject);
 
-        assertThat(result.userId())
+        assertThat(repository.savedBinding.userId())
                 .isEqualTo(userId);
-
-        assertThat(repository.savedBinding)
-                .isSameAs(result);
 
         assertThat(repository.saveCount)
                 .isEqualTo(1);

@@ -23,8 +23,11 @@ import io.github.piresrenan.orderhub.security.application.port.in.ResolveTrusted
 import io.github.piresrenan.orderhub.security.application.service.ResolveAuthenticatedUserService;
 import io.github.piresrenan.orderhub.security.application.service.ResolveTrustedTenantContextService;
 import io.github.piresrenan.orderhub.tenants.application.port.in.operational.FindTenantOperationalStateUseCase;
-import io.github.piresrenan.orderhub.users.application.port.in.FindTenantMembershipUseCase;
+import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityUseCase;
+import io.github.piresrenan.orderhub.users.application.port.out.TrustedExternalIdentityProviders;
+import io.github.piresrenan.orderhub.security.adapter.in.authentication.jwt.AdditionalJwtTrustProperties;
+import io.github.piresrenan.orderhub.security.adapter.in.authentication.jwt.ConfiguredIssuerJwtDecoder;
 
 /**
  * Spring composition root for the Security module.
@@ -34,8 +37,27 @@ import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalId
  */
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(
-        JwtResourceServerProperties.class)
+        {JwtResourceServerProperties.class, AdditionalJwtTrustProperties.class})
 public class SecurityConfiguration {
+
+    /** Only these proof-consumption paths accept a verified identity without an internal binding. */
+    @Bean
+    @org.springframework.core.annotation.Order(1)
+    @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
+    SecurityFilterChain identityBootstrapFilterChain(HttpSecurity http, JwtDecoder decoder) throws Exception {
+        http.securityMatcher("/identity/bootstrap/staff", "/identity/bootstrap/external-links")
+                .csrf(csrf -> csrf.disable()).requestCache(cache -> cache.disable())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .formLogin(login -> login.disable()).httpBasic(basic -> basic.disable()).logout(logout -> logout.disable())
+                .authorizeHttpRequests(requests -> requests.anyRequest().authenticated())
+                .oauth2ResourceServer(server -> server.authenticationEntryPoint((request, response, exception) -> {
+                    response.setStatus(401); response.setContentType("application/problem+json");
+                    response.setHeader("WWW-Authenticate", "Bearer"); response.setHeader("Cache-Control", "no-store");
+                    response.getWriter().write("{\"type\":\"urn:orderhub:problem:bootstrap-authentication-required\",\"title\":\"Unauthorized\",\"status\":401,\"detail\":\"Valid bearer authentication is required\",\"code\":\"bootstrap-authentication-required\"}");
+                }).jwt(jwt -> jwt.decoder(decoder).jwtAuthenticationConverter(
+                        new io.github.piresrenan.orderhub.security.adapter.in.authentication.jwt.VerifiedExternalIdentityJwtAuthenticationConverter())));
+        return http.build();
+    }
 
     /**
      * Composes the Security application boundary that translates one external
@@ -63,13 +85,13 @@ public class SecurityConfiguration {
      * <p>Security consumes only module-owned application contracts. The Tenant
      * aggregate and Tenant persistence internals never cross this boundary.
      *
-     * @param memberships Users-owned Tenant membership lookup boundary
+     * @param memberships Users-owned membership eligibility boundary
      * @param tenantOperationalStates Tenants-owned operational-state boundary
      * @return trusted Tenant-context resolution use case
      */
     @Bean
     ResolveTrustedTenantContextUseCase resolveTrustedTenantContextUseCase(
-            FindTenantMembershipUseCase memberships,
+            IsTenantMembershipOperationallyActiveUseCase memberships,
             FindTenantOperationalStateUseCase tenantOperationalStates) {
 
         return new ResolveTrustedTenantContextService(
@@ -232,18 +254,42 @@ public class SecurityConfiguration {
      */
     @Bean
     JwtDecoder jwtDecoder(
-            JwtResourceServerProperties properties) {
+            JwtResourceServerProperties properties, AdditionalJwtTrustProperties additional) {
+
+        var primary = decoder(properties.issuer(), properties.audience(), properties.jwkSetUri());
+        if (additional.additionalIssuers().isEmpty()) { return primary; }
+        var decoders = new java.util.HashMap<String, JwtDecoder>();
+        decoders.put(properties.issuer(), primary);
+        for (var provider : additional.additionalIssuers()) {
+            if (decoders.containsKey(provider.issuer())) { throw new IllegalArgumentException("JWT trusted issuers must be unique"); }
+            decoders.put(provider.issuer(), decoder(provider.issuer(), properties.audience(), provider.jwkSetUri()));
+        }
+        return new ConfiguredIssuerJwtDecoder(decoders);
+    }
+
+    /** Shares the same server-owned issuer set used by JWT verification with Users last-path protection. */
+    @Bean
+    TrustedExternalIdentityProviders trustedExternalIdentityProviders(JwtResourceServerProperties properties, AdditionalJwtTrustProperties additional) {
+        var issuers = new java.util.HashSet<String>();
+        issuers.add(properties.issuer());
+        additional.additionalIssuers().forEach(provider -> issuers.add(provider.issuer()));
+        var configured = java.util.Set.copyOf(issuers);
+        return configured::contains;
+    }
+
+    /** Uses Nimbus verification and the shared issuer, audience and temporal policy for one configured provider. */
+    private JwtDecoder decoder(String issuer, String audience, String jwkSetUri) {
 
         var decoder =
                 NimbusJwtDecoder
                         .withJwkSetUri(
-                                properties.jwkSetUri())
+                                jwkSetUri)
                         .build();
 
         decoder.setJwtValidator(
                 new JwtValidationPolicy(
-                        properties.issuer(),
-                        properties.audience()));
+                        issuer,
+                        audience));
 
         return decoder;
     }

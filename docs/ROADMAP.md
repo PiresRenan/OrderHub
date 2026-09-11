@@ -490,25 +490,27 @@ No housekeeping scheduler, retention deletion, archive mechanism or new
 infrastructure is introduced by OH-017. This entry records future engineering
 intent only.
 
-## Identity provisioning and account lifecycle — planned
+## Identity provisioning and account lifecycle — OH-019 COMPLETE
 
-Authenticated internal identity already supports durable external identity
-bindings, but operational provisioning remains incomplete.
+OH-019 completes authorized atomic Staff provisioning, an explicit first-Staff
+cold start, one-time Customer account linking, external identity
+link/unlink/relink/provider migration, and membership suspension, suspension
+recovery and terminal termination. User, membership, Staff, Customer and
+authorization ownership remain separate.
 
-Future work must cover concrete workflows such as:
+Thin HTTP routes reuse the production JWT trust boundary. Proofs are bounded,
+digest-only and one-time; owner-local evidence commits atomically with the
+business mutation. PostgreSQL concurrency, rollback, anti-enumeration and real
+JWT acceptance are covered by the canonical 1502-test clean verification with
+zero failures, errors or skips on 2026-09-11.
 
-- Staff invitation/provisioning into an authorized Tenant;
-- Customer account linking when a guest/commercial identity becomes an
-  authenticated User;
-- external identity link/unlink/relink lifecycle;
-- recovery and provider migration without changing internal User identity;
-- membership suspension/termination semantics;
-- privacy-safe anti-enumeration behavior;
-- auditable privileged provisioning changes.
-
-This work should be attached to the first administration/self-service workflow
-that actually needs it rather than inventing an identity-management product in
-isolation.
+[ADR-0017](adr/ADR-0017-tenant-identity-provisioning-and-account-lifecycle.md)
+is TESTED; the [execution evidence](oh019-execution-evidence.md) and
+[HTTP contract](oh019-http-contract.md) record the implemented boundaries.
+Implementation completion does not authorize release: required GitHub CI,
+general/security review and human approval remain separate gates, and issue
+#38 remains open until merge. Delivery infrastructure, generic registration,
+orphan-account recovery and OH-020/OH-021/OH-022 remain deferred.
 
 ## API documentation / OpenAPI — planned with administration/API maturity
 

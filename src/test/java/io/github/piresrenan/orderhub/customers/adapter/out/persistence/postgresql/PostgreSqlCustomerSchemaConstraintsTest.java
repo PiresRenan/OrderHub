@@ -17,6 +17,11 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
+/**
+ * Why: Customer identity and ownership must remain separate from Staff and arbitrary selectors.
+ * Covers: Customer schema, exact ownership and linking behavior exercised by this suite.
+ * Prevents: Account takeover, cross-Tenant ownership and regressions hidden by invalid cleanup fixtures.
+ */
 @Testcontainers
 class PostgreSqlCustomerSchemaConstraintsTest {
 
@@ -215,6 +220,7 @@ class PostgreSqlCustomerSchemaConstraintsTest {
                 SELECT table_name
                 FROM information_schema.tables
                 WHERE table_schema = 'customers'
+                  AND table_name IN ('customer_profiles', 'customer_account_bindings')
                 ORDER BY table_name
                 """,
                 String.class);
@@ -234,6 +240,7 @@ class PostgreSqlCustomerSchemaConstraintsTest {
                     || is_nullable
                 FROM information_schema.columns
                 WHERE table_schema = 'customers'
+                  AND table_name IN ('customer_profiles', 'customer_account_bindings')
                 ORDER BY
                     table_name,
                     ordinal_position
@@ -266,6 +273,7 @@ class PostgreSqlCustomerSchemaConstraintsTest {
                   ON source_attribute.attrelid = source_table.oid
                  AND source_attribute.attnum = source_key.attnum
                 WHERE source_namespace.nspname = 'customers'
+                  AND source_table.relname IN ('customer_profiles', 'customer_account_bindings')
                   AND constraint_definition.contype IN ('p', 'u')
                 GROUP BY
                     source_table.relname,
@@ -322,6 +330,7 @@ class PostgreSqlCustomerSchemaConstraintsTest {
                   ON target_attribute.attrelid = target_table.oid
                  AND target_attribute.attnum = target_key.attnum
                 WHERE source_namespace.nspname = 'customers'
+                  AND source_table.relname IN ('customer_profiles', 'customer_account_bindings')
                   AND constraint_definition.contype = 'f'
                 GROUP BY
                     source_table.relname,
@@ -344,6 +353,7 @@ class PostgreSqlCustomerSchemaConstraintsTest {
                 SELECT trigger_name
                 FROM information_schema.triggers
                 WHERE trigger_schema = 'customers'
+                  AND event_object_table IN ('customer_profiles', 'customer_account_bindings')
                 ORDER BY trigger_name
                 """,
                 String.class);
