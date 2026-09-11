@@ -1,6 +1,6 @@
 # ADR-0018 — Bounded Operational Data Lifecycle
 
-Status: DESIGNED — POST-OH-019 RECONCILIATION CANDIDATE
+Status: DESIGNED — POST-OH-019 QUALIFIED CANDIDATE
 
 ## Context
 
@@ -56,10 +56,10 @@ storage cost. An expired late event is intentionally not represented in the
 current analytical projection; operational workforce audit remains authoritative.
 
 Final integrated OH-019 Flyway history ends at V43, so V44 is the first free
-migration authority for this analytical retention index. This ADR must not
-become TESTED and OH-020 must not become COMPLETE until post-OH-019 replay,
-migration, full-suite and exact-head integration evidence is green on the final
-baseline.
+migration authority for this analytical retention index. Post-OH-019 replay,
+migration reconciliation and the canonical local full-suite qualification are
+green. This ADR remains DESIGNED until exact-HEAD CI/review and governed
+integration complete the remaining acceptance gates.
 
 ## Alternatives
 

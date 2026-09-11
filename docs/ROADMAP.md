@@ -440,10 +440,10 @@ Inventory changes are represented as auditable movements/adjustments rather than
 untraceable `set quantity` operations. Warehouse/location administration remains
 future scope until that domain exists.
 
-## Operational data lifecycle and housekeeping — post-OH-019 candidate
+## Operational data lifecycle and housekeeping — qualified candidate
 
-Status: DESIGNED / POST-OH-019 RECONCILIATION IN PROGRESS — implementation
-candidate exists; final acceptance and integration remain pending.
+Status: IMPLEMENTATION QUALIFIED — post-OH-019 clean verification is green;
+exact-HEAD CI/review and governed integration remain pending.
 
 OrderHub should eventually provide a bounded, owner-driven operational data
 lifecycle capability to prevent unbounded growth of ephemeral and derived state
