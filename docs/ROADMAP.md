@@ -501,7 +501,7 @@ authorization ownership remain separate.
 Thin HTTP routes reuse the production JWT trust boundary. Proofs are bounded,
 digest-only and one-time; owner-local evidence commits atomically with the
 business mutation. PostgreSQL concurrency, rollback, anti-enumeration and real
-JWT acceptance are covered by the canonical 1500-test clean verification with
+JWT acceptance are covered by the canonical 1502-test clean verification with
 zero failures, errors or skips on 2026-09-11.
 
 [ADR-0017](adr/ADR-0017-tenant-identity-provisioning-and-account-lifecycle.md)

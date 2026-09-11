@@ -414,9 +414,12 @@ is redacted and successful responses disable caching.
 
 The real production-decoder acceptance suite uses two independent RSA/JWK
 providers and real PostgreSQL. Nineteen HTTP/JWT cases and four modularity cases
-passed. Final canonical `mvnw.cmd -B clean verify` passed **1500 tests, zero
+passed. Final canonical `mvnw.cmd -B clean verify` passed **1502 tests, zero
 failures, zero errors and zero skipped**, including the four modularity tests,
-on 2026-09-11 at 04:33:46 -03:00 in 8:14. The
+on 2026-09-11 at 14:00:40 -03:00 in 8:47. Staff issuance and consumption both
+use PostgreSQL time, avoiding lifetime changes caused by application-host clock
+skew; two composition regressions cover database time ahead of and behind the
+host. The
 [execution ledger](../oh019-execution-evidence.md) preserves the preceding
 infrastructure interruption and isolated composition-fixture correction.
 Remote CI and review remain separate approval gates; no interrupted run is

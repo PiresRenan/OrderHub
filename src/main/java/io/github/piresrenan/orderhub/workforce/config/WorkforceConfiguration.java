@@ -1,7 +1,6 @@
 package io.github.piresrenan.orderhub.workforce.config;
 
 import java.security.SecureRandom;
-import java.time.Clock;
 
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationEventPublisher;
@@ -157,7 +156,7 @@ public class WorkforceConfiguration {
     }
 
     /**
-     * Composes one singleton issuance use case with explicit UTC time,
+     * Composes one singleton issuance use case with database-owned UTC time,
      * cryptographic entropy and externally validated credential lifetime.
      *
      * <p>Clock and entropy remain composition-owned implementation details
@@ -166,11 +165,12 @@ public class WorkforceConfiguration {
     @Bean
     IssueStaffProvisioningIntentUseCase issueStaffProvisioningIntentUseCase(
             StaffProvisioningIntentRepository repository,
-            StaffProvisioningProperties properties) {
+            StaffProvisioningProperties properties,
+            JdbcTemplate jdbcTemplate) {
 
         return new StaffProvisioningIssuanceService(
                 repository,
-                Clock.systemUTC(),
+                new PostgreSqlStaffProvisioningClock(jdbcTemplate),
                 properties.intentTtl(),
                 new SecureRandom());
     }

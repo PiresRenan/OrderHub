@@ -530,3 +530,37 @@ this run.
 - Read-only pre-PR inspection found historical checkpoint PR #43 already CLOSED
   without merge, on the earlier `ee10b3f` checkpoint. It is not the final PR;
   no historical review response is used to certify the final candidate.
+
+## GitHub candidate and review remediation cycle 1
+
+- Published HTTP candidate `2e29dcacbde426c2adfe498685f47197fde45ad3`, tree
+  `8fb0934a1ba1fbe93fb13c32021a5cd5fb51dff3`, opened as ready PR
+  [#44](https://github.com/PiresRenan/OrderHub/pull/44), base `pre-release`.
+  Issue #38 remains open with [evidence and PR link](https://github.com/PiresRenan/OrderHub/issues/38#issuecomment-5637670014).
+- Initial exact-candidate checks all passed: Branch Policy run 34623600698
+  (3 seconds), CI run 34623600771 (6:17), Platform CI run 34623600700 (4:40).
+- PR opening automatically triggered Codex review 5181263255 at
+  2026-09-11T16:47:34Z on `2e29dcacbde426c2adfe498685f47197fde45ad3`.
+  [Finding 3991421226](https://github.com/PiresRenan/OrderHub/pull/44#discussion_r3991421226)
+  correctly identified issuance composition using host UTC while durable
+  timestamps and consumption use PostgreSQL time. Classified VALID_PRODUCT_DEFECT.
+- Two new behavioral composition cases supplied database time in 2000 and 2099;
+  both failed before the fix because persisted expiry was calculated from host
+  time. RED: **2 tests / 2 failures / 0 errors / 0 skipped**, log
+  `%TEMP%/oh019-review-clock-red.log`. The production factory now supplies the
+  existing PostgreSqlStaffProvisioningClock to issuance as well as consumption.
+  This changes no published migration or lifecycle API.
+- Customer and external proof issuance were inspected for the same defect:
+  both already calculate creation and expiry using statement_timestamp() in
+  PostgreSQL. They require no change.
+- This is material remediation cycle **1 of at most 8**. The automatic review
+  does not replace the mandated explicit comprehensive and security-focused
+  requests after the corrected candidate is qualified and CI is green.
+- Corrected targeted Staff/cold-start/composition/HTTP/Modulith regression passed
+  **54 / 0 / 0 / 0**, 2026-09-11 13:51:07 -03:00, duration 1:05, log
+  `%TEMP%/oh019-review-clock-green.log`.
+- Corrected canonical `mvnw.cmd -B clean verify` passed at
+  **2026-09-11 14:00:40 -03:00**, duration **8:47**, with XML totals
+  **1502 / 0 / 0 / 0**. The two additional cases are the clock-skew regression;
+  no test was removed or skipped. Log: `%TEMP%/oh019-review-cycle1-clean-verify.log`.
+  Full architecture, context, migrations and PostgreSQL races passed again.
