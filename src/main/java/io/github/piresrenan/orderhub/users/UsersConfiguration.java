@@ -51,6 +51,12 @@ import io.github.piresrenan.orderhub.users.application.service.ResolveOrCreateEx
 public class UsersConfiguration {
 
         @Bean
+        io.github.piresrenan.orderhub.users.application.port.in.TransitionTenantMembershipUseCase transitionTenantMembershipUseCase(JdbcTemplate jdbc) {
+                return new io.github.piresrenan.orderhub.users.application.service.TransitionTenantMembershipService(
+                        new io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.PostgreSqlTenantMembershipTransitionRepository(jdbc));
+        }
+
+        @Bean
         ExternalIdentityLifecycleUseCase externalIdentityLifecycleUseCase(
                         JdbcTemplate jdbc, PlatformTransactionManager manager, ExternalIdentityUserProvisioningCoordinator coordinator,
                         TrustedExternalIdentityProviders providers) {

@@ -60,6 +60,18 @@ import io.github.piresrenan.orderhub.tenants.application.port.in.operational.Fin
 public class WorkforceConfiguration {
 
     @Bean
+    io.github.piresrenan.orderhub.workforce.application.port.in.ManageTenantMembershipUseCase manageTenantMembershipUseCase(
+            JdbcTemplate jdbc, PlatformTransactionManager manager, WorkforcePermissionEnvelopeRepository envelopes,
+            AuthorizeCurrentTenantActionUseCase authorization, IsTenantMembershipOperationallyActiveUseCase memberships,
+            FindTenantOperationalStateUseCase tenants, io.github.piresrenan.orderhub.users.application.port.in.TransitionTenantMembershipUseCase transitions) {
+        var transaction = new TransactionTemplate(manager);
+        transaction.setTimeout(15);
+        return new io.github.piresrenan.orderhub.workforce.application.service.TenantMembershipAdministrationService(
+                new io.github.piresrenan.orderhub.workforce.adapter.out.persistence.postgresql.PostgreSqlTenantMembershipAdministrationFacts(jdbc, envelopes),
+                authorization, memberships, tenants, transitions, new SpringWorkforceTransactionExecutor(transaction));
+    }
+
+    @Bean
     io.github.piresrenan.orderhub.workforce.application.service.ColdStartStaffProvisioningService coldStartStaffProvisioningService(
             io.github.piresrenan.orderhub.authorization.application.port.in.provisioning.ColdStartStaffAuthorizationUseCase authorization,
             StaffProvisioningFactsRepository facts, FindTenantOperationalStateUseCase tenants, IssueStaffProvisioningIntentUseCase primitive,

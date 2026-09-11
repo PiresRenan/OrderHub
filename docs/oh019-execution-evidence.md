@@ -400,3 +400,43 @@ this run.
   `oh019-external-lifecycle-` (red, schema-red, green, adversarial,
   users-regression, qualified, final-regression, clean-verify) and
   `oh019-additional-provider-trust-` (red, green).
+
+## Operational membership administration
+
+- External lifecycle checkpoint was committed and pushed normally as
+  `7b11bea81b4569923260746aab31341c86ac6a85`, tree
+  `7176653a7ca4b661ff4e7802abc4bea7f46710a0`; remote confirmed, clean worktree.
+  V1-V42 are now published and immutable. Its full qualification is 1466 / 0 / 0 / 0.
+- Runtime RED: two cases failed because the administration contract did not
+  exist. Schema RED independently proved the missing owner evidence table.
+  V43 adds only bounded append-only membership transition evidence.
+- Users owns locked state transition and evidence; Workforce coordinates
+  current Tenant/member/Staff authority through TENANT_MEMBERS_MANAGE. Staff
+  targets must fit actor band and position envelope. Self transitions are
+  denied, Customer-only targets need no fabricated Staff, and no role changes.
+- Explicit recovery supports only SUSPENDED -> ACTIVE. TERMINATED is terminal;
+  desired-state replay returns unchanged without duplicate evidence. Published
+  ensure-active semantics still reject non-operational memberships.
+- Existing Tenant governance advisory serialization plus post-wait authority
+  checks prevent mutual administrator disable. Each of mutual termination and
+  recovery-versus-termination passed 32 real PostgreSQL rounds.
+- Real evidence-write failures roll back all three actions; retry succeeds.
+  Outer rollback preserves membership and evidence. Historical Staff and
+  Customer bindings remain. Before the suspension commit another connection
+  can establish context; after commit new context is denied. No retroactive
+  cancellation of an established request is claimed.
+- Initial runtime/schema passed 3 / 0 / 0 / 0; hostile/architecture run passed
+  14 / 0 / 0 / 0; expanded cross-capability regression passed 74 / 0 / 0 / 0.
+- Additional hostile RED proved that a nested call could reuse an actor already
+  terminated in its ambient transaction because the isolated authorization
+  snapshot saw committed old state. An additional ambient operational check
+  corrects that case without changing the published authorization read boundary.
+- Final targeted, PostgreSQL upgrade/schema, architecture, composition and
+  cross-capability regression passed **89 / 0 / 0 / 0** in 1:21, 2026-09-10
+  22:10:02 -03:00. This internal application checkpoint uses the authorized
+  targeted/broader gate; canonical full verification remains required for the
+  final HTTP candidate. Logs: `%TEMP%/oh019-membership-` with suffixes
+  administration-red, schema-red, initial-green, adversarial, qualified,
+  ambient-actor-red and final-regression.
+- Bootstrap/HTTP remains pending; ADR-0017 remains DESIGNED and no PR, review,
+  merge or issue closure has occurred.

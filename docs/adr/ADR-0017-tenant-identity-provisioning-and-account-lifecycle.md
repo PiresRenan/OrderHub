@@ -178,7 +178,37 @@ subject, JWT or linking credentials in audit evidence.
 
 ### Membership lifecycle affects trust, not history
 
-OH-019 will introduce the smallest lifecycle representation proven necessary for TenantMembership.
+TenantMembership uses the published ACTIVE, SUSPENDED and TERMINATED states.
+
+The operational administration contract explicitly supports ACTIVE -> SUSPENDED,
+SUSPENDED -> ACTIVE recovery, and ACTIVE/SUSPENDED -> TERMINATED. Requesting the
+already desired state returns unchanged; TERMINATED cannot recover. The existing
+ensure-active provisioning contract never performs these transitions implicitly.
+
+Workforce coordinates administration using the trusted internal actor, an ACTIVE
+Tenant and actor membership, current TENANT_MEMBERS_MANAGE authorization, and
+the current Staff ceiling. A Staff target cannot exceed the actor's band or
+position envelope. Self transitions are denied. Customer-only membership does
+not require fabricating a Staff target. No role assignment is changed.
+
+The existing Workforce Tenant governance lock serializes these administrative
+transitions. Authority is re-evaluated after lock acquisition, so two governance
+actors cannot both disable one another. Workforce facts and role policy are read
+through the existing coherent authorization snapshot; no additional Staff row
+locks invert provisioning's lock order. This is point-in-time authorization,
+not a promise to cancel work after a later permission or placement change.
+The ambient transaction also checks actor operational state: the isolated read
+snapshot must not hide an actor termination already written by that caller.
+
+Users performs the locked membership transition and V43 append-only evidence
+in the coordinator's same REQUIRED physical transaction. Evidence records only
+internal attribution, bounded before/after states, action and correlation.
+Audit failure rolls back the transition; no independent audit commit occurs.
+
+The visibility boundary for future trusted context is the transition commit:
+another connection can still observe ACTIVE while suspension is uncommitted;
+new context establishment after that commit denies access. Previously established
+contexts and in-flight requests are not retroactively cancelled.
 
 A non-active membership must be ineligible for new `TrustedTenantContext` establishment.
 
@@ -336,7 +366,7 @@ a provisioning orchestrator proves what it needs.
 
 The following are deliberately not frozen before TDD/discovery:
 
-1. exact TenantMembership lifecycle transition commands, whether recovery/reactivation is admitted at all, and the concurrency semantics of those transitions;
+1. final HTTP routing and acceptance qualification for the implemented membership transitions;
 2. whether Staff provisioning requires a durable invitation aggregate or a smaller provisioning-intent model;
 3. invitation/bootstrap credential lifetime and replay result semantics;
 4. exact Customer linking proof mechanism;
