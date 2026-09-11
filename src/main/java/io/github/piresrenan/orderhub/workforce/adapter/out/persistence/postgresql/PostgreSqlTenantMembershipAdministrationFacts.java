@@ -16,9 +16,11 @@ import io.github.piresrenan.orderhub.workforce.application.port.in.authorization
 public final class PostgreSqlTenantMembershipAdministrationFacts implements TenantMembershipAdministrationFacts {
     private final JdbcTemplate jdbc;
     private final WorkforcePermissionEnvelopeRepository envelopes;
+    /** Requires the supplied owner contracts; construction performs no lifecycle mutation or independent commit. */
     public PostgreSqlTenantMembershipAdministrationFacts(JdbcTemplate jdbc, WorkforcePermissionEnvelopeRepository envelopes) {
         this.jdbc = Objects.requireNonNull(jdbc); this.envelopes = Objects.requireNonNull(envelopes);
     }
+    /** Serializes lifecycle administrators before revalidation, preventing mutual disable races. */
     @Override public void lockTenant(UUID tenant) {
         if (!TransactionSynchronizationManager.isActualTransactionActive() || jdbc.getDataSource() == null
                 || !TransactionSynchronizationManager.hasResource(jdbc.getDataSource())) {
@@ -27,6 +29,7 @@ public final class PostgreSqlTenantMembershipAdministrationFacts implements Tena
         try { jdbc.queryForObject("SELECT workforce.acquire_governance_tenant_lock(?)", Object.class, tenant); }
         catch (DataAccessException exception) { throw new StaffAuthorizationUnavailableException(exception); }
     }
+    /** Reads current actor/target ceilings in the authorization snapshot without inverting Staff mutation locks. */
     @Override public PermissionEnvelope envelope(UUID actor, UUID tenant, UUID subject) {
         var actorEnvelope = envelopes.find(actor, tenant);
         if (subject == null || actorEnvelope.permissions().isEmpty()) { return actorEnvelope; }

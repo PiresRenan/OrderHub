@@ -40,6 +40,25 @@ import io.github.piresrenan.orderhub.security.adapter.in.authentication.jwt.Conf
         {JwtResourceServerProperties.class, AdditionalJwtTrustProperties.class})
 public class SecurityConfiguration {
 
+    /** Only these proof-consumption paths accept a verified identity without an internal binding. */
+    @Bean
+    @org.springframework.core.annotation.Order(1)
+    @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
+    SecurityFilterChain identityBootstrapFilterChain(HttpSecurity http, JwtDecoder decoder) throws Exception {
+        http.securityMatcher("/identity/bootstrap/staff", "/identity/bootstrap/external-links")
+                .csrf(csrf -> csrf.disable()).requestCache(cache -> cache.disable())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .formLogin(login -> login.disable()).httpBasic(basic -> basic.disable()).logout(logout -> logout.disable())
+                .authorizeHttpRequests(requests -> requests.anyRequest().authenticated())
+                .oauth2ResourceServer(server -> server.authenticationEntryPoint((request, response, exception) -> {
+                    response.setStatus(401); response.setContentType("application/problem+json");
+                    response.setHeader("WWW-Authenticate", "Bearer"); response.setHeader("Cache-Control", "no-store");
+                    response.getWriter().write("{\"type\":\"urn:orderhub:problem:bootstrap-authentication-required\",\"title\":\"Unauthorized\",\"status\":401,\"detail\":\"Valid bearer authentication is required\",\"code\":\"bootstrap-authentication-required\"}");
+                }).jwt(jwt -> jwt.decoder(decoder).jwtAuthenticationConverter(
+                        new io.github.piresrenan.orderhub.security.adapter.in.authentication.jwt.VerifiedExternalIdentityJwtAuthenticationConverter())));
+        return http.build();
+    }
+
     /**
      * Composes the Security application boundary that translates one external
      * identity into OrderHub's internal authenticated User principal.
@@ -248,6 +267,7 @@ public class SecurityConfiguration {
         return new ConfiguredIssuerJwtDecoder(decoders);
     }
 
+    /** Shares the same server-owned issuer set used by JWT verification with Users last-path protection. */
     @Bean
     TrustedExternalIdentityProviders trustedExternalIdentityProviders(JwtResourceServerProperties properties, AdditionalJwtTrustProperties additional) {
         var issuers = new java.util.HashSet<String>();
@@ -257,6 +277,7 @@ public class SecurityConfiguration {
         return configured::contains;
     }
 
+    /** Uses Nimbus verification and the shared issuer, audience and temporal policy for one configured provider. */
     private JwtDecoder decoder(String issuer, String audience, String jwkSetUri) {
 
         var decoder =

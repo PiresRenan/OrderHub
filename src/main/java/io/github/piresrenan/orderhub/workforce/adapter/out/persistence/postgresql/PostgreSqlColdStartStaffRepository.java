@@ -16,8 +16,10 @@ public final class PostgreSqlColdStartStaffRepository implements ColdStartStaffR
     private static final String CODE = "INITIAL_GOVERNANCE_V1";
     private final JdbcTemplate jdbc;
 
+    /** Requires the supplied owner contracts; construction performs no lifecycle mutation or independent commit. */
     public PostgreSqlColdStartStaffRepository(JdbcTemplate jdbc) { this.jdbc = Objects.requireNonNull(jdbc, "jdbc"); }
 
+    /** Serializes bootstrap and rejects any historical Staff or completed ceremony before mutation. */
     @Override public void lockEmptyTenant(UUID tenantId) {
         requireTransaction();
         try {
@@ -34,6 +36,7 @@ public final class PostgreSqlColdStartStaffRepository implements ColdStartStaffR
         }
     }
 
+    /** Creates or validates the exact initial placement and permission ceiling, never an implicit broader default. */
     @Override public ColdStartStaffPlacement prepare(UUID tenantId, PermissionEnvelope envelope) {
         lockEmptyTenant(tenantId);
         try {
@@ -63,6 +66,7 @@ public final class PostgreSqlColdStartStaffRepository implements ColdStartStaffR
         }
     }
 
+    /** Rejects autocommit or an unrelated DataSource before authoritative state can be changed. */
     private void requireTransaction() {
         if (!TransactionSynchronizationManager.isActualTransactionActive()
                 || !TransactionSynchronizationManager.hasResource(Objects.requireNonNull(jdbc.getDataSource(), "dataSource"))) {

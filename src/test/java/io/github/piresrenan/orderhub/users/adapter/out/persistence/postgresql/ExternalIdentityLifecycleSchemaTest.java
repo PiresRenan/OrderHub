@@ -13,6 +13,11 @@ import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityQuery;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveOrCreateExternalUserUseCase;
 
+/**
+ * Why: An external provider identity must preserve one stable internal owner.
+ * Covers: The binding lifecycle, schema or provider migration behavior exercised by this suite.
+ * Prevents: Identity reassignment, orphan Users and history loss across retries or upgrades.
+ */
 @SpringBootTest
 @Import(PostgreSqlTestConfiguration.class)
 class ExternalIdentityLifecycleSchemaTest {

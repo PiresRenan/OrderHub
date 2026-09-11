@@ -14,10 +14,12 @@ import io.github.piresrenan.orderhub.authorization.domain.model.PermissionCode;
 public final class PostgreSqlColdStartStaffAuthorizationRepository implements ColdStartStaffAuthorizationRepository {
     private final JdbcTemplate jdbc;
 
+    /** Requires the supplied owner contracts; construction performs no lifecycle mutation or independent commit. */
     public PostgreSqlColdStartStaffAuthorizationRepository(JdbcTemplate jdbc) {
         this.jdbc = Objects.requireNonNull(jdbc, "jdbc");
     }
 
+    /** Holds the actual Platform grant through the ceremony; absence never becomes Tenant authority. */
     @Override public boolean holdPlatformManagerGrant(UUID actorUserId) {
         requireTransaction();
         try {
@@ -31,6 +33,7 @@ public final class PostgreSqlColdStartStaffAuthorizationRepository implements Co
         }
     }
 
+    /** Acquires the catalog lock before role insertion to avoid shared-lock upgrade races. */
     @Override public void lockRoleCatalog() {
         requireTransaction();
         try {
@@ -42,6 +45,7 @@ public final class PostgreSqlColdStartStaffAuthorizationRepository implements Co
         }
     }
 
+    /** Creates only the explicit v1 governance role; all writes remain in the caller transaction. */
     @Override public void createGovernanceRole(UUID tenantId, String code, Set<PermissionCode> permissions) {
         requireTransaction();
         try {
@@ -58,6 +62,7 @@ public final class PostgreSqlColdStartStaffAuthorizationRepository implements Co
         }
     }
 
+    /** Rejects autocommit or an unrelated DataSource before authoritative state can be changed. */
     private void requireTransaction() {
         if (!TransactionSynchronizationManager.isActualTransactionActive()
                 || !TransactionSynchronizationManager.hasResource(Objects.requireNonNull(jdbc.getDataSource(), "dataSource"))) {

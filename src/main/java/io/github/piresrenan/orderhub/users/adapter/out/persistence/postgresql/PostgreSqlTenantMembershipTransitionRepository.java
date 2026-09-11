@@ -14,12 +14,15 @@ import io.github.piresrenan.orderhub.users.domain.model.TenantMembershipStatus;
 /** Mutation and evidence participate in the coordinator's same physical database transaction. */
 public final class PostgreSqlTenantMembershipTransitionRepository implements TenantMembershipTransitionRepository {
     private final JdbcTemplate jdbc;
+    /** Requires the supplied owner contracts; construction performs no lifecycle mutation or independent commit. */
     public PostgreSqlTenantMembershipTransitionRepository(JdbcTemplate jdbc) { this.jdbc = Objects.requireNonNull(jdbc); }
 
+    /** Locks the exact membership before evaluating a lifecycle transition, including terminal-state retries. */
     @Override public Optional<TenantMembershipStatus> lock(UUID tenant, UUID subject) {
         return guarded(() -> jdbc.query("SELECT status FROM users.tenant_memberships WHERE tenant_id = ? AND user_id = ? FOR UPDATE",
                 (row, n) -> TenantMembershipStatus.valueOf(row.getString(1)), tenant, subject).stream().findFirst());
     }
+    /** Changes the locked membership and appends its evidence in one physical transaction. */
     @Override public void change(UUID actor, UUID tenant, UUID subject, String action, TenantMembershipStatus before, TenantMembershipStatus after, UUID correlation) {
         guarded(() -> {
             if (jdbc.update("UPDATE users.tenant_memberships SET status = ? WHERE tenant_id = ? AND user_id = ? AND status = ?",
@@ -31,6 +34,7 @@ public final class PostgreSqlTenantMembershipTransitionRepository implements Ten
             return null;
         });
     }
+    /** Requires the owner database transaction and preserves technical failure separately from policy denial. */
     private <T> T guarded(Supplier<T> work) {
         if (!TransactionSynchronizationManager.isActualTransactionActive() || jdbc.getDataSource() == null
                 || !TransactionSynchronizationManager.hasResource(jdbc.getDataSource())) {

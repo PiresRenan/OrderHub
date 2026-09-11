@@ -44,6 +44,7 @@ public final class StaffProvisioningIssuanceService
     private final Duration ttl;
     private final SecureRandom secureRandom;
 
+    /** Requires the supplied owner contracts; construction performs no lifecycle mutation or independent commit. */
     public StaffProvisioningIssuanceService(
             StaffProvisioningIntentRepository repository,
             Clock clock,
@@ -70,6 +71,7 @@ public final class StaffProvisioningIssuanceService
                         "secureRandom");
     }
 
+    /** Creates cryptographic proof material once and returns only bounded replay or fingerprint conflict afterward. */
     @Override
     public StaffProvisioningIssuance issue(
             IssueStaffProvisioningIntentCommand command) {
@@ -161,6 +163,7 @@ public final class StaffProvisioningIssuanceService
         }
     }
 
+    /** Encodes only frozen semantic issuance facts; correlation and retry metadata do not change replay identity. */
     private byte[] canonicalFingerprint(
             IssueStaffProvisioningIntentCommand command) {
 
@@ -195,6 +198,7 @@ public final class StaffProvisioningIssuanceService
         return digest.digest();
     }
 
+    /** Uses fixed-width UUID bytes so textual formatting cannot change the canonical fingerprint. */
     private void updateUuid(
             MessageDigest digest,
             UUID value) {
@@ -212,6 +216,7 @@ public final class StaffProvisioningIssuanceService
                 bytes);
     }
 
+    /** Distinguishes absence from an empty value when encoding the frozen operation fingerprint. */
     private void updateNullableUtf8(
             MessageDigest digest,
             String value) {
@@ -233,6 +238,7 @@ public final class StaffProvisioningIssuanceService
                         UTF_8));
     }
 
+    /** Separates variable-length fields to prevent ambiguous concatenation in the operation fingerprint. */
     private void updateLengthPrefixed(
             MessageDigest digest,
             byte[] value) {
@@ -248,6 +254,7 @@ public final class StaffProvisioningIssuanceService
                 value);
     }
 
+    /** Hashes canonical bytes with the required SHA-256 algorithm. */
     private byte[] sha256(
             byte[] value) {
 
@@ -256,6 +263,7 @@ public final class StaffProvisioningIssuanceService
                         value);
     }
 
+    /** Requires SHA-256 availability; cryptographic setup failure is never treated as policy denial. */
     private MessageDigest sha256Digest() {
 
         try {
@@ -271,6 +279,7 @@ public final class StaffProvisioningIssuanceService
         }
     }
 
+    /** Rejects absent or non-positive proof lifetime rather than supplying an implicit security default. */
     private static Duration requirePositiveTtl(
             Duration value) {
 

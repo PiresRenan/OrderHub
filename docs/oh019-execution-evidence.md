@@ -440,3 +440,93 @@ this run.
   ambient-actor-red and final-regression.
 - Bootstrap/HTTP remains pending; ADR-0017 remains DESIGNED and no PR, review,
   merge or issue closure has occurred.
+
+## HTTP/bootstrap candidate and environment blocker
+
+- Membership administration was committed/pushed as
+  `74f6c85ad8a7263ea74d24194c7604de74f2ac20`, tree
+  `0b3839794c0a1ff3f560fea2fa380abac66d8deb`; remote confirmed. V1-V43 remain
+  published and immutable. The subsequent HTTP candidate is not yet committed.
+- Two real configured JWT/JWK REDs returned 401 for unbound proof consumers.
+  Two dedicated bootstrap paths now share the production decoder and expose
+  only verified issuer/subject, with no internal User or granted authority.
+  Ordinary authentication still requires an active internal binding.
+- Thin account, Staff, Customer and membership routes derive actors from the
+  principal. The route/body/result contract is in `oh019-http-contract.md`.
+- Additional REDs exposed missing private issuance (404), missing bootstrap
+  authentication Problem Details, and secret-bearing Staff result toString.
+  These were corrected; initial HTTP/architecture passed 9 / 0 / 0 / 0.
+- Hostile acceptance exposed malformed JSON and authorization rejection mapped
+  to 500, and existing-placement conflict mapped to 500. Explicit sanitized
+  classifications preserve 400, 403 and 409 while technical uncertainty stays 500.
+  One fixture used credential_digest instead of Staff secret_digest and was
+  corrected. An expectation that extra identity body fields were ignored was
+  corrected: strict JSON binding rejects them with 400, preserving the proof;
+  retry with only the proof still uses the signed identity, not injected claims.
+- A separate negotiation RED proved that Accept application/xml returned 406
+  after consuming Staff proof. Declaring JSON at controller mapping now rejects
+  before mutation, preserving the proof and allowing a valid retry.
+- Cross-capability/architecture regression passed **92 / 0 / 0 / 0** in 1:17,
+  2026-09-10 22:27:42 -03:00. Final acceptance with two independently signed
+  configured issuers passed **23 / 0 / 0 / 0** (19 HTTP/JWT + 4 modularity),
+  in 28.489 seconds, 2026-09-10 22:29:16 -03:00.
+- Coverage includes invalid signature/issuer/audience/time/missing identity
+  claims, zero-authority projection, claims/body injection, no JWT-only User
+  creation, secret/replay privacy, private account migration, Customer ownership
+  and cancellation, membership transitions, no Platform authority bleed, real
+  audit rollback, bounded policy/conflict/technical errors, malformed input,
+  negotiation and absence of credentials in captured runtime output.
+- Logs in `%TEMP%`: `oh019-bootstrap-http-red.log`,
+  `oh019-bootstrap-http-initial-green.log`, `oh019-lifecycle-http-boundaries-red.log`,
+  `oh019-lifecycle-http-boundaries-green.log`, `oh019-lifecycle-http-adversarial.log`,
+  `oh019-lifecycle-http-hostile.log`, `oh019-bootstrap-negotiation-red.log`,
+  `oh019-lifecycle-http-qualified.log`, `oh019-lifecycle-http-final-acceptance.log`.
+- On continuation dated 2026-09-11, final `mvnw.cmd -B clean verify` could not
+  complete: drive C reported zero free bytes, log/document writes failed, and
+  Docker reported `Docker Desktop is unable to start`. The incomplete log is
+  `oh019-final-clean-verify.log`; it is infrastructure failure, not green
+  qualification. Subsequent observed free space was only about 36 MiB.
+- Automatic approval review rejected removal of the verified generated
+  `C:\Dev\OrderHub\target` directory with only `blocked by policy` as its reason.
+  No deletion workaround, Docker reset/prune, user-file cleanup or history
+  rewrite was attempted. Source and prior evidence remain preserved.
+- Final clean verify, ADR TESTED/ROADMAP COMPLETE promotion, final commit/push,
+  ready PR, required CI and both GitHub Codex reviews remain outstanding.
+  Issue #38 remains OPEN, pre-release remains
+  `9e87d15e98db88f95f5829f6e8f57a4aadfb4b80`, and no merge occurred.
+
+## Resumed final qualification
+
+- On 2026-09-11 the host again had available disk space and Docker 29.7.2
+  responded successfully. No cleanup workaround or destructive recovery was
+  performed by this task.
+- The resumed full run executed **1500 / 0 / 1 / 0**, ending at 04:21:12 -03:00
+  after 8:48. The sole error was an isolated Workforce composition fixture
+  missing the newly required Users membership-transition contract. Production
+  dependencies were preserved; the fixture now supplies the same non-executing
+  proxy pattern as its other owner contracts. Its targeted rerun passed
+  **3 / 0 / 0 / 0** at 04:25:10 -03:00.
+- Logs: `%TEMP%/oh019-final-clean-verify-resumed.log` and
+  `%TEMP%/oh019-composition-fixture-recovery.log`. Neither a failed run nor a
+  targeted rerun substitutes for the canonical final gate.
+- Method-level contract documentation and test Why/Covers/Prevents descriptions
+  were completed under CONTRIBUTING. A comparison excluding Java block comments
+  and whitespace confirmed these documentation edits introduced no executable
+  changes beyond the independently tested HTTP changes and composition fixture.
+- Before final publication, fetch confirmed local/tracking/remote feature HEAD
+  `74f6c85ad8a7263ea74d24194c7604de74f2ac20`, unchanged pre-release
+  `9e87d15e98db88f95f5829f6e8f57a4aadfb4b80`, empty stash, no modifications to
+  published migrations, and a clean `git diff --check`.
+- The final canonical `mvnw.cmd -B clean verify` completed successfully at
+  **2026-09-11 04:33:46 -03:00**, duration **8:14**, with actual report XML totals
+  **1500 tests / 0 failures / 0 errors / 0 skipped**. This includes four passing
+  `OrderHubModularityTests`, application composition, real JWT acceptance,
+  cumulative Flyway/schema/upgrade and PostgreSQL concurrency suites. Log:
+  `%TEMP%/oh019-final-clean-verify-qualified.log`. The count matches the previous
+  full run; the isolated fixture error is resolved without removing any test.
+- ADR-0017 is now TESTED and ROADMAP OH-019 COMPLETE for implementation under
+  the autonomous mandate. Exact-HEAD remote CI and both Codex review passes
+  remain distinct mandatory gates; local promotion does not claim them green.
+- Read-only pre-PR inspection found historical checkpoint PR #43 already CLOSED
+  without merge, on the earlier `ee10b3f` checkpoint. It is not the final PR;
+  no historical review response is used to certify the final candidate.

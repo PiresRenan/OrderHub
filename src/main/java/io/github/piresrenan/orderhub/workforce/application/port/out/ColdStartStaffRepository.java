@@ -6,6 +6,8 @@ import io.github.piresrenan.orderhub.workforce.application.model.ColdStartStaffP
 
 /** Workforce alone proves and stabilizes the absence of any prior Staff relationship. */
 public interface ColdStartStaffRepository {
+    /** Serializes bootstrap and rejects any historical Staff or completed ceremony before mutation. */
     void lockEmptyTenant(UUID tenantId);
+    /** Creates or validates the exact initial placement and permission ceiling, never an implicit broader default. */
     ColdStartStaffPlacement prepare(UUID tenantId, PermissionEnvelope envelope);
 }

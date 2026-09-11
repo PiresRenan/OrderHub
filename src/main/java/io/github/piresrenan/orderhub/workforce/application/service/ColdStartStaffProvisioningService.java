@@ -26,6 +26,7 @@ public final class ColdStartStaffProvisioningService implements ColdStartStaffPr
     private final StaffProvisioningIntentRepository intents;
     private final Clock clock;
 
+    /** Requires the supplied owner contracts; construction performs no lifecycle mutation or independent commit. */
     public ColdStartStaffProvisioningService(ColdStartStaffAuthorizationUseCase authorization, ColdStartStaffRepository coldStart,
             StaffProvisioningFactsRepository facts, FindTenantOperationalStateUseCase tenants, IssueStaffProvisioningIntentUseCase primitive,
             StaffProvisioningEvidenceRepository evidence, WorkforceTransactionExecutor transaction,
@@ -41,6 +42,7 @@ public final class ColdStartStaffProvisioningService implements ColdStartStaffPr
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
+    /** Issues the explicit Platform ceremony only while historical Tenant Staff authority is absent. */
     @Override public StaffProvisioningIssuance issue(UUID actorUserId, UUID tenantId, UUID operationId, UUID correlationId) {
         Objects.requireNonNull(operationId, "operationId");
         Objects.requireNonNull(correlationId, "correlationId");
@@ -97,12 +99,14 @@ public final class ColdStartStaffProvisioningService implements ColdStartStaffPr
                 StaffProvisioningEvidence.Action.CONSUMED, intent.correlationId()));
     }
 
+    /** Combines current Platform authority and active Tenant state with serialized cold-start eligibility. */
     private void requireEmpty(UUID actor, UUID tenant) {
         authorization.requirePlatformManager(actor);
         requireActiveTenant(tenant);
         coldStart.lockEmptyTenant(tenant);
     }
 
+    /** Fails closed for missing or non-active Tenants without exposing their state. */
     private void requireActiveTenant(UUID tenantId) {
         if (tenants.find(new FindTenantOperationalStateQuery(tenantId)).orElse(null) != TenantOperationalState.ACTIVE) {
             throw new StaffProvisioningUnavailableException();

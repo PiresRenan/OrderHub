@@ -17,6 +17,11 @@ import io.github.piresrenan.orderhub.users.application.port.out.TenantMembership
 import io.github.piresrenan.orderhub.users.domain.model.TenantMembership;
 import io.github.piresrenan.orderhub.users.domain.model.TenantMembershipStatus;
 
+/**
+ * Why: Historical Tenant association must not imply current operational access.
+ * Covers: The membership state, concurrency or runtime composition boundary exercised by this suite.
+ * Prevents: Implicit reactivation, inconsistent concurrent outcomes and missing production composition.
+ */
 class EnsureActiveTenantMembershipServiceTest {
 
     private static final UUID USER_ID =

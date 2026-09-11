@@ -27,6 +27,11 @@ import io.github.piresrenan.orderhub.workforce.application.model.StaffProvisioni
 import io.github.piresrenan.orderhub.workforce.application.port.out.StaffProvisioningIntentRepository;
 import io.github.piresrenan.orderhub.workforce.application.service.StaffProvisioningIssuanceService;
 
+/**
+ * Why: Staff onboarding is a privileged one-time workflow rather than a caller-asserted identity.
+ * Covers: The intent, issuance, consumption or composition boundary exercised by this suite.
+ * Prevents: Replay corruption, authority bypass and incomplete atomic provisioning behavior.
+ */
 class StaffProvisioningIssuanceServiceCharacterizationTest {
 
     private static final Clock CLOCK =

@@ -26,6 +26,7 @@ public final class ResolveTrustedTenantContextService
     private final IsTenantMembershipOperationallyActiveUseCase memberships;
     private final FindTenantOperationalStateUseCase tenantOperationalStates;
 
+    /** Requires the supplied owner contracts; construction performs no lifecycle mutation or independent commit. */
     public ResolveTrustedTenantContextService(
             IsTenantMembershipOperationallyActiveUseCase memberships,
             FindTenantOperationalStateUseCase tenantOperationalStates) {
@@ -44,6 +45,7 @@ public final class ResolveTrustedTenantContextService
         this.tenantOperationalStates = tenantOperationalStates;
     }
 
+    /** Requires active membership before Tenant lookup; this point-in-time read does not cancel established requests. */
     @Override
     public Optional<TrustedTenantContext> resolve(
             ResolveTrustedTenantContextQuery query) {

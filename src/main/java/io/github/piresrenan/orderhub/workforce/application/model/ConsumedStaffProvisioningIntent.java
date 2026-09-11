@@ -45,6 +45,7 @@ public record ConsumedStaffProvisioningIntent(
                 "Correlation ID");
     }
 
+    /** Rejects missing internal selectors before persistence or canonical fingerprint construction. */
     private static void requireIdentifier(
             UUID value,
             String label) {

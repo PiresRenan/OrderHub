@@ -17,6 +17,11 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
+/**
+ * Why: Customer identity and ownership must remain separate from Staff and arbitrary selectors.
+ * Covers: Customer schema, exact ownership and linking behavior exercised by this suite.
+ * Prevents: Account takeover, cross-Tenant ownership and regressions hidden by invalid cleanup fixtures.
+ */
 @Testcontainers
 class PostgreSqlCustomerSchemaConstraintsTest {
 

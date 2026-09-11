@@ -10,6 +10,7 @@ import java.util.UUID;
  * Replay can identify the previously established intent but cannot recover
  * credential material because only its digest is durable.</p>
  */
+@org.springframework.modulith.NamedInterface("staff-provisioning")
 public sealed interface StaffProvisioningIssuance
         permits StaffProvisioningIssuance.Issued,
         StaffProvisioningIssuance.Replay,
@@ -19,11 +20,15 @@ public sealed interface StaffProvisioningIssuance
      * A new durable intent was established and its one-time credential can be
      * returned exactly on this successful response path.
      */
+    @org.springframework.modulith.NamedInterface("staff-provisioning")
     record Issued(
             UUID intentId,
             String credential,
             OffsetDateTime expiresAt)
             implements StaffProvisioningIssuance {
+
+        /** Redacts credential or provider identity data from incidental textual logging. */
+        @Override public String toString() { return "Issued[credential=redacted]"; }
 
         public Issued {
 
@@ -51,6 +56,7 @@ public sealed interface StaffProvisioningIssuance
      *
      * <p>No one-time credential is available on replay.</p>
      */
+    @org.springframework.modulith.NamedInterface("staff-provisioning")
     record Replay(
             UUID intentId)
             implements StaffProvisioningIssuance {
@@ -68,6 +74,7 @@ public sealed interface StaffProvisioningIssuance
      * The durable operation identity is already bound to a different canonical
      * issuance request.
      */
+    @org.springframework.modulith.NamedInterface("staff-provisioning")
     record FingerprintConflict()
             implements StaffProvisioningIssuance {
     }

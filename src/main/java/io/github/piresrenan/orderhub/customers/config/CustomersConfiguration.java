@@ -22,6 +22,7 @@ import io.github.piresrenan.orderhub.customers.application.service.ResolveCustom
 @Configuration(proxyBeanMethods = false)
 public class CustomersConfiguration {
 
+    /** Composes proof, binding and evidence under one bounded REQUIRED transaction. */
     @Bean
     CustomerAccountLinkingUseCase customerAccountLinkingUseCase(
             JdbcTemplate jdbc, PlatformTransactionManager manager, AuthorizeStaffTenantActionUseCase authority,

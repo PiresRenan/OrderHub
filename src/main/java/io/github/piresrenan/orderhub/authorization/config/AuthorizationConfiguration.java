@@ -36,6 +36,7 @@ import io.github.piresrenan.orderhub.authorization.adapter.out.persistence.postg
 @Configuration(proxyBeanMethods = false)
 public class AuthorizationConfiguration {
 
+    /** Composes the explicit first-Staff policy over Authorization-owned repositories and evidence. */
     @Bean
     io.github.piresrenan.orderhub.authorization.application.port.in.provisioning.ColdStartStaffAuthorizationUseCase coldStartStaffAuthorizationUseCase(
             JdbcTemplate jdbc) {
@@ -114,6 +115,7 @@ public class AuthorizationConfiguration {
     MutateAdministrativeGrantUseCase mutateAdministrativeGrantUseCase(
             AuditedAdministrativeGrantMutationService service) {
         return new MutateAdministrativeGrantUseCase() {
+            /** Joins the existing administrative audit boundary when granting durable authority. */
             @Override
             public void grant(UUID actorUserId,
                     io.github.piresrenan.orderhub.authorization.domain.model.AdministrativeGrant grant,
@@ -121,6 +123,7 @@ public class AuthorizationConfiguration {
                 service.grant(actorUserId, grant, correlationId);
             }
 
+            /** Joins the existing administrative audit boundary when revoking durable authority. */
             @Override
             public void revoke(UUID actorUserId,
                     io.github.piresrenan.orderhub.authorization.domain.model.AdministrativeGrant grant,

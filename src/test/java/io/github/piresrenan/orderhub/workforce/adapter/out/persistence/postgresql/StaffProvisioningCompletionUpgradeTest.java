@@ -12,6 +12,11 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 /** Verifies upgrade from published V37 preserves existing proofs and accepted migration checksums. */
+/**
+ * Why: Staff onboarding is a privileged one-time workflow rather than a caller-asserted identity.
+ * Covers: The intent, issuance, consumption or composition boundary exercised by this suite.
+ * Prevents: Replay corruption, authority bypass and incomplete atomic provisioning behavior.
+ */
 @Testcontainers
 class StaffProvisioningCompletionUpgradeTest {
     @Container

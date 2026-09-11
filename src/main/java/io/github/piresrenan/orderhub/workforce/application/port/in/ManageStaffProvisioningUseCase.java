@@ -8,7 +8,9 @@ import io.github.piresrenan.orderhub.workforce.application.model.StaffProvisioni
 /** Authorized normal-Tenant issuance and cancellation, accepting trusted internal actor identity. */
 @NamedInterface("staff-provisioning")
 public interface ManageStaffProvisioningUseCase {
+    /** Requires current Tenant Staff management authority and delegation before issuing frozen onboarding facts. */
     StaffProvisioningIssuance issue(IssueStaffProvisioningIntentCommand command);
 
+    /** Authorizes Tenant intent cancellation by opaque identifier without revealing or accepting its secret. */
     boolean cancel(UUID actorUserId, UUID tenantId, UUID intentId, UUID correlationId);
 }

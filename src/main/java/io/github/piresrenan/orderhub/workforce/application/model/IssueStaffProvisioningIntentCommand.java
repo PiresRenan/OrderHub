@@ -9,6 +9,7 @@ import java.util.UUID;
  * fingerprint are deliberately absent because they are application-owned
  * facts rather than caller authority.</p>
  */
+@org.springframework.modulith.NamedInterface("staff-provisioning")
 public record IssueStaffProvisioningIntentCommand(
         UUID tenantId,
         UUID issuedByUserId,
@@ -52,6 +53,7 @@ public record IssueStaffProvisioningIntentCommand(
                 "Correlation ID");
     }
 
+    /** Rejects missing internal selectors before persistence or canonical fingerprint construction. */
     private static void requireIdentifier(
             UUID value,
             String label) {

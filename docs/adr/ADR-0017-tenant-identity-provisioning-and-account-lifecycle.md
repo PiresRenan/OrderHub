@@ -1,6 +1,6 @@
 # ADR-0017 — Tenant Identity Provisioning and Account Lifecycle
 
-Status: DESIGNED
+Status: TESTED
 
 ## Context
 
@@ -62,7 +62,9 @@ Implementation follows mandatory TDD:
 
 `RED -> minimal GREEN -> inspect/refactor -> targeted regression -> broader regression -> hostile review -> clean checkpoint`.
 
-This ADR records the architecture boundaries that are already justified. Details whose correct answer depends on executable lifecycle evidence remain explicitly unresolved until their RED is produced.
+This ADR records the decisions established through runtime/schema RED and
+adversarial integration evidence, with qualification history in the
+[execution ledger](../oh019-execution-evidence.md).
 
 ## Decision
 
@@ -107,7 +109,32 @@ A Staff onboarding flow must prove the provisioning actor has sufficient current
 
 Provisioning must not grant permissions merely because a User or membership was created. Workforce position/authority and role assignment remain governed by their existing ceilings and delegation rules.
 
-If a durable invitation/provisioning credential is required, its lifecycle must support at least the invariants justified by executable tests: one-time consumption, replay resistance, cancellation/revocation, bounded expiry when applicable and concurrency-safe acquisition.
+The Workforce intent freezes Tenant, issuer, department, position, optional
+initial role, operation fingerprint, correlation and expiry. It stores only a
+SHA-256 digest of 256 random bits. New issuance returns its credential once;
+matching replay returns only the intent ID, and changed frozen facts conflict.
+Staff TTL is required configuration, currently 30 minutes.
+
+Consumption uses one conditional UPDATE RETURNING, revalidates issuer authority,
+resolves or creates the external User under the exact-pair PostgreSQL advisory
+lock, ensures active membership, materializes Staff and optionally assigns the
+initial role. One REQUIRED transaction owns all state and owner-local evidence.
+Any downstream failure rolls back proof, speculative User, binding, membership,
+Staff and role effects. A row trigger checks proof expiry again after lock wait.
+Existing inconsistent Staff placement is a conflict, never an implicit overwrite.
+
+Normal issuance requires TENANT_MEMBERS_MANAGE. Optional role assignment also
+requires TENANT_ROLES_ASSIGN and RoleDelegationPolicy; protected/governance roles
+require the independent privileged-role permission. Over-broad placement or
+role envelopes are rejected rather than clipped. Current owner authority facts
+are stabilized through the mutation transaction.
+
+The explicit first-Staff ceremony requires PLATFORM_TENANTS_MANAGE and the
+existing Tenant governance lock. Any historical Staff, including inactive
+Staff, or a completed ceremony closes cold start. It establishes the exact
+INITIAL_GOVERNANCE_V1 placement and INITIAL_TENANT_GOVERNANCE_V1 custom role with
+an explicit 17-permission ceiling. Normal provisioning never falls back to cold
+start. Platform cleanup ends once Tenant Staff authority exists.
 
 Email/SMS delivery is not part of identity correctness and is not introduced without a concrete integration requirement.
 
@@ -216,7 +243,8 @@ Membership suspension/termination does not silently delete StaffProfile, Custome
 
 Roles/permissions remain authorization state; they do not define whether membership exists or is operationally active.
 
-The exact lifecycle vocabulary and whether recovery/reactivation is admitted must be established by RED evidence before persistence migration.
+These transition and recovery rules follow the runtime/schema RED and
+PostgreSQL concurrency evidence, without changing ensure-active semantics.
 
 ### Authorization before sensitive lookup
 
@@ -237,7 +265,8 @@ Technical uncertainty fails closed but is not misrepresented as policy denial.
 
 ### Secrets and bootstrap credentials are minimized
 
-If OH-019 introduces invitation/linking secrets, they must be cryptographically unguessable and treated as credentials.
+Staff, Customer and external-link proofs use cryptographically unguessable
+one-time credentials and return them only on initial issuance.
 
 Raw values must not be persisted when a one-way digest is sufficient and must never appear in logs, metrics, audit payloads, exception messages or Problem Details.
 
@@ -362,24 +391,44 @@ output-port package. They appear in no exposed signature and no external
 consumer depends on them, so their public failure contract stays deferred until
 a provisioning orchestrator proves what it needs.
 
-## Open design questions requiring executable evidence
+## Executable HTTP decision checkpoint
 
-The following are deliberately not frozen before TDD/discovery:
+### Current HTTP implementation checkpoint
 
-1. final HTTP routing and acceptance qualification for the implemented membership transitions;
-2. whether Staff provisioning requires a durable invitation aggregate or a smaller provisioning-intent model;
-3. invitation/bootstrap credential lifetime and replay result semantics;
-4. exact Customer linking proof mechanism;
-5. whether external-identity provider migration is represented as an atomic replace, add-then-remove sequence or another bounded transition;
-6. minimum safe last-authentication-path invariant for unlink;
-7. exact application transaction owner for workflows that coordinate Users with Workforce or Customers;
-8. whether any new permission code is actually required versus existing administrative/workforce permissions;
-9. which operations require durable operation-id fingerprints versus desired-state idempotency;
-10. migration versions and indexes, which are authorized only after schema RED.
+The [HTTP contract](../oh019-http-contract.md) records the implemented thin
+Administration routes. Two bootstrap paths use the same configured Resource
+Server decoder as ordinary authentication and project only verified exact
+issuer/subject with zero granted authorities. A valid JWT alone creates no
+User; the one-time business proof selects the authorized relationship. Normal
+routes still require an active internal binding. Customer linking consumes
+proof as an already bound User and adds no generic registration or delivery
+infrastructure.
 
-An implementation must not choose one of these merely because it is convenient.
+Strict JSON binding rejects supplied identity/authority fields. Declared JSON
+response negotiation prevents unsupported Accept representations from spending
+a proof before returning 406. Authentication failures have sanitized bootstrap
+Problem Details; malformed input is 400, policy rejection 403, authorized state
+conflict 409, and technical uncertainty 500. Lifecycle error instance paths do
+not reflect internal selectors. Secret-bearing request/result toString output
+is redacted and successful responses disable caching.
 
-## Concurrency model to prove
+The real production-decoder acceptance suite uses two independent RSA/JWK
+providers and real PostgreSQL. Nineteen HTTP/JWT cases and four modularity cases
+passed. Final canonical `mvnw.cmd -B clean verify` passed **1500 tests, zero
+failures, zero errors and zero skipped**, including the four modularity tests,
+on 2026-09-11 at 04:33:46 -03:00 in 8:14. The
+[execution ledger](../oh019-execution-evidence.md) preserves the preceding
+infrastructure interruption and isolated composition-fixture correction.
+Remote CI and review remain separate approval gates; no interrupted run is
+counted as green.
+
+The original design questions are resolved by the implemented decisions:
+bounded owner proofs, add-then-remove migration, last-path denial, explicit
+suspension recovery, owner-coordinated REQUIRED transactions, existing
+permissions, fingerprint replay and desired-state idempotency. No generic IAM,
+registration, delivery or privileged orphan-recovery system is introduced.
+
+## Concurrency validation model
 
 Where the final design admits the operation, executable PostgreSQL tests must cover the invariants exposed by at least these competing mutations:
 
@@ -396,7 +445,11 @@ Tests should synchronize the relevant race window deterministically instead of d
 
 ## Persistence and migration governance
 
-Accepted V1-V35 migrations are immutable.
+Published V1-V43 migrations are immutable. OH-019 adds V36-V43: membership
+state, Staff intent, owner evidence, authority stabilization, post-lock deadline,
+Customer proof, external identity lifecycle and membership evidence. Upgrade
+tests preserve predecessor data and checksums. No cross-module foreign key is
+introduced by these changes.
 
 The next integer is not itself authorization for a migration.
 
@@ -474,9 +527,16 @@ OH-019 does not implement:
 
 ## Validation / promotion rule
 
-ADR-0017 remains `DESIGNED` throughout implementation.
+ADR-0017 remains `DESIGNED` until the final local implementation has executable
+evidence for the admitted lifecycle, retry, concurrency, audit, anti-enumeration,
+cross-Tenant and migration contracts, full Maven Wrapper `clean verify`, and
+Spring Modulith verification. It can then be marked `TESTED` for the qualified
+implementation before opening the governed PR.
 
-It may become `TESTED` only after the final OH-019 candidate has executable evidence for the admitted lifecycle, retry, concurrency, audit, anti-enumeration, cross-Tenant and migration contracts; full Maven Wrapper `clean verify`; Spring Modulith verification; exact-HEAD Branch Policy/CI/Platform Validation; and all material review findings resolved.
+PR approval is a separate gate: exact-HEAD Branch Policy/CI/Platform Validation
+must pass, and both comprehensive and security-focused Codex reviews must be
+clean on that same HEAD with no unresolved material findings. Local `TESTED`
+status never substitutes for those remote gates or human release approval.
 
 The governed PR targets only `pre-release` and uses squash integration under ADR-0003.
 

@@ -12,6 +12,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
 
 /** Customer proof durability is independent of Staff placement and role state. */
+/**
+ * Why: Customer identity and ownership must remain separate from Staff and arbitrary selectors.
+ * Covers: Customer schema, exact ownership and linking behavior exercised by this suite.
+ * Prevents: Account takeover, cross-Tenant ownership and regressions hidden by invalid cleanup fixtures.
+ */
 @SpringBootTest
 @Import(PostgreSqlTestConfiguration.class)
 class CustomerLinkProofMigrationTest {

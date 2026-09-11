@@ -81,16 +81,19 @@ public record NewStaffProvisioningIntent(
                 requestFingerprint.clone();
     }
 
+    /** Returns a defensive digest copy so callers cannot alter the durable proof request. */
     @Override
     public byte[] secretDigest() {
         return secretDigest.clone();
     }
 
+    /** Returns a defensive fingerprint copy so issuance identity cannot be mutated by callers. */
     @Override
     public byte[] requestFingerprint() {
         return requestFingerprint.clone();
     }
 
+    /** Rejects missing internal selectors before persistence or canonical fingerprint construction. */
     private static void requireIdentifier(
             UUID value,
             String label) {
@@ -101,6 +104,7 @@ public record NewStaffProvisioningIntent(
         }
     }
 
+    /** Rejects malformed digest material before durable proof lookup or creation. */
     private static void requireDigest(
             byte[] value,
             String label) {

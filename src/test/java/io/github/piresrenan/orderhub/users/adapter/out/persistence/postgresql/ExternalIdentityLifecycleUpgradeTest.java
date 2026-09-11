@@ -11,6 +11,11 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
+/**
+ * Why: An external provider identity must preserve one stable internal owner.
+ * Covers: The binding lifecycle, schema or provider migration behavior exercised by this suite.
+ * Prevents: Identity reassignment, orphan Users and history loss across retries or upgrades.
+ */
 @Testcontainers
 class ExternalIdentityLifecycleUpgradeTest {
     @Container private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(DockerImageName.parse(

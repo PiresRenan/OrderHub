@@ -21,6 +21,11 @@ import io.github.piresrenan.orderhub.workforce.application.port.in.authorization
 import io.github.piresrenan.orderhub.workforce.application.service.StaffProvisioningAdministrationService;
 
 /** Proves authority precedes sensitive issuance/cancellation and required evidence follows each applied change. */
+/**
+ * Why: Staff onboarding is a privileged one-time workflow rather than a caller-asserted identity.
+ * Covers: The intent, issuance, consumption or composition boundary exercised by this suite.
+ * Prevents: Replay corruption, authority bypass and incomplete atomic provisioning behavior.
+ */
 class StaffProvisioningAdministrationServiceTest {
     private final StaffProvisioningFactsRepository facts = mock(StaffProvisioningFactsRepository.class);
     private final StaffProvisioningAuthorizationUseCase authorization = mock(StaffProvisioningAuthorizationUseCase.class);

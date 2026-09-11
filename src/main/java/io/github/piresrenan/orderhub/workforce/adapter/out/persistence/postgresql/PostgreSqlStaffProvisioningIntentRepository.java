@@ -29,6 +29,7 @@ public final class PostgreSqlStaffProvisioningIntentRepository
 
     private final JdbcTemplate jdbcTemplate;
 
+    /** Requires the supplied owner contracts; construction performs no lifecycle mutation or independent commit. */
     public PostgreSqlStaffProvisioningIntentRepository(
             JdbcTemplate jdbcTemplate) {
 
@@ -41,6 +42,7 @@ public final class PostgreSqlStaffProvisioningIntentRepository
                 jdbcTemplate;
     }
 
+    /** Persists frozen issuance facts or classifies an exact operation replay without returning the original secret. */
     @Override
     public StaffProvisioningIntentCreation create(
             NewStaffProvisioningIntent intent) {
@@ -137,6 +139,7 @@ public final class PostgreSqlStaffProvisioningIntentRepository
                     exception);
         }
     }
+    /** Atomically consumes only a pending valid proof; row-lock deadline enforcement prevents stale completion. */
     @Override
     public Optional<ConsumedStaffProvisioningIntent> consumePending(
             byte[] secretDigest,
@@ -216,6 +219,7 @@ public final class PostgreSqlStaffProvisioningIntentRepository
         }
     }
 
+    /** Cancels a pending Tenant intent by opaque ID; terminal repeats do not produce another effect. */
     @Override
     public boolean cancelPending(
             UUID tenantId,
@@ -263,6 +267,7 @@ public final class PostgreSqlStaffProvisioningIntentRepository
         }
     }
 
+    /** Reads immutable issuance identity for replay without holding locks in the opposite consumption order. */
     private List<PersistedCreationIdentity> findCreationIdentity(UUID tenantId, UUID operationId) {
         return jdbcTemplate.query("""
                 SELECT intent_id, request_fingerprint
@@ -272,6 +277,7 @@ public final class PostgreSqlStaffProvisioningIntentRepository
                         row.getBytes("request_fingerprint")), tenantId, operationId);
     }
 
+    /** Distinguishes matching replay from operation reuse with different frozen facts. */
     private StaffProvisioningIntentCreation recognizeCreationReplay(List<PersistedCreationIdentity> persisted,
             byte[] fingerprint) {
         if (persisted.size() != 1) {
@@ -302,6 +308,7 @@ public final class PostgreSqlStaffProvisioningIntentRepository
                             : requestFingerprint.clone();
         }
 
+        /** Requires the canonical operation fingerprint before classifying durable replay. */
         @Override
         public byte[] requestFingerprint() {
 
@@ -311,6 +318,7 @@ public final class PostgreSqlStaffProvisioningIntentRepository
         }
     }
 
+    /** Rejects missing internal selectors before persistence or canonical fingerprint construction. */
     private static void requireIdentifier(
             UUID value,
             String label) {
@@ -321,6 +329,7 @@ public final class PostgreSqlStaffProvisioningIntentRepository
         }
     }
 
+    /** Rejects malformed digest material before durable proof lookup or creation. */
     private static void requireDigest(
             byte[] secretDigest) {
 

@@ -34,6 +34,7 @@ public final class CustomerAccountLinkingService implements CustomerAccountLinki
     private final FindTenantOperationalStateUseCase tenants;
     private final SecureRandom random = new SecureRandom();
 
+    /** Requires the supplied owner contracts; construction performs no lifecycle mutation or independent commit. */
     public CustomerAccountLinkingService(CustomerLinkProofRepository proofs, CustomerLinkTransactionExecutor transaction,
             AuthorizeStaffTenantActionUseCase authority, IsTenantMembershipOperationallyActiveUseCase memberships,
             EnsureActiveTenantMembershipUseCase ensureMembership, FindTenantOperationalStateUseCase tenants) {
@@ -45,6 +46,7 @@ public final class CustomerAccountLinkingService implements CustomerAccountLinki
         this.tenants = Objects.requireNonNull(tenants);
     }
 
+    /** Requires current management authority before selecting the Customer and issuing a bounded proof. */
     @Override public CustomerLinkIssuance issue(UUID actor, UUID tenant, UUID customer, UUID operation, UUID correlation) {
         Objects.requireNonNull(customer); Objects.requireNonNull(operation); Objects.requireNonNull(correlation);
         return transaction.execute(() -> {
@@ -62,6 +64,7 @@ public final class CustomerAccountLinkingService implements CustomerAccountLinki
         });
     }
 
+    /** Joins proof consumption, active-membership desired state, exact binding and evidence atomically. */
     @Override public UUID consume(UUID trustedUser, UUID tenant, String credential) {
         Objects.requireNonNull(trustedUser); Objects.requireNonNull(tenant);
         var digest = decodeDigest(credential);
@@ -79,6 +82,7 @@ public final class CustomerAccountLinkingService implements CustomerAccountLinki
         } finally { Arrays.fill(digest, (byte) 0); }
     }
 
+    /** Revalidates the manager after any proof-lock wait before retaining cancellation evidence. */
     @Override public boolean cancel(UUID actor, UUID tenant, UUID proofId, UUID correlation) {
         Objects.requireNonNull(proofId); Objects.requireNonNull(correlation);
         return transaction.execute(() -> {
@@ -92,6 +96,7 @@ public final class CustomerAccountLinkingService implements CustomerAccountLinki
         });
     }
 
+    /** Rejects non-operational Tenant/member state and requires current Staff management authority. */
     private void requireManager(UUID actor, UUID tenant) {
         Objects.requireNonNull(actor); Objects.requireNonNull(tenant);
         if (!memberships.isOperationallyActive(new IsTenantMembershipOperationallyActiveQuery(actor, tenant))
@@ -101,6 +106,7 @@ public final class CustomerAccountLinkingService implements CustomerAccountLinki
         }
     }
 
+    /** Accepts only canonical 256-bit proof encoding and discards decoded secret material after hashing. */
     private static byte[] decodeDigest(String value) {
         if (value == null || value.length() != 43) { throw new CustomerLinkUnavailableException(); }
         byte[] decoded;
@@ -114,6 +120,7 @@ public final class CustomerAccountLinkingService implements CustomerAccountLinki
         } finally { Arrays.fill(decoded, (byte) 0); }
     }
 
+    /** Hashes canonical bytes with the required SHA-256 algorithm. */
     private static byte[] sha256(byte[] value) {
         try { return MessageDigest.getInstance("SHA-256").digest(value); }
         catch (NoSuchAlgorithmException exception) { throw new IllegalStateException("SHA-256 is unavailable", exception); }

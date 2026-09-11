@@ -19,6 +19,7 @@ public final class TenantMembershipAdministrationService implements ManageTenant
     private final FindTenantOperationalStateUseCase tenants;
     private final TransitionTenantMembershipUseCase transitions;
     private final WorkforceTransactionExecutor transaction;
+    /** Requires the supplied owner contracts; construction performs no lifecycle mutation or independent commit. */
     public TenantMembershipAdministrationService(TenantMembershipAdministrationFacts facts, AuthorizeCurrentTenantActionUseCase authorization,
             IsTenantMembershipOperationallyActiveUseCase memberships, FindTenantOperationalStateUseCase tenants,
             TransitionTenantMembershipUseCase transitions, WorkforceTransactionExecutor transaction) {
@@ -26,10 +27,14 @@ public final class TenantMembershipAdministrationService implements ManageTenant
         this.memberships = Objects.requireNonNull(memberships); this.tenants = Objects.requireNonNull(tenants);
         this.transitions = Objects.requireNonNull(transitions); this.transaction = Objects.requireNonNull(transaction);
     }
+    /** Explicitly suspends an eligible target through current Tenant management authority. */
+    /** Requests authorized recovery from suspension; termination is never reversed. */
+    /** Removes future membership eligibility while preserving Staff, Customer and evidence history. */
     @Override public boolean suspend(UUID actor, UUID tenant, UUID subject, UUID correlation) { return change(actor, tenant, subject, correlation, TransitionTenantMembershipUseCase.Action.SUSPEND); }
     @Override public boolean recover(UUID actor, UUID tenant, UUID subject, UUID correlation) { return change(actor, tenant, subject, correlation, TransitionTenantMembershipUseCase.Action.RECOVER); }
     @Override public boolean terminate(UUID actor, UUID tenant, UUID subject, UUID correlation) { return change(actor, tenant, subject, correlation, TransitionTenantMembershipUseCase.Action.TERMINATE); }
 
+    /** Rejects self transitions and rechecks authority after Tenant serialization before the joined Users mutation. */
     private boolean change(UUID actor, UUID tenant, UUID subject, UUID correlation, TransitionTenantMembershipUseCase.Action action) {
         Objects.requireNonNull(actor); Objects.requireNonNull(tenant); Objects.requireNonNull(subject); Objects.requireNonNull(correlation);
         requireAuthority(actor, tenant, null);
@@ -42,6 +47,7 @@ public final class TenantMembershipAdministrationService implements ManageTenant
             catch (TenantMembershipTransitionUnavailableException exception) { throw new TenantMembershipAdministrationUnavailableException(); }
         });
     }
+    /** Checks both ambient operational writes and the isolated current policy snapshot so a disabled actor cannot act again. */
     private void requireAuthority(UUID actor, UUID tenant, UUID subject) {
         // The isolated authorization snapshot cannot see this ambient transaction's own writes.
         // Require operational state here too, so an actor already disabled by the caller cannot act again.

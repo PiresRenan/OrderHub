@@ -33,6 +33,11 @@ import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalId
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolvedUserIdentity;
 
+/**
+ * Why: Platform authority must come from current internal grants rather than JWT claims.
+ * Covers: Real JWT authentication and the Platform administration boundary.
+ * Prevents: Provider-claim escalation and regression from identity schema evolution.
+ */
 @SpringBootTest(properties = {
         "orderhub.security.jwt.issuer=https://issuer.example.test",
         "orderhub.security.jwt.audience=orderhub-api",

@@ -21,6 +21,11 @@ import io.github.piresrenan.orderhub.users.application.port.in.ResolveOrCreateEx
 import io.github.piresrenan.orderhub.users.application.port.in.ResolvedUserIdentity;
 import io.github.piresrenan.orderhub.users.application.port.out.ExternalIdentityUserProvisioningCoordinator;
 
+/**
+ * Why: An external provider identity must preserve one stable internal owner.
+ * Covers: The binding lifecycle, schema or provider migration behavior exercised by this suite.
+ * Prevents: Identity reassignment, orphan Users and history loss across retries or upgrades.
+ */
 class ResolveOrCreateExternalUserServiceTest {
 
     private static final String SERVICE_CLASS =

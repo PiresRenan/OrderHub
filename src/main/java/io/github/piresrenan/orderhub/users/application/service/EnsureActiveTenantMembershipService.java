@@ -27,6 +27,7 @@ public final class EnsureActiveTenantMembershipService
 
     private final TenantMembershipRepository tenantMembershipRepository;
 
+    /** Requires the supplied owner contracts; construction performs no lifecycle mutation or independent commit. */
     public EnsureActiveTenantMembershipService(
             TenantMembershipRepository tenantMembershipRepository) {
 
@@ -36,6 +37,7 @@ public final class EnsureActiveTenantMembershipService
                         "tenantMembershipRepository");
     }
 
+    /** Establishes absence as ACTIVE and reconciles exact-pair contention without reactivating historical non-operational state. */
     @Override
     public TenantMembershipEnsureResult ensureActive(
             EstablishTenantMembershipCommand command) {
@@ -79,6 +81,7 @@ public final class EnsureActiveTenantMembershipService
         }
     }
 
+    /** Exposes operational eligibility without leaking the membership aggregate across the module boundary. */
     private TenantMembershipEnsureResult classify(
             TenantMembership membership) {
 

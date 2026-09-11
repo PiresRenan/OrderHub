@@ -25,6 +25,7 @@ public final class ExternalIdentityLifecycleService implements ExternalIdentityL
     private final TrustedExternalIdentityProviders providers;
     private final SecureRandom random = new SecureRandom();
 
+    /** Requires the supplied owner contracts; construction performs no lifecycle mutation or independent commit. */
     public ExternalIdentityLifecycleService(ExternalIdentityLifecycleRepository repository, ExternalIdentityLifecycleTransaction transaction,
             ExternalIdentityUserProvisioningCoordinator coordinator, TrustedExternalIdentityProviders providers) {
         this.repository = Objects.requireNonNull(repository);
@@ -33,6 +34,7 @@ public final class ExternalIdentityLifecycleService implements ExternalIdentityL
         this.providers = Objects.requireNonNull(providers);
     }
 
+    /** Requires a usable authentication path and returns a new bounded proof only on initial issuance. */
     @Override public ExternalIdentityLinkIssuance issue(UUID user, UUID operation, UUID correlation) {
         Objects.requireNonNull(user); Objects.requireNonNull(operation); Objects.requireNonNull(correlation);
         return transaction.execute(() -> {
@@ -47,6 +49,7 @@ public final class ExternalIdentityLifecycleService implements ExternalIdentityL
         });
     }
 
+    /** Combines verified identity, proof consumption and exact-pair serialization without creating a replacement User. */
     @Override public UUID consume(String credential, String verifiedIssuer, String verifiedSubject) {
         var digest = decodeDigest(credential);
         try {
@@ -64,6 +67,7 @@ public final class ExternalIdentityLifecycleService implements ExternalIdentityL
         } finally { Arrays.fill(digest, (byte) 0); }
     }
 
+    /** Retains historical ownership and rejects removal of the last currently trusted active authentication path. */
     @Override public boolean unlink(UUID user, UUID binding, UUID correlation) {
         Objects.requireNonNull(user); Objects.requireNonNull(binding); Objects.requireNonNull(correlation);
         return transaction.execute(() -> {
@@ -79,6 +83,7 @@ public final class ExternalIdentityLifecycleService implements ExternalIdentityL
         });
     }
 
+    /** Cancels an owner-scoped pending proof with atomic attribution; repeated terminal requests are unchanged. */
     @Override public boolean cancel(UUID user, UUID proofId, UUID correlation) {
         Objects.requireNonNull(user); Objects.requireNonNull(proofId); Objects.requireNonNull(correlation);
         return transaction.execute(() -> {
@@ -89,13 +94,16 @@ public final class ExternalIdentityLifecycleService implements ExternalIdentityL
         });
     }
 
+    /** Returns the owner private active-binding projection without exposing provider subjects. */
     @Override public List<ExternalIdentityAccount> accounts(UUID user) {
         Objects.requireNonNull(user);
         return transaction.execute(() -> repository.accounts(user).stream().filter(ExternalIdentityLifecycleRepository.Account::active)
                 .map(account -> new ExternalIdentityAccount(account.id(), account.issuer())).toList());
     }
 
+    /** Keeps policy rejection bounded without exposing private authority or identity details. */
     private static void require(boolean condition) { if (!condition) { throw new ExternalIdentityLifecycleUnavailableException(); } }
+    /** Accepts only canonical 256-bit proof encoding and discards decoded secret material after hashing. */
     private static byte[] decodeDigest(String credential) {
         require(credential != null && credential.length() == 43);
         byte[] decoded;
@@ -106,6 +114,7 @@ public final class ExternalIdentityLifecycleService implements ExternalIdentityL
             return hash(decoded);
         } finally { Arrays.fill(decoded, (byte) 0); }
     }
+    /** Produces the one-way credential digest without retaining raw proof material. */
     private static byte[] hash(byte[] value) {
         try { return MessageDigest.getInstance("SHA-256").digest(value); }
         catch (java.security.NoSuchAlgorithmException exception) { throw new IllegalStateException("SHA-256 is unavailable", exception); }

@@ -33,6 +33,7 @@ public final class StaffProvisioningAdministrationService implements ManageStaff
     private final Clock clock;
     private final AuthorizeStaffTenantActionUseCase readAuthority;
 
+    /** Requires the supplied owner contracts; construction performs no lifecycle mutation or independent commit. */
     public StaffProvisioningAdministrationService(StaffProvisioningFactsRepository facts,
             StaffProvisioningAuthorizationUseCase authorization, IsTenantMembershipOperationallyActiveUseCase memberships,
             FindTenantOperationalStateUseCase tenants, StaffProvisioningEvidenceRepository evidence,

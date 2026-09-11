@@ -27,6 +27,7 @@ final class StaffProvisioningIssuerEligibility {
         this.tenants = Objects.requireNonNull(tenants, "tenants");
     }
 
+    /** Requires operational membership/Tenant and current locked Staff management authority. */
     StaffProvisioningActor require(UUID userId, UUID tenantId) {
         requireOperational(userId, tenantId);
         var actor = facts.actor(userId, tenantId).orElseThrow(StaffProvisioningUnavailableException::new);
@@ -34,6 +35,7 @@ final class StaffProvisioningIssuerEligibility {
         return actor;
     }
 
+    /** Rejects absent or inactive relationships before sensitive provisioning lookup. */
     void requireOperational(UUID userId, UUID tenantId) {
         if (!memberships.isOperationallyActive(new IsTenantMembershipOperationallyActiveQuery(userId, tenantId))
                 || tenants.find(new FindTenantOperationalStateQuery(tenantId)).orElse(null) != TenantOperationalState.ACTIVE) {

@@ -16,6 +16,11 @@ import io.github.piresrenan.orderhub.tenants.application.port.in.operational.Ten
 import io.github.piresrenan.orderhub.tenants.application.port.in.operational.TenantOperationalStateUnavailableException;
 import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveUseCase;
 
+/**
+ * Why: Authentication alone does not establish operational Tenant access.
+ * Covers: Current membership and Tenant eligibility in trusted-context resolution.
+ * Prevents: Access to non-operational Tenants or memberships through identity alone.
+ */
 class ResolveTrustedTenantOperationalStateTest {
 
     @Test

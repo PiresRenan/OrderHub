@@ -20,6 +20,11 @@ import io.github.piresrenan.orderhub.users.application.port.in.BindExternalIdent
 import io.github.piresrenan.orderhub.users.application.port.out.ExternalIdentityBindingPersistenceException;
 
 /** Owner runtime tests use synthetic already-verified facts; real JWT verification is a separate boundary. */
+/**
+ * Why: An external provider identity must preserve one stable internal owner.
+ * Covers: The binding lifecycle, schema or provider migration behavior exercised by this suite.
+ * Prevents: Identity reassignment, orphan Users and history loss across retries or upgrades.
+ */
 @SpringBootTest(properties = {
         "orderhub.security.jwt.issuer=https://synthetic-identity-lifecycle.test",
         "orderhub.security.jwt.additional-issuers[0].issuer=https://synthetic-next-provider.test",

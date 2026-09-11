@@ -27,6 +27,11 @@ import io.github.piresrenan.orderhub.workforce.application.model.NewStaffProvisi
 import io.github.piresrenan.orderhub.workforce.application.model.StaffProvisioningIntentCreation;
 import io.github.piresrenan.orderhub.workforce.application.port.out.StaffProvisioningIntentRepository;
 
+/**
+ * Why: Staff onboarding is a privileged one-time workflow rather than a caller-asserted identity.
+ * Covers: The intent, issuance, consumption or composition boundary exercised by this suite.
+ * Prevents: Replay corruption, authority bypass and incomplete atomic provisioning behavior.
+ */
 @Testcontainers
 class PostgreSqlStaffProvisioningIntentCreationConcurrencyTest {
 

@@ -53,6 +53,11 @@ import io.github.piresrenan.orderhub.users.application.port.in.ResolvedUserIdent
  * membership eligibility use established Security test seams.
  * </p>
  */
+/**
+ * Why: Customer identity and ownership must remain separate from Staff and arbitrary selectors.
+ * Covers: Customer schema, exact ownership and linking behavior exercised by this suite.
+ * Prevents: Account takeover, cross-Tenant ownership and regressions hidden by invalid cleanup fixtures.
+ */
 @SpringBootTest(properties = {
         "orderhub.security.jwt.issuer=https://issuer.example.test",
         "orderhub.security.jwt.audience=orderhub-api",

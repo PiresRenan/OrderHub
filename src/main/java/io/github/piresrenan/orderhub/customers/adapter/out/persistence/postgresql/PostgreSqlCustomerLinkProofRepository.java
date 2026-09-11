@@ -16,8 +16,10 @@ import io.github.piresrenan.orderhub.customers.application.port.out.CustomerLink
 /** Owner-local SQL only; row transitions, binding and evidence join the caller transaction. */
 public final class PostgreSqlCustomerLinkProofRepository implements CustomerLinkProofRepository {
     private final JdbcTemplate jdbc;
+    /** Requires the supplied owner contracts; construction performs no lifecycle mutation or independent commit. */
     public PostgreSqlCustomerLinkProofRepository(JdbcTemplate jdbc) { this.jdbc = java.util.Objects.requireNonNull(jdbc); }
 
+    /** Creates one scoped proof or recognizes operation replay without recovering its secret. */
     @Override public Creation create(UUID actor, UUID tenant, UUID customer, UUID operation, UUID correlation, byte[] digest) {
         return guarded(() -> {
             // A completed operation can be replayed without competing for its mutable proof row.
@@ -36,6 +38,7 @@ public final class PostgreSqlCustomerLinkProofRepository implements CustomerLink
         });
     }
 
+    /** Reads immutable issuance identity without acquiring a competing mutation lock. */
     private Optional<Proof> replay(UUID actor, UUID tenant, UUID customer, UUID operation) {
         var existing = jdbc.query("SELECT * FROM customers.account_link_proofs WHERE tenant_id = ? AND operation_id = ?", this::map, tenant, operation);
         if (existing.isEmpty()) { return Optional.empty(); }
@@ -44,6 +47,7 @@ public final class PostgreSqlCustomerLinkProofRepository implements CustomerLink
         return Optional.of(proof);
     }
 
+    /** Conditionally spends a pending unexpired proof and returns its frozen owner facts. */
     @Override public Optional<Proof> consume(UUID tenant, byte[] digest) {
         return guarded(() -> jdbc.query("""
                 UPDATE customers.account_link_proofs SET consumed_at = clock_timestamp()
@@ -52,6 +56,7 @@ public final class PostgreSqlCustomerLinkProofRepository implements CustomerLink
                 """, this::map, tenant, digest).stream().findFirst());
     }
 
+    /** Cancels only a pending proof in the selected Tenant; terminal repeats are unchanged. */
     @Override public Optional<Proof> cancel(UUID tenant, UUID proof) {
         return guarded(() -> jdbc.query("""
                 UPDATE customers.account_link_proofs SET cancelled_at = clock_timestamp()
@@ -59,6 +64,7 @@ public final class PostgreSqlCustomerLinkProofRepository implements CustomerLink
                 """, this::map, tenant, proof).stream().findFirst());
     }
 
+    /** Establishes only the exact Customer/User tuple, preserving independent historical relationships. */
     @Override public void bind(Proof proof, UUID user) {
         guarded(() -> jdbc.update("""
                 INSERT INTO customers.customer_account_bindings (tenant_id, customer_id, user_id) VALUES (?, ?, ?)
@@ -66,6 +72,7 @@ public final class PostgreSqlCustomerLinkProofRepository implements CustomerLink
                 """, proof.tenantId(), proof.customerId(), user));
     }
 
+    /** Makes owner attribution mandatory within the same transaction as the linking effect. */
     @Override public void append(Proof proof, UUID actor, UUID subject, String action, UUID correlation) {
         guarded(() -> jdbc.update("""
                 INSERT INTO customers.account_link_events
@@ -74,12 +81,14 @@ public final class PostgreSqlCustomerLinkProofRepository implements CustomerLink
                 """, UUID.randomUUID(), proof.tenantId(), proof.customerId(), proof.proofId(), actor, subject, action, correlation));
     }
 
+    /** Projects only internal proof facts required by the application coordinator. */
     private Proof map(ResultSet row, int ignored) throws SQLException {
         return new Proof(row.getObject("proof_id", UUID.class), row.getObject("tenant_id", UUID.class),
                 row.getObject("customer_id", UUID.class), row.getObject("issued_by_user_id", UUID.class),
                 row.getObject("correlation_id", UUID.class), row.getObject("expires_at", OffsetDateTime.class));
     }
 
+    /** Requires the owner database transaction and preserves technical failure separately from policy denial. */
     private <T> T guarded(Supplier<T> work) {
         if (!TransactionSynchronizationManager.isActualTransactionActive() || jdbc.getDataSource() == null
                 || !TransactionSynchronizationManager.hasResource(jdbc.getDataSource())) {

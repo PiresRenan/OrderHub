@@ -24,6 +24,11 @@ import io.github.piresrenan.orderhub.authorization.domain.model.AuthorizationDec
 import io.github.piresrenan.orderhub.authorization.domain.model.PermissionCode;
 
 /** Proves first Staff setup starts from an actually empty Tenant and never becomes a recurring Platform bypass. */
+/**
+ * Why: The first-Staff ceremony must not become a general Platform-to-Tenant bypass.
+ * Covers: Explicit cold-start authority, competing ceremonies and atomic evidence.
+ * Prevents: Repeated bootstrap, historical-Staff bypass and privilege beyond the v1 ceiling.
+ */
 @SpringBootTest
 @Import(PostgreSqlTestConfiguration.class)
 class StaffColdStartProductionIntegrationTest {

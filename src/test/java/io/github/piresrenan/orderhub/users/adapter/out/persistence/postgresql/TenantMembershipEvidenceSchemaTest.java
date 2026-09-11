@@ -10,6 +10,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
 
 /** Membership transitions need owner-local attribution without erasing historical identities. */
+/**
+ * Why: Historical Tenant association must not imply current operational access.
+ * Covers: The membership state, concurrency or runtime composition boundary exercised by this suite.
+ * Prevents: Implicit reactivation, inconsistent concurrent outcomes and missing production composition.
+ */
 @SpringBootTest
 @Import(PostgreSqlTestConfiguration.class)
 class TenantMembershipEvidenceSchemaTest {

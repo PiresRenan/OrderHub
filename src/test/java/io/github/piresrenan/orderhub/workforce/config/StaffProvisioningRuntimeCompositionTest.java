@@ -23,8 +23,14 @@ import io.github.piresrenan.orderhub.authorization.application.port.in.provision
 import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveOrCreateExternalUserUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.EnsureActiveTenantMembershipUseCase;
+import io.github.piresrenan.orderhub.users.application.port.in.TransitionTenantMembershipUseCase;
 import io.github.piresrenan.orderhub.tenants.application.port.in.operational.FindTenantOperationalStateUseCase;
 
+/**
+ * Why: Staff onboarding is a privileged one-time workflow rather than a caller-asserted identity.
+ * Covers: The intent, issuance, consumption or composition boundary exercised by this suite.
+ * Prevents: Replay corruption, authority bypass and incomplete atomic provisioning behavior.
+ */
 class StaffProvisioningRuntimeCompositionTest {
 
     private static final String TTL_PROPERTY =
@@ -150,6 +156,8 @@ class StaffProvisioningRuntimeCompositionTest {
                 () -> unsupportedProxy(ResolveOrCreateExternalUserUseCase.class));
         context.registerBean(EnsureActiveTenantMembershipUseCase.class,
                 () -> unsupportedProxy(EnsureActiveTenantMembershipUseCase.class));
+        context.registerBean(TransitionTenantMembershipUseCase.class,
+                () -> unsupportedProxy(TransitionTenantMembershipUseCase.class));
         context.registerBean(FindTenantOperationalStateUseCase.class,
                 () -> unsupportedProxy(FindTenantOperationalStateUseCase.class));
 

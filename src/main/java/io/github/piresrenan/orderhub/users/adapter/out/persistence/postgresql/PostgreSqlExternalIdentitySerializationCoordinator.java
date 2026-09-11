@@ -206,6 +206,7 @@ public final class PostgreSqlExternalIdentitySerializationCoordinator
         }
     }
 
+    /** Separates exact issuer and subject bytes so distinct pairs cannot share an ambiguous lock preimage. */
     private static void writeLengthPrefixed(
             DataOutputStream canonical,
             String value)

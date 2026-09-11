@@ -23,6 +23,11 @@ import io.github.piresrenan.orderhub.workforce.application.model.StaffProvisioni
 import io.github.piresrenan.orderhub.customers.application.port.in.linking.CustomerAccountLinkingUseCase;
 import io.github.piresrenan.orderhub.customers.application.port.in.linking.CustomerLinkIssuance;
 
+/**
+ * Why: membership changes must affect future access without erasing business identity.
+ * Covers: authorized transitions, recovery/termination and administrator races, snapshots and audit rollback.
+ * Prevents: implicit reactivation, mutual access removal and an ambient transaction reusing a terminated actor.
+ */
 @SpringBootTest
 @Import(PostgreSqlTestConfiguration.class)
 class TenantMembershipAdministrationProductionTest {

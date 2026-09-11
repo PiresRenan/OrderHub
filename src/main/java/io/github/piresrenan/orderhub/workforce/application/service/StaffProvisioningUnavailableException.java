@@ -1,6 +1,7 @@
 package io.github.piresrenan.orderhub.workforce.application.service;
 
 /** Privacy-equivalent rejection of a proof or non-operational desired state. */
+@org.springframework.modulith.NamedInterface("staff-provisioning")
 public final class StaffProvisioningUnavailableException extends RuntimeException {
     private static final long serialVersionUID = 1L;
 

@@ -10,8 +10,10 @@ import io.github.piresrenan.orderhub.users.domain.model.TenantMembershipStatus;
 /** Explicit recovery is limited to suspension; termination preserves history and is terminal. */
 public final class TransitionTenantMembershipService implements TransitionTenantMembershipUseCase {
     private final TenantMembershipTransitionRepository repository;
+    /** Requires the supplied owner contracts; construction performs no lifecycle mutation or independent commit. */
     public TransitionTenantMembershipService(TenantMembershipTransitionRepository repository) { this.repository = Objects.requireNonNull(repository); }
 
+    /** Preserves terminal membership history, supports explicit suspension recovery and records only actual transitions. */
     @Override public boolean transition(UUID actor, UUID tenant, UUID subject, Action action, UUID correlation) {
         Objects.requireNonNull(actor); Objects.requireNonNull(tenant); Objects.requireNonNull(subject);
         Objects.requireNonNull(action); Objects.requireNonNull(correlation);

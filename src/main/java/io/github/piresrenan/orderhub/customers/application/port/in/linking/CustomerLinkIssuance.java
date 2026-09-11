@@ -12,6 +12,7 @@ public sealed interface CustomerLinkIssuance {
             Objects.requireNonNull(credential, "credential");
             Objects.requireNonNull(expiresAt, "expiresAt");
         }
+        /** Redacts credential or provider identity data from incidental textual logging. */
         @Override public String toString() { return "CustomerLinkIssuance.Issued[credential=REDACTED]"; }
     }
     record Replay(UUID proofId) implements CustomerLinkIssuance {}

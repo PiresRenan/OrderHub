@@ -19,6 +19,11 @@ import io.github.piresrenan.orderhub.customers.application.port.in.linking.Custo
 import io.github.piresrenan.orderhub.customers.application.port.in.linking.CustomerLinkUnavailableException;
 import io.github.piresrenan.orderhub.customers.application.port.out.CustomerAccountBindingPersistenceException;
 
+/**
+ * Why: Customer identity and ownership must remain separate from Staff and arbitrary selectors.
+ * Covers: Customer schema, exact ownership and linking behavior exercised by this suite.
+ * Prevents: Account takeover, cross-Tenant ownership and regressions hidden by invalid cleanup fixtures.
+ */
 @SpringBootTest
 @Import(PostgreSqlTestConfiguration.class)
 class CustomerAccountLinkingProductionTest {

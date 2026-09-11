@@ -15,17 +15,21 @@ public final class PostgreSqlStaffProvisioningClock extends Clock {
     private final JdbcTemplate jdbc;
     private final ZoneId zone;
 
+    /** Requires the supplied owner contracts; construction performs no lifecycle mutation or independent commit. */
     public PostgreSqlStaffProvisioningClock(JdbcTemplate jdbc) {
         this(jdbc, ZoneOffset.UTC);
     }
 
+    /** Requires the supplied owner contracts; construction performs no lifecycle mutation or independent commit. */
     private PostgreSqlStaffProvisioningClock(JdbcTemplate jdbc, ZoneId zone) {
         this.jdbc = Objects.requireNonNull(jdbc, "jdbc");
         this.zone = Objects.requireNonNull(zone, "zone");
     }
 
+    /** Exposes the representation zone without changing the database-owned authoritative instant. */
     @Override public ZoneId getZone() { return zone; }
 
+    /** Changes presentation zone while preserving the same database time source. */
     @Override public Clock withZone(ZoneId zone) {
         return new PostgreSqlStaffProvisioningClock(jdbc, zone);
     }

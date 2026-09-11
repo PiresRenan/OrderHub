@@ -28,6 +28,7 @@ public final class ColdStartStaffAuthorizationService implements ColdStartStaffA
     private final RoleAssignmentRepository assignments;
     private final StaffProvisioningAuthorizationRepository evidence;
 
+    /** Requires the supplied owner contracts; construction performs no lifecycle mutation or independent commit. */
     public ColdStartStaffAuthorizationService(ColdStartStaffAuthorizationRepository coldStart,
             RoleDefinitionRepository definitions, RoleAssignmentRepository assignments, StaffProvisioningAuthorizationRepository evidence) {
         this.coldStart = Objects.requireNonNull(coldStart, "coldStart");
@@ -36,17 +37,20 @@ public final class ColdStartStaffAuthorizationService implements ColdStartStaffA
         this.evidence = Objects.requireNonNull(evidence, "evidence");
     }
 
+    /** Requires the current explicit Platform permission, without fabricating Staff authority. */
     @Override public void requirePlatformManager(UUID actorUserId) {
         Objects.requireNonNull(actorUserId, "actorUserId");
         require(coldStart.holdPlatformManagerGrant(actorUserId));
     }
 
+    /** Validates any existing bootstrap role before returning the fixed v1 permission ceiling. */
     @Override public ColdStartStaffRole plan(UUID actorUserId, UUID tenantId) {
         requirePlatformManager(actorUserId);
         definitions.findByCodeAndScope(CODE, new TenantAuthorizationScope(tenantId)).ifPresent(this::validate);
         return new ColdStartStaffRole(CODE, PermissionEnvelope.of(PERMISSIONS));
     }
 
+    /** Assigns the validated initial role and required attribution in the ambient transaction. */
     @Override public void assign(UUID actorUserId, UUID tenantId, UUID targetUserId, UUID intentId, UUID correlationId) {
         requirePlatformManager(actorUserId);
         coldStart.lockRoleCatalog();
@@ -62,12 +66,14 @@ public final class ColdStartStaffAuthorizationService implements ColdStartStaffA
         evidence.append(actorUserId, tenantId, targetUserId, CODE, intentId, correlationId, changed);
     }
 
+    /** Rejects altered bootstrap role semantics instead of silently accepting a broader ceiling. */
     private void validate(RoleDefinition role) {
         require(role.code().equals(CODE) && role.persona() == AuthorizationPersona.STAFF
                 && role.mutability() == RoleMutability.TENANT_CUSTOM && role.authorityBand() == AuthorityBand.TENANT_GOVERNANCE
                 && role.permissions().equals(PERMISSIONS) && role.permissionEnvelope().permissions().equals(PERMISSIONS));
     }
 
+    /** Keeps policy rejection bounded without exposing private authority or identity details. */
     private static void require(boolean condition) {
         if (!condition) { throw new StaffProvisioningAuthorizationDeniedException(); }
     }

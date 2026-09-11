@@ -50,12 +50,14 @@ import io.github.piresrenan.orderhub.users.application.service.ResolveOrCreateEx
 @Configuration(proxyBeanMethods = false)
 public class UsersConfiguration {
 
+        /** Exposes owner-local lifecycle mutation while requiring the coordinator transaction. */
         @Bean
         io.github.piresrenan.orderhub.users.application.port.in.TransitionTenantMembershipUseCase transitionTenantMembershipUseCase(JdbcTemplate jdbc) {
                 return new io.github.piresrenan.orderhub.users.application.service.TransitionTenantMembershipService(
                         new io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.PostgreSqlTenantMembershipTransitionRepository(jdbc));
         }
 
+        /** Composes proof consumption, exact-pair serialization and same-User lifecycle evidence. */
         @Bean
         ExternalIdentityLifecycleUseCase externalIdentityLifecycleUseCase(
                         JdbcTemplate jdbc, PlatformTransactionManager manager, ExternalIdentityUserProvisioningCoordinator coordinator,

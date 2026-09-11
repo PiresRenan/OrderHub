@@ -92,6 +92,7 @@ public final class ResolveOrCreateExternalUserService
                         query));
     }
 
+    /** Reuses the exact binding or establishes User and binding together within the serialized caller scope. */
     private ResolvedUserIdentity resolveOrEstablish(
             ResolveExternalIdentityQuery query) {
 

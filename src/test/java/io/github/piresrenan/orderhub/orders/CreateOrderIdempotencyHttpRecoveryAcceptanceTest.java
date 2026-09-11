@@ -42,6 +42,11 @@ import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalId
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolvedUserIdentity;
 
+/**
+ * Why: Order retry recovery must retain trusted identity and ownership boundaries.
+ * Covers: HTTP idempotency recovery with the current identity schema.
+ * Prevents: Cross-scope retry effects and invalid setup masking business failures.
+ */
 @SpringBootTest(properties = {
         "orderhub.security.jwt.issuer=https://issuer.idempotency.test",
         "orderhub.security.jwt.audience=orderhub-api",

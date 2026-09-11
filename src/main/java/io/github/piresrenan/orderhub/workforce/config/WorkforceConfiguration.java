@@ -59,6 +59,7 @@ import io.github.piresrenan.orderhub.tenants.application.port.in.operational.Fin
 @EnableConfigurationProperties(StaffProvisioningProperties.class)
 public class WorkforceConfiguration {
 
+    /** Composes current Tenant authority with the narrow Users transition boundary in one transaction. */
     @Bean
     io.github.piresrenan.orderhub.workforce.application.port.in.ManageTenantMembershipUseCase manageTenantMembershipUseCase(
             JdbcTemplate jdbc, PlatformTransactionManager manager, WorkforcePermissionEnvelopeRepository envelopes,
@@ -71,6 +72,7 @@ public class WorkforceConfiguration {
                 authorization, memberships, tenants, transitions, new SpringWorkforceTransactionExecutor(transaction));
     }
 
+    /** Composes the explicit Platform ceremony separately from normal Tenant Staff provisioning. */
     @Bean
     io.github.piresrenan.orderhub.workforce.application.service.ColdStartStaffProvisioningService coldStartStaffProvisioningService(
             io.github.piresrenan.orderhub.authorization.application.port.in.provisioning.ColdStartStaffAuthorizationUseCase authorization,
