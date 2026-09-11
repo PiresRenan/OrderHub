@@ -32,6 +32,7 @@ public final class AnalyticsHousekeepingTrigger {
         this.meters = meters;
     }
 
+    /** Runs one batch and records its durable outcome without hiding failures. */
     @Scheduled(fixedDelayString = "${orderhub.analytics.housekeeping.fixed-delay:1h}")
     public void runOneBatch() {
         try {
@@ -47,6 +48,7 @@ public final class AnalyticsHousekeepingTrigger {
         }
     }
 
+    /** Records only the fixed dataset and the closed success/failure vocabulary. */
     private void count(String outcome) {
         meters.counter(METRIC,
                 "dataset", "workforce_authority_change_facts",

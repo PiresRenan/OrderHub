@@ -10,6 +10,11 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.NestedExceptionUtils;
 
+/**
+ * Why: invalid deployment values must fail during binding.
+ * Covers: required policy, timing and batch boundaries through Spring binding.
+ * Prevents: silently normalized limits and invalid housekeeping startup.
+ */
 class AnalyticsHousekeepingConfigurationBindingTest {
 
     private final ApplicationContextRunner contextRunner =
@@ -57,6 +62,8 @@ class AnalyticsHousekeepingConfigurationBindingTest {
     @Test
     void validatesBatchAndDelayBoundariesDuringBinding() {
         for (var invalid : new String[] {
+                "orderhub.analytics.housekeeping.retention-window=0s",
+                "orderhub.analytics.housekeeping.retention-window=-1d",
                 "orderhub.analytics.housekeeping.batch-size=0",
                 "orderhub.analytics.housekeeping.batch-size=-1",
                 "orderhub.analytics.housekeeping.batch-size=1001",

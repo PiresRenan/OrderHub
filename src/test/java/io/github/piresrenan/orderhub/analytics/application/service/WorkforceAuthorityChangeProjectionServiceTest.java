@@ -42,6 +42,9 @@ class WorkforceAuthorityChangeProjectionServiceTest {
 
     @Test
     void ignoresAnAlreadyExpiredReplayBeforePersistingAnything() {
+        // Why: replay must not recreate a fact after its owner-defined expiry.
+        // Covers: inclusive expiry before any pseudonym resolution or fact write.
+        // Prevents: resurrection and unnecessary expired-event subject mappings.
         var tenantId = UUID.randomUUID();
         var eventId = UUID.randomUUID();
         var pseudonyms = new RecordingPseudonymRepository();

@@ -17,6 +17,11 @@ import io.github.piresrenan.orderhub.analytics.application.service.WorkforceAuth
 import io.github.piresrenan.orderhub.analytics.application.service.WorkforceAuthorityChangeProjectionService;
 import io.github.piresrenan.orderhub.workforce.application.port.in.ResolveWorkforceAuthorityChangeAnalyticsSourceUseCase;
 
+/**
+ * Why: opt-in configuration must govern ingestion and cleanup consistently.
+ * Covers: disabled, invalid, enabled and boolean-alias composition.
+ * Prevents: partial policy activation and unintended housekeeping beans.
+ */
 class AnalyticsHousekeepingWiringTest {
 
     private final ApplicationContextRunner contextRunner =
@@ -66,6 +71,41 @@ class AnalyticsHousekeepingWiringTest {
                     assertThat(context).hasSingleBean(
                             AnalyticsHousekeepingTrigger.class);
                 });
+    }
+
+    @Test
+    void booleanBindingAndHousekeepingWiringAgree() {
+        // Why: Spring accepts boolean aliases that must not enable replay
+        // suppression while leaving the matching purge operation unwired.
+        // Covers: enabled/disabled aliases and surrounding whitespace.
+        // Prevents: ingestion and housekeeping using different owner policies.
+        for (var enabled : new String[] {"true", "yes", "on", "1", " true "}) {
+            contextRunner.withPropertyValues(
+                            "orderhub.analytics.housekeeping.enabled=" + enabled,
+                            "orderhub.analytics.housekeeping.retention-window=90d")
+                    .run(context -> {
+                        assertThat(context).hasNotFailed();
+                        assertThat(context.getBean(AnalyticsHousekeepingProperties.class)
+                                .enabled()).isTrue();
+                        assertThat(context).hasSingleBean(
+                                WorkforceAuthorityChangeFactRetentionService.class);
+                        assertThat(context).hasSingleBean(
+                                AnalyticsHousekeepingTrigger.class);
+                    });
+        }
+        for (var disabled : new String[] {"false", "no", "off", "0", " false "}) {
+            contextRunner.withPropertyValues(
+                            "orderhub.analytics.housekeeping.enabled=" + disabled)
+                    .run(context -> {
+                        assertThat(context).hasNotFailed();
+                        assertThat(context.getBean(AnalyticsHousekeepingProperties.class)
+                                .enabled()).isFalse();
+                        assertThat(context).doesNotHaveBean(
+                                WorkforceAuthorityChangeFactRetentionService.class);
+                        assertThat(context).doesNotHaveBean(
+                                AnalyticsHousekeepingTrigger.class);
+                    });
+        }
     }
 
     @Configuration(proxyBeanMethods = false)

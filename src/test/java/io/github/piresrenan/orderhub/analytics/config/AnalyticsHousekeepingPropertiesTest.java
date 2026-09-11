@@ -8,6 +8,11 @@ import org.junit.jupiter.api.Test;
 
 import jakarta.validation.Validation;
 
+/**
+ * Why: housekeeping must be opt-in with positive timing and bounded work.
+ * Covers: disabled defaults and direct validation of unsafe values.
+ * Prevents: default deletion and invalid policy or batch configuration.
+ */
 class AnalyticsHousekeepingPropertiesTest {
 
     @Test

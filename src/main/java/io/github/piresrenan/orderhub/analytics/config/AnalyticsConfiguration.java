@@ -3,10 +3,13 @@ package io.github.piresrenan.orderhub.analytics.config;
 import java.time.Clock;
 import java.util.Map;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Condition;
+import org.springframework.context.annotation.ConditionContext;
+import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.type.AnnotatedTypeMetadata;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -51,11 +54,13 @@ import io.github.piresrenan.orderhub.workforce.application.port.in.ResolveWorkfo
 @EnableConfigurationProperties(AnalyticsHousekeepingProperties.class)
 public class AnalyticsConfiguration {
 
+    /** Supplies one UTC clock for ingestion eligibility and cleanup cutoff. */
     @Bean
     Clock analyticsClock() {
         return Clock.systemUTC();
     }
 
+    /** Composes the analytics-owned Tenant-local pseudonym persistence. */
     @Bean
     AnalyticalSubjectPseudonymRepository analyticalSubjectPseudonymRepository(
             JdbcTemplate jdbcTemplate) {
@@ -64,6 +69,7 @@ public class AnalyticsConfiguration {
                 jdbcTemplate);
     }
 
+    /** Composes idempotent persistence for the admitted workforce fact type. */
     @Bean
     WorkforceAuthorityChangeFactRepository
             workforceAuthorityChangeFactRepository(
@@ -73,6 +79,7 @@ public class AnalyticsConfiguration {
                 jdbcTemplate);
     }
 
+    /** Applies expiry before projection only when the same cleanup policy is on. */
     @Bean
     WorkforceAuthorityChangeProjectionService
             workforceAuthorityChangeProjectionService(
@@ -93,9 +100,9 @@ public class AnalyticsConfiguration {
                 retentionPolicies(properties), analyticsClock);
     }
 
+    /** Composes the owner retention operation only when its policy is enabled. */
     @Bean
-    @ConditionalOnProperty(prefix = "orderhub.analytics.housekeeping",
-            name = "enabled", havingValue = "true")
+    @Conditional(HousekeepingEnabled.class)
     WorkforceAuthorityChangeFactRetentionService retentionService(
             JdbcTemplate jdbcTemplate,
             AnalyticsHousekeepingProperties properties) {
@@ -105,9 +112,9 @@ public class AnalyticsConfiguration {
                         jdbcTemplate));
     }
 
+    /** Schedules one bounded operation using the same policy as ingestion. */
     @Bean
-    @ConditionalOnProperty(prefix = "orderhub.analytics.housekeeping",
-            name = "enabled", havingValue = "true")
+    @Conditional(HousekeepingEnabled.class)
     AnalyticsHousekeepingTrigger analyticsHousekeepingTrigger(
             WorkforceAuthorityChangeFactRetentionService retentionService,
             AnalyticsHousekeepingProperties properties,
@@ -117,6 +124,7 @@ public class AnalyticsConfiguration {
                 retentionService, properties, analyticsClock, meterRegistry);
     }
 
+    /** Builds the sole admitted dataset policy from validated operator input. */
     private static AnalyticalRetentionPolicyCatalog retentionPolicies(
             AnalyticsHousekeepingProperties properties) {
         return new AnalyticalRetentionPolicyCatalog(Map.of(
@@ -124,6 +132,21 @@ public class AnalyticsConfiguration {
                 new AnalyticalRetentionPolicy(properties.retentionWindow())));
     }
 
+    /** Uses Spring boolean conversion consistently with configuration binding. */
+    static final class HousekeepingEnabled implements Condition {
+
+        /** Keeps boolean aliases from enabling ingestion without cleanup. */
+        @Override
+        public boolean matches(
+                ConditionContext context,
+                AnnotatedTypeMetadata metadata) {
+            return context.getEnvironment().getProperty(
+                    "orderhub.analytics.housekeeping.enabled",
+                    Boolean.class, false);
+        }
+    }
+
+    /** Connects durable after-commit publications to the owner projection service. */
     @Bean
     WorkforceAuthorityChangeAuditRecordedListener
             workforceAuthorityChangeAuditRecordedListener(

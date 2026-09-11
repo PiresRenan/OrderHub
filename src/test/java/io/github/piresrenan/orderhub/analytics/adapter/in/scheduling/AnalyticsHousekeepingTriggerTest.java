@@ -22,9 +22,12 @@ class AnalyticsHousekeepingTriggerTest {
 
     @Test
     void executesOneBatchAndRecordsOnlyBoundedDimensions() {
+        // Why: a full batch must not turn a scheduled invocation into a drain loop.
+        // Covers: exactly one full batch and fixed dataset/outcome metric tags.
+        // Prevents: unbounded work per trigger and identifier cardinality leaks.
         var service = mock(WorkforceAuthorityChangeFactRetentionService.class);
         var now = Instant.parse("2026-09-08T12:00:00Z");
-        when(service.purgeExpired(now, 25)).thenReturn(7);
+        when(service.purgeExpired(now, 25)).thenReturn(25);
         var registry = new SimpleMeterRegistry();
         var trigger = new AnalyticsHousekeepingTrigger(
                 service,
@@ -41,7 +44,7 @@ class AnalyticsHousekeepingTriggerTest {
                 "outcome", "success").count()).isEqualTo(1);
         assertThat(registry.counter(AnalyticsHousekeepingTrigger.DELETED_METRIC,
                 "dataset", "workforce_authority_change_facts").count())
-                .isEqualTo(7);
+                .isEqualTo(25);
         assertThat(registry.getMeters()).allSatisfy(meter ->
                 assertThat(meter.getId().getTags()).allSatisfy(tag ->
                         assertThat(tag.getKey())
@@ -50,6 +53,9 @@ class AnalyticsHousekeepingTriggerTest {
 
     @Test
     void recordsFailureWithoutFalseSuccessAndRethrowsUnchanged() {
+        // Why: a failed deletion must remain visible as a failure.
+        // Covers: bounded failure metrics and unchanged exception propagation.
+        // Prevents: false success or hidden persistence failure.
         var service = mock(WorkforceAuthorityChangeFactRetentionService.class);
         var now = Instant.parse("2026-09-08T12:00:00Z");
         var failure = new IllegalStateException("synthetic test failure");

@@ -19,6 +19,7 @@ public record AnalyticsHousekeepingProperties(
         @Min(1) @Max(1000) int batchSize,
         @NotNull Duration fixedDelay) {
 
+    /** Requires an operator policy when enabled, while permitting an unset opt-out. */
     @AssertTrue(message = "retention-window must be positive when housekeeping is enabled")
     public boolean isRetentionWindowValid() {
         return !enabled || (retentionWindow != null
@@ -26,6 +27,7 @@ public record AnalyticsHousekeepingProperties(
                 && !retentionWindow.isNegative());
     }
 
+    /** Rejects absent or nonpositive timing before scheduler registration. */
     @AssertTrue(message = "fixed-delay must be positive")
     public boolean isFixedDelayValid() {
         return fixedDelay != null
