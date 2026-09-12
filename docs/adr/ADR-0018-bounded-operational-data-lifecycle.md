@@ -1,6 +1,6 @@
 # ADR-0018 — Bounded Operational Data Lifecycle
 
-Status: DESIGNED — POST-OH-019 QUALIFIED CANDIDATE
+Status: TESTED
 
 ## Context
 
@@ -58,8 +58,14 @@ current analytical projection; operational workforce audit remains authoritative
 Final integrated OH-019 Flyway history ends at V43, so V44 is the first free
 migration authority for this analytical retention index. Post-OH-019 replay,
 migration reconciliation and the canonical local full-suite qualification are
-green. This ADR remains DESIGNED until exact-HEAD CI/review and governed
-integration complete the remaining acceptance gates.
+green. Final review corrected Boolean-alias activation so ingestion and cleanup
+use the same effective policy. The fresh full suite passed 1519 tests with zero
+failures, errors or skips; exact-candidate CI, Platform CI and Branch Policy
+passed and material review findings were resolved. PR #45 was squash-integrated
+as `d722487320354a7fdc3742b1446eba498f4a7a7f`, with the expected OH-019 parent
+and a tree identical to the reviewed candidate. The
+[execution evidence](../oh020-execution-evidence.md) records qualification,
+review dispositions and integration proofs.
 
 ## Alternatives
 

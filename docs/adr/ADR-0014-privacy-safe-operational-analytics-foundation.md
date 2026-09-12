@@ -487,10 +487,10 @@ publication left `FAILED` by a projection failure is republished on the next
 startup. No custom scheduler, recovery table, retry queue, administrative
 endpoint or outbox exists.
 
-**Binding precondition on enabling retention (resolved provisionally by
+**Binding precondition on enabling retention (resolved by
 ADR-0018).**
 
-Analytical retention is deliberately not wired in this slice: no policy catalog,
+Analytical retention was deliberately not wired in the OH-016 slice: no policy catalog,
 retention service or purge schedule is instantiated, because the effective
 window is a legal and business decision this ADR does not fix.
 
@@ -517,9 +517,11 @@ available remedy carries a decision this slice must not make implicitly:
 ADR-0018 chooses the first remedy without inventing a retention duration:
 retention remains opt-in and requires the duration from deployment policy; once
 enabled, ingestion applies that same owner policy and acknowledges an
-already-expired replay without recreating the fact. The post-OH-019 integration
-must requalify this provisional resolution before this section is considered
-finally accepted.
+already-expired replay without recreating the fact. OH-020 PR #45 is now
+integrated on the final OH-019 baseline, with PostgreSQL, replay, configuration,
+Modulith and exact-candidate CI/review qualification. ADR-0018 is TESTED; the
+[OH-020 execution evidence](../oh020-execution-evidence.md) records the accepted
+resolution and verified integration.
 
 **Review history.**
 
