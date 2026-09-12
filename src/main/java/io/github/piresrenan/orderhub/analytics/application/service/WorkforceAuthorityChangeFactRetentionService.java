@@ -106,4 +106,20 @@ public final class WorkforceAuthorityChangeFactRetentionService {
                 tenantId,
                 cutoff);
     }
+
+    /** Removes one globally bounded batch using the owner-defined policy. */
+    public int purgeExpired(
+            Instant referenceTime,
+            int batchSize) {
+
+        if (referenceTime == null) {
+            throw new IllegalArgumentException("Reference time is required");
+        }
+
+        var cutoff = referenceTime.minus(
+                retentionPolicyCatalog.policyFor(RETAINED_FACT_TYPE)
+                        .retentionWindow());
+
+        return retentionRepository.deleteExpired(cutoff, batchSize);
+    }
 }

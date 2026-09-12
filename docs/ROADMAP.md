@@ -440,10 +440,10 @@ Inventory changes are represented as auditable movements/adjustments rather than
 untraceable `set quantity` operations. Warehouse/location administration remains
 future scope until that domain exists.
 
-## Operational data lifecycle and housekeeping - planned
+## Operational data lifecycle and housekeeping — qualified candidate
 
-Status: PLANNED / DISCOVERY REQUIRED - explicitly outside OH-017 implementation
-scope.
+Status: IMPLEMENTATION QUALIFIED — post-OH-019 clean verification is green;
+exact-HEAD CI/review and governed integration remain pending.
 
 OrderHub should eventually provide a bounded, owner-driven operational data
 lifecycle capability to prevent unbounded growth of ephemeral and derived state
@@ -489,6 +489,15 @@ memory telemetry. It is not implemented as part of this roadmap item.
 No housekeeping scheduler, retention deletion, archive mechanism or new
 infrastructure is introduced by OH-017. This entry records future engineering
 intent only.
+
+OH-020 discovery on the provisional OH-019 checkpoint admitted only
+analytics-owned workforce authority-change facts. Retention is opt-in, bounded
+and index-supported; already-expired replay is ignored so deleted facts cannot
+be resurrected. Completed event publications already use immediate deletion.
+Orders idempotency, subject mappings, authoritative state and audit evidence
+remain excluded. ADR-0018 records the candidate design. Final OH-019 Flyway
+history now ends at V43, so the analytical retention index is reconciled to V44
+and must be fully requalified on this final post-OH-019 baseline.
 
 ## Identity provisioning and account lifecycle — OH-019 COMPLETE
 
