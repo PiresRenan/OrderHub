@@ -176,20 +176,48 @@ Disposition of non-material observations:
 The only purge dataset remains `analytics.workforce_authority_change_facts`.
 V36-V43 are untouched and V44 remains unique. OH-021/OH-022 are outside scope.
 
-## Remaining governance gates
+## Governed integration and final promotion
 
-This evidence establishes the locally qualified post-OH-019 implementation
-candidate. It does not by itself mark OH-020 COMPLETE.
+PR [#45](https://github.com/PiresRenan/OrderHub/pull/45) was squash-merged into
+`pre-release` at **2026-09-12T00:19:43Z** (2026-09-11 in America/Sao_Paulo).
 
-Remaining gates:
+| Authority | Verified value |
+| --- | --- |
+| Reviewed PR HEAD | `fb8f10336209df2bfe68c72eb5e9f552aa3e88af` |
+| Reviewed candidate tree | `2da06ea451601b836561cf416ca481efe07abe54` |
+| Integrated commit | `d722487320354a7fdc3742b1446eba498f4a7a7f` |
+| Integrated parent | `ebb20582542558c06d66c32e9c5a1fc3203c0cb3` |
+| Integrated tree | `2da06ea451601b836561cf416ca481efe07abe54` |
+| Implementation source subtree | `be89f553df23c2cab69be7168b50e7f8f398271a` |
+| V44 blob | `89ec410dfe05f2d22e346534f08b49fd59de045b` |
 
-- pull request targeting pre-release;
-- exact-HEAD repository CI / platform validation;
-- final review and resolution of material findings;
-- governed squash integration;
-- integrated parent/tree verification;
-- ADR-0018 promotion to TESTED;
-- ROADMAP promotion to COMPLETE;
-- issue #39 closure.
+The final candidate added only this ledger after qualified implementation
+`f4bfc7f`. Codex reviewed that documentation-only delta at the exact PR HEAD.
+The [recorded final review](https://github.com/PiresRenan/OrderHub/pull/45#pullrequestreview-5184383511)
+has no unresolved BLOCKER/MAJOR. PR discussions had no unresolved thread or
+changes-requested review. The merge used an exact-head match, a clean worktree,
+the unchanged OH-019 base, and the repository's required protected-branch gates:
 
-No additional product scope is admitted by these remaining gates.
+| Exact-candidate check | Result |
+| --- | --- |
+| [CI #92](https://github.com/PiresRenan/OrderHub/actions/runs/34660840871) | SUCCESS; 1519 tests, 0 failures/errors/skips; BUILD SUCCESS |
+| [Platform CI #81](https://github.com/PiresRenan/OrderHub/actions/runs/34660840865) | SUCCESS; image, Compose and Kubernetes development/scale validation |
+| [Branch Policy](https://github.com/PiresRenan/OrderHub/actions/runs/34660885591) | SUCCESS; permitted source/base and Conventional Commit title |
+
+After fetch, `git diff --exit-code fb8f103 origin/pre-release` was empty and
+`origin/pre-release^` equaled the expected OH-019 base. Thus squash integration
+preserved the complete reviewed tree, not merely selected files. Only V44 was
+added to the accepted migration chain; all 42 migration versions are unique,
+with no changes to V36-V43 or earlier accepted migrations.
+
+This post-integration documentation promotion sets ADR-0018 to **TESTED**,
+ROADMAP OH-020 to **COMPLETE**, and ADR-0014's retention precondition to its
+finally accepted resolution. No executable file, migration or policy changes
+in this promotion. The protected-branch documentation PR is independently
+checked and merged before Issue [#39](https://github.com/PiresRenan/OrderHub/issues/39)
+is closed; its closing comment records that final governance integration.
+
+The acceptance remains limited to analytics workforce authority-change facts.
+OH-021's branch remains `f1f7891eafd47cc4d35a44a58973ae67342fd4db`, and neither
+OH-021 worktree was modified. OH-021/OH-022, additional datasets, business truth,
+audit/recovery authority, infrastructure and APIs are outside this completion.

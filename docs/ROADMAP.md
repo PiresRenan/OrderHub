@@ -440,64 +440,42 @@ Inventory changes are represented as auditable movements/adjustments rather than
 untraceable `set quantity` operations. Warehouse/location administration remains
 future scope until that domain exists.
 
-## Operational data lifecycle and housekeeping — qualified candidate
+## Operational data lifecycle and housekeeping — OH-020 COMPLETE
 
-Status: IMPLEMENTATION QUALIFIED — post-OH-019 clean verification is green;
-exact-HEAD CI/review and governed integration remain pending.
+Status: COMPLETE — implementation and review qualified, required checks green,
+and governed squash integration into `pre-release` verified.
 
-OrderHub should eventually provide a bounded, owner-driven operational data
-lifecycle capability to prevent unbounded growth of ephemeral and derived state
-without weakening replay, audit, authorization or domain correctness.
+OH-020 admits only `analytics.workforce_authority_change_facts` to owner-defined
+retention. Cleanup is opt-in and requires a positive deployment-supplied window;
+the same policy suppresses already-expired replay before subject mapping or fact
+persistence. Boolean configuration aliases activate ingestion and cleanup
+consistently.
 
-This direction is intentionally broader and more precise than a generic
-"garbage collector". The owning module decides whether a record is purgeable,
-archivable or still authoritative; a future housekeeping capability may
-orchestrate execution but must not invent retention semantics for foreign data.
+Each fixed-delay invocation executes one batch of 1..1000 rows. PostgreSQL
+selects the oldest available eligible rows with deterministic Tenant/event tie
+breaks, an inclusive cutoff and `FOR UPDATE SKIP LOCKED`. One atomic statement
+preserves rollback/retry correctness. V44 adds the matching retention index.
+Metrics use only a fixed dataset and bounded outcomes.
 
-Initial candidate classes include only datasets with a proven lifecycle need,
-such as:
+PR [#45](https://github.com/PiresRenan/OrderHub/pull/45) was integrated as
+`d722487320354a7fdc3742b1446eba498f4a7a7f`, directly after governed OH-019
+`ebb20582542558c06d66c32e9c5a1fc3203c0cb3`. The integrated tree is identical to
+the reviewed candidate. Fresh Maven Wrapper verification passed **1519 tests,
+zero failures, errors or skips**; CI, Platform CI and Branch Policy passed and
+no BLOCKER/MAJOR review finding remains open.
 
-- completed Spring Modulith event-publication records;
-- durable idempotency records after an explicitly defined contractual retention
-  window;
-- analytical facts/projections after retention and replay semantics explicitly
-  prevent deleted data from being resurrected;
-- other ephemeral or derived operational records admitted by an owner-defined
-  retention policy.
+[ADR-0018](adr/ADR-0018-bounded-operational-data-lifecycle.md) is TESTED. The
+[execution evidence](oh020-execution-evidence.md) records scope, RED/GREEN,
+PostgreSQL concurrency/rollback, replay, configuration, Modulith, review and
+integration proofs for Issue [#39](https://github.com/PiresRenan/OrderHub/issues/39).
 
-Required engineering principles for any future implementation include:
-
-- retention/purge eligibility owned by the module that owns the data;
-- bounded batch size and bounded execution time;
-- index-supported selection rather than unbounded table scans/deletes;
-- idempotent and retry-safe execution;
-- multi-instance correctness without relying on JVM-local locking;
-- transactional chunk boundaries appropriate to each dataset;
-- observability for duration, outcome, purged/archive counts and last successful
-  execution without high-cardinality identifiers;
-- explicit interaction with replay/recovery semantics;
-- no deletion of authoritative business state or privileged audit evidence based
-  on age alone;
-- no replacement of PostgreSQL autovacuum/ANALYZE responsibilities;
-- no new broker, distributed scheduler or storage technology without measured
-  need.
-
-JVM garbage-collector selection/tuning is a separate runtime-performance concern
-and remains evidence-driven through heap, allocation, pause, CPU and container
-memory telemetry. It is not implemented as part of this roadmap item.
-
-No housekeeping scheduler, retention deletion, archive mechanism or new
-infrastructure is introduced by OH-017. This entry records future engineering
-intent only.
-
-OH-020 discovery on the provisional OH-019 checkpoint admitted only
-analytics-owned workforce authority-change facts. Retention is opt-in, bounded
-and index-supported; already-expired replay is ignored so deleted facts cannot
-be resurrected. Completed event publications already use immediate deletion.
-Orders idempotency, subject mappings, authoritative state and audit evidence
-remain excluded. ADR-0018 records the candidate design. Final OH-019 Flyway
-history now ends at V43, so the analytical retention index is reconciled to V44
-and must be fully requalified on this final post-OH-019 baseline.
+Completed Modulith publications already use DELETE completion mode;
+incomplete/failed publications retain recovery authority. Authoritative state,
+workforce audit, privileged evidence, Orders/Inventory idempotency, analytical
+subject mappings and Flyway history remain excluded. No generic cleanup
+framework, new infrastructure, archive tier or HTTP deletion surface is added.
+PostgreSQL autovacuum/ANALYZE and JVM GC tuning remain separate operational
+concerns. OH-021 and OH-022 remain outside this completed scope.
 
 ## Identity provisioning and account lifecycle — OH-019 COMPLETE
 
@@ -519,7 +497,7 @@ is TESTED; the [execution evidence](oh019-execution-evidence.md) and
 Implementation completion does not authorize release: required GitHub CI,
 general/security review and human approval remain separate gates, and issue
 #38 remains open until merge. Delivery infrastructure, generic registration,
-orphan-account recovery and OH-020/OH-021/OH-022 remain deferred.
+orphan-account recovery and OH-021/OH-022 remain deferred.
 
 ## API documentation / OpenAPI — planned with administration/API maturity
 
