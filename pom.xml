@@ -49,6 +49,8 @@
              through spring-modulith-core so the architecture test does
              not silently depend on a transitive runtime artifact. -->
         <archunit.version>1.4.2</archunit.version>
+        <!-- Boot 4.1 compatible, including the 3.1.1 Swagger/UI security fixes. -->
+        <springdoc.version>3.1.1</springdoc.version>
     </properties>
 
     <!-- ==================================================================
@@ -88,6 +90,11 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>${springdoc.version}</version>
         </dependency>
 
         <!--

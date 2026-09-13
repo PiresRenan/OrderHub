@@ -19,10 +19,18 @@ import io.github.piresrenan.orderhub.orders.application.port.in.CreateCustomerOr
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
 import io.github.piresrenan.orderhub.orders.application.port.in.ViewCustomerOrderUseCase;
 import io.github.piresrenan.orderhub.security.application.model.TrustedActorContext;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/orders")
+@Tag(name = "Orders", description = "Customer self-service Order creation and read operations.")
 public final class OrderController {
 
     private final CreateCustomerOrderUseCase createCustomerOrderUseCase;
@@ -71,12 +79,61 @@ public final class OrderController {
      * @param request validated HTTP payload whose customerId is only a selector
      * @return created Order and its independent Inventory allocation outcome
      */
+    @Operation(
+            operationId = "ordersCreate",
+            summary = "Create a Customer order",
+            description = "Creates an Order on behalf of the authenticated Customer actor, who must hold "
+                    + "CUSTOMER_ORDERS_CREATE and own the referenced customerId. A successful new execution "
+                    + "and a durable replay of an already completed request with the same Idempotency-Key and "
+                    + "canonical content both return 201 with the same representation. Reusing the same "
+                    + "Idempotency-Key with different canonical request content returns 422. A concurrent "
+                    + "request still acquiring the same Idempotency-Key returns 409. A request exceeding the "
+                    + "technical item-count limit returns 413. A missing or syntactically invalid "
+                    + "Idempotency-Key returns 400.",
+            parameters = {
+                    @Parameter(
+                            name = "X-Tenant-Id",
+                            in = ParameterIn.HEADER,
+                            required = true,
+                            description = "Active Tenant selector, validated against the authenticated internal "
+                                    + "identity, active membership and Tenant state.",
+                            schema = @Schema(type = "string", format = "uuid")),
+                    @Parameter(
+                            name = OrderIdempotencyKeyHeader.NAME,
+                            in = ParameterIn.HEADER,
+                            required = true,
+                            description = "Opaque idempotency identity for this create-Order request. 1 to 128 "
+                                    + "visible ASCII characters (0x21-0x7E) excluding comma; whitespace is forbidden. Reusing this "
+                                    + "key with different canonical request content is rejected.",
+                            schema = @Schema(type = "string", minLength = 1, maxLength = OrderIdempotencyKeyHeader.MAX_LENGTH))
+            })
+    @ApiResponse(
+            responseCode = "201",
+            description = "Order created, or durably replayed from a prior completed execution with the same "
+                    + "Idempotency-Key and canonical content.",
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = OrderResponse.class)))
+    @ApiResponse(
+            responseCode = "400",
+            description = "The Idempotency-Key header is missing or syntactically invalid.",
+            content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = org.springframework.http.ProblemDetail.class)))
+    @ApiResponse(
+            responseCode = "409",
+            description = "The idempotency identity is still acquired by another request, or Catalog eligibility or Inventory commitment rejects this Order.",
+            content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = org.springframework.http.ProblemDetail.class)))
+    @ApiResponse(
+            responseCode = "413",
+            description = "The request exceeds the technical maximum number of items accepted by this endpoint.",
+            content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = org.springframework.http.ProblemDetail.class)))
+    @ApiResponse(
+            responseCode = "422",
+            description = "The Idempotency-Key was already used for a request with different canonical content.",
+            content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = org.springframework.http.ProblemDetail.class)))
     @PostMapping(
             consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<OrderResponse> create(
-            TrustedActorContext actorContext,
-            @RequestHeader HttpHeaders headers,
+            @Parameter(hidden = true) TrustedActorContext actorContext,
+            @Parameter(hidden = true) @RequestHeader HttpHeaders headers,
             @Valid @RequestBody CreateOrderRequest request) {
 
         var idempotencyKeyDigest =
@@ -123,12 +180,33 @@ public final class OrderController {
      * @param orderId requested Order identifier
      * @return authorized persisted Order representation
      */
+    @Operation(
+            operationId = "ordersView",
+            summary = "View a Customer's own order",
+            description = "Returns one Order owned by the authenticated Customer actor, who must hold "
+                    + "CUSTOMER_ORDERS_VIEW and own the referenced Order. An absent Order and an Order the "
+                    + "actor does not own are reported identically as not found to avoid revealing existence "
+                    + "or ownership to an unauthorized caller.",
+            parameters = {
+                    @Parameter(
+                            name = "X-Tenant-Id",
+                            in = ParameterIn.HEADER,
+                            required = true,
+                            description = "Active Tenant selector, validated against the authenticated internal "
+                                    + "identity, active membership and Tenant state.",
+                            schema = @Schema(type = "string", format = "uuid"))
+            })
+    @ApiResponse(
+            responseCode = "200",
+            description = "Authorized persisted Order representation.",
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = OrderViewResponse.class)))
+    @ApiResponse(responseCode = "404", description = "The Order is absent or is unavailable to the current Customer", content = @Content(mediaType = "application/problem+json", schema = @Schema(implementation = org.springframework.http.ProblemDetail.class)))
     @GetMapping(
             value = "/{orderId}",
             produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<OrderViewResponse> view(
-            TrustedActorContext actorContext,
-            @PathVariable UUID orderId) {
+            @Parameter(hidden = true) TrustedActorContext actorContext,
+            @Parameter(description = "Requested Order identifier.") @PathVariable UUID orderId) {
 
         var order =
                 viewCustomerOrderUseCase.view(

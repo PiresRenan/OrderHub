@@ -55,3 +55,12 @@ jobs:
         run: |
           chmod +x mvnw
           ./mvnw --batch-mode --no-transfer-progress clean verify
+
+      - name: Preserve generated API qualification contract
+        # Pinned to actions/upload-artifact v7.0.1 (Node 24).
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: openapi-contract-${{ github.sha }}
+          path: target/contracts/openapi.json
+          if-no-files-found: error
+          retention-days: 14

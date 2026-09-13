@@ -1,7 +1,7 @@
 # OH-021 execution evidence
 
-Status: DISCOVERY / DESIGNED. No implementation or integration qualification is
-claimed by this initial record.
+Status: IMPLEMENTED / QUALIFICATION IN PROGRESS. Integration qualification is
+not yet claimed.
 
 ## Authority rediscovery — 2026-09-12
 
@@ -66,8 +66,61 @@ these to 60 and HTTP 422. Agent output is evidence to review, never authority.
 
 ## Qualification ledger
 
-Pending: behavioral RED/GREEN, OpenAPI/HTTP drift checks, local authentication
-and seed smoke, B44 equivalence/upgrade, operations/config documentation checks,
-adversarial review, final clean verify, exact-HEAD CI, squash integration and
-post-merge governance. This section will be replaced by concrete results and
-links as those gates complete.
+The refinement checkpoint is `bb4c9dc223abc20699c43b1648e876175f50460b`.
+The task branch is published with upstream tracking and no history rewrite.
+
+Behavioral REDs exposed missing runtime documentation, absent local launcher,
+bare authentication/denial bodies and inert JSON environment aliases. The first
+generated contract also exposed incorrect integer/string types and overlapping
+issued/replay unions. Corrections preserve business authorization and wire
+payloads while describing them accurately; fixed 401/403 bodies disclose no
+internal cause or private selector.
+
+On 2026-09-13, this command passed **17 tests, zero failures/errors/skips**:
+
+```powershell
+.\mvnw.cmd -B '-Dtest=OpenApiContractTest,ProductionHttpPostureTest,ParserEnvironmentBindingTest,DocumentationDriftTest,FlywayBaselineMigrationTest' test
+```
+
+The six migration proofs cover fresh B44, physical schema and canonical data
+equivalence, historical upgrade preservation, future V45 convergence, immutable
+accepted checksums and pooled-session settings. Review found and corrected two
+material generator defects: session-scoped dump settings leaked to reused pool
+connections, and line-oriented native output corrupted embedded carriage returns
+inside nine SQL whitespace constraints. Transaction-local directives and byte
+copy/LF-only processing fix these without weakening direct catalog comparisons.
+B44 regenerated identically with SHA-256
+`ad1b03dbbfd4b1d9ec3a04be4961dfa6a54aaf75bb36b19fd9d93b441f5c07a6`
+after representing the nine trim literals with equivalent explicit Unicode
+escapes. This avoids hidden controls/trailing whitespace without changing SQL
+meaning; all six migration proofs passed again on that final representation.
+All 42 accepted versioned scripts remain unchanged.
+
+Independent JSON Schema 2020-12 validation of the regenerated contract accepts
+numeric prices and both legitimate proof outcomes; rejects fractional/negative/
+overflow prices, unknown request fields, empty or partial proof outcomes; and
+verifies every generated int32/int64 property is integer. The contract's 60
+operations exactly match MVC handlers. A real-JWT local development acceptance
+test previously passed its full stock, Customer Order/replay and persona-denial
+flow; it is included again in full verification with runtime dual Flyway locations.
+
+The first full Wrapper `clean verify` passed **1537 tests, zero failures/errors/
+skips**, including Modulith, in 10:56 on 2026-09-13. Subsequent baseline escaping
+and contract assertions passed 12 focused tests. Sonnet's bounded read-only
+security/seed review reported no material findings, but independent follow-up
+found an alternate Hikari JDBC property could redirect startup connectivity.
+A new RED reproduced that failure with a deliberately unreachable local URL.
+The development configuration now constructs its pool from the owned container;
+the separate Flyway connection and pre-seed URL check remain pinned.
+
+The production image built successfully. An isolated Compose project using
+`.env.example` reached minimal readiness UP, UID 10001:10001, read-only root and
+all capabilities dropped. Its database recorded `44 | SQL_BASELINE | true`.
+Packaged-JAR inspection confirmed B44 and absence of development/test identity
+classes. The owned Compose project and its disposable storage were removed.
+
+Pending: final clean verify including the added ownership regression, documented
+launcher smoke, exact-HEAD GitHub CI and Codex review, squash integration,
+post-merge governance and cleanup. Detailed local raw logs are retained outside
+the repository under `C:/Dev/oh021-evidence`; CI and PR links will provide the
+portable final record.

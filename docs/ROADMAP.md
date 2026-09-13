@@ -494,24 +494,26 @@ zero failures, errors or skips on 2026-09-11.
 [ADR-0017](adr/ADR-0017-tenant-identity-provisioning-and-account-lifecycle.md)
 is TESTED; the [execution evidence](oh019-execution-evidence.md) and
 [HTTP contract](oh019-http-contract.md) record the implemented boundaries.
-Implementation completion does not authorize release: required GitHub CI,
-general/security review and human approval remain separate gates, and issue
-#38 remains open until merge. Delivery infrastructure, generic registration,
+Issue #38 is closed after governed integration. Implementation completion does
+not authorize release. Delivery infrastructure, generic registration,
 orphan-account recovery and OH-021/OH-022 remain deferred.
 
-## API documentation / OpenAPI — planned with administration/API maturity
+## API contract and production readiness — OH-021 IN PROGRESS
 
-OpenAPI support may exist in code promoted to `main`; exposure is controlled by
-runtime environment, not by keeping code out of the main branch.
+OH-021 implements the generated contract for 60 existing operations, a disposable
+authenticated local runtime, a history-preserving fresh-install baseline and
+engineering/operations guides. Qualification and governed integration remain
+pending in the [execution evidence](oh021-execution-evidence.md).
 
-Intended runtime posture:
+Implemented runtime posture:
 
 - local/development: OpenAPI document and Swagger UI enabled;
 - pre-release/staging: enabled only when required and protected by authentication;
 - production: interactive Swagger UI disabled and runtime API-document endpoint
   disabled unless an explicit operational/product requirement later changes the
   decision;
-- CI: generated OpenAPI contract may be validated/published as an artifact.
+- CI: generated OpenAPI contract is checked against real handlers and published
+  as a qualification artifact.
 
 Production bearer tokens must not be persisted by browser documentation tooling.
 
@@ -534,14 +536,14 @@ Direction:
 OH-013 establishes authorization primitives; later slices expand the privileged
 operational workflows without bypassing those primitives.
 
-## Transactional outbox — planned
+## Durable internal publication — implemented; external delivery deferred
 
-Introduce durable event publication only when there is a concrete asynchronous
-consumer. Database state and event publication must not become a dual write.
-
-The implementation decision will compare a manual transactional outbox with
-Spring Modulith event publication facilities using actual OrderHub requirements
-and failure tests.
+The existing Workforce authority-change notification uses Spring Modulith's
+transactional publication registry with an idempotent Analytics consumer and
+restart recovery. Owner evidence and publication commit atomically; delivery is
+at least once. This is one internal projection boundary, not an external event
+stream or generic delivery service. See the [architecture guide](architecture/overview.md)
+and [operations runbook](operations/README.md).
 
 A message broker is not introduced merely because events exist.
 
