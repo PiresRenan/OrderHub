@@ -316,7 +316,7 @@ public final class CatalogAdministrationController {
             @Schema(description = "Required nonblank name; surrounding Unicode whitespace is normalized", requiredMode = Schema.RequiredMode.REQUIRED, maxLength = 160) @NotNull String name,
             @Schema(description = "Preserved URL-oriented identifier; no normalization", requiredMode = Schema.RequiredMode.REQUIRED, minLength = 2, maxLength = 256, pattern = "^(?:[A-Za-z0-9_-]+)$") @NotNull String slug,
             @Schema(description = "Optional description, at most 4000 Unicode code points", requiredMode = Schema.RequiredMode.NOT_REQUIRED, maxLength = 4000, nullable = true) String description,
-            @Schema(description = "Optional nonblank brand; surrounding Unicode whitespace is normalized", maxLength = 120, nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED) String brand) {
+            @Schema(description = "Optional nonblank brand; surrounding Unicode whitespace is normalized", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED) String brand) {
         /** Projects authoring fields without lifecycle or ownership authority. */
         CatalogProductMetadata metadata() { return new CatalogProductMetadata(name,slug,description,brand); }
     }
@@ -326,7 +326,7 @@ public final class CatalogAdministrationController {
             @Schema(description = "Required nonblank name; surrounding Unicode whitespace is normalized", requiredMode = Schema.RequiredMode.REQUIRED, maxLength = 160) @NotNull String name,
             @Schema(description = "Preserved URL-oriented identifier; no normalization", requiredMode = Schema.RequiredMode.REQUIRED, minLength = 2, maxLength = 256, pattern = "^(?:[A-Za-z0-9_-]+)$") @NotNull String slug,
             @Schema(description = "Optional description, at most 4000 Unicode code points", requiredMode = Schema.RequiredMode.NOT_REQUIRED, maxLength = 4000, nullable = true) String description,
-            @Schema(description = "Optional nonblank brand; surrounding Unicode whitespace is normalized", maxLength = 120, nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED) String brand) {
+            @Schema(description = "Optional nonblank brand; surrounding Unicode whitespace is normalized", nullable = true, requiredMode = Schema.RequiredMode.NOT_REQUIRED) String brand) {
         /** Projects authoring fields without lifecycle or ownership authority. */
         CatalogProductMetadata metadata() { return new CatalogProductMetadata(name,slug,description,brand); }
     }
@@ -341,7 +341,7 @@ public final class CatalogAdministrationController {
     record VariantCreate(
             @Schema(description = "Immutable client-selected resource UUID", requiredMode = Schema.RequiredMode.REQUIRED, type = "string", format = "uuid") @NotNull UUID id,
             @Schema(description = "Merchant SKU, at most 64 Unicode code points; no surrounding whitespace or control characters", requiredMode = Schema.RequiredMode.REQUIRED, minLength = 1, maxLength = 64) @NotNull @Size(max=160) String sku,
-            @Schema(description = "Optional nonblank display name; surrounding Unicode whitespace is normalized", requiredMode = Schema.RequiredMode.NOT_REQUIRED, maxLength = 160, nullable = true) String displayName,
+            @Schema(description = "Optional nonblank display name; surrounding Unicode whitespace is normalized", requiredMode = Schema.RequiredMode.NOT_REQUIRED, nullable = true) String displayName,
             @Schema(description = "Optional numeric GTIN of 8, 12, 13 or 14 digits with a valid GS1 check digit", requiredMode = Schema.RequiredMode.NOT_REQUIRED, pattern = "^(?:([0-9]{8}|[0-9]{12}|[0-9]{13}|[0-9]{14}))$", nullable = true) String gtin,
             @Schema(description = "Optional nonblank manufacturer part number; no surrounding whitespace or controls", requiredMode = Schema.RequiredMode.NOT_REQUIRED, maxLength = 70, nullable = true) String mpn,
             @ArraySchema(maxItems = 50, arraySchema = @Schema(description = "Distinct attribute keys: [A-Za-z][A-Za-z0-9._-]* up to 64 code points. Values are nonblank up to 256 code points, with no surrounding whitespace or controls.")) @NotNull @Size(max=50) List<@NotNull ProductVariantAttribute> attributes) {
@@ -352,7 +352,7 @@ public final class CatalogAdministrationController {
     record VariantUpdate(
             @Schema(description = "Previously observed positive revision", requiredMode = Schema.RequiredMode.REQUIRED, type = "integer", types = {"integer"}, format = "int64", minimum = "1", maximum = "9223372036854775806") @NotNull BigDecimal expectedRevision,
             @Schema(description = "Merchant SKU, at most 64 Unicode code points; no surrounding whitespace or control characters", requiredMode = Schema.RequiredMode.REQUIRED, minLength = 1, maxLength = 64) @NotNull @Size(max=160) String sku,
-            @Schema(description = "Optional nonblank display name; surrounding Unicode whitespace is normalized", requiredMode = Schema.RequiredMode.NOT_REQUIRED, maxLength = 160, nullable = true) String displayName,
+            @Schema(description = "Optional nonblank display name; surrounding Unicode whitespace is normalized", requiredMode = Schema.RequiredMode.NOT_REQUIRED, nullable = true) String displayName,
             @Schema(description = "Optional numeric GTIN of 8, 12, 13 or 14 digits with a valid GS1 check digit", requiredMode = Schema.RequiredMode.NOT_REQUIRED, pattern = "^(?:([0-9]{8}|[0-9]{12}|[0-9]{13}|[0-9]{14}))$", nullable = true) String gtin,
             @Schema(description = "Optional nonblank manufacturer part number; no surrounding whitespace or controls", requiredMode = Schema.RequiredMode.NOT_REQUIRED, maxLength = 70, nullable = true) String mpn,
             @ArraySchema(maxItems = 50, arraySchema = @Schema(description = "Distinct attribute keys: [A-Za-z][A-Za-z0-9._-]* up to 64 code points. Values are nonblank up to 256 code points, with no surrounding whitespace or controls.")) @NotNull @Size(max=50) List<@NotNull ProductVariantAttribute> attributes) {

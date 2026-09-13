@@ -43,6 +43,13 @@ executable proof; a passing route-count test does not prove every schema is
 correct. Generated OpenAPI is exported to `target/contracts/openapi.json`.
 Migration proof artifacts are under `target/migration-proof` when generated.
 
+After generation, `node scripts/verify-openapi-text.mjs` checks normalized text
+constraints in ECMAScript with and without the Unicode flag. It prevents a
+Java-only regex test from accepting patterns that reject supplementary Unicode
+characters in JavaScript clients. This optional local check requires Node.js;
+CI runs it using the hosted runner's Node runtime. Maven itself still requires
+only Java and Docker.
+
 ## CI and review
 
 The protected `pre-release` ruleset requires `ci-build`, `branch-policy` and

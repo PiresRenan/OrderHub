@@ -143,6 +143,25 @@ tests passed; independent JSON Schema validation rejects 121 while accepting
 120 astral characters with padding. A new generated-contract regression compares
 the schema pattern with the real validator, including nonbreaking spaces.
 
+The [second Codex review](https://github.com/PiresRenan/OrderHub/pull/47#pullrequestreview-5192356369)
+identified two further P2 issues: an ECMAScript consumer without the Unicode
+flag counted surrogate halves, and raw brand/display-name caps contradicted
+owner normalization. Both were reproduced. Generated patterns now use explicit
+code-point atoms that work in Java, Python and ECMAScript with/without Unicode
+mode. Product/Category name caps remain raw 160-code-point limits because their
+application boundary imposes that limit before normalization; brand/display-name
+caps apply after stripping, and their control-character rejection is preserved.
+SKU, MPN and attribute values likewise expose their existing nonblank, unpadded,
+control-free constraints. Explicit end-of-input assertions prevent regex engines
+from accepting a final newline in otherwise bounded identifiers.
+
+Sixteen focused Java tests and **296 ECMAScript string cases** passed. The latter
+run as `node scripts/verify-openapi-text.mjs` after Maven in CI; no application
+Node dependency is introduced. Python JSON Schema checks also confirm normalized
+brand/Unicode acceptance and final-newline rejection. The local full run for
+the superseded candidate was interrupted when the second review required these
+changes; its partial execution is not claimed as final qualification.
+
 Pending: final local clean verify, exact-HEAD GitHub CI and repeat Codex review, squash integration,
 post-merge governance and cleanup. Detailed local raw logs are retained outside
 the repository under `C:/Dev/oh021-evidence`; CI and PR links will provide the

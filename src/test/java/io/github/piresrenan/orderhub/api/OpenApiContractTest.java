@@ -128,6 +128,38 @@ class OpenApiContractTest {
     }
 
     @Test
+    void catalogNormalizedTextMatchesOwnerValidation() throws Exception {
+        var schemas = document().path("components").path("schemas");
+        var id = java.util.UUID.fromString("02100000-0000-4000-8000-000000000001");
+        var samples = java.util.Arrays.asList(null, "", " ", "a", "\u00A0a\u00A0", "\ta", "a\u0085",
+                " " + "😀".repeat(120) + " ", "😀".repeat(121), " " + "😀".repeat(160) + " ", "😀".repeat(161));
+        for (var value : samples) {
+            for (var name : List.of("CatalogProductCreate", "CatalogProductUpdate")) {
+                assertTextParity(schemas.path(name).path("properties").path("brand"), value,
+                        () -> io.github.piresrenan.orderhub.catalog.domain.model.Product.create(id, id, "Name", "slug", null, value, List.of()));
+                assertTextParity(schemas.path(name).path("properties").path("name"), value, () -> {
+                    new io.github.piresrenan.orderhub.catalog.application.port.in.administration.CatalogProductMetadata(value, "slug", null, null);
+                    io.github.piresrenan.orderhub.catalog.domain.model.Product.create(id, id, value, "slug", null, List.of());
+                });
+            }
+            for (var name : List.of("CatalogVariantCreate", "CatalogVariantUpdate")) {
+                assertTextParity(schemas.path(name).path("properties").path("displayName"), value,
+                        () -> io.github.piresrenan.orderhub.catalog.domain.model.ProductVariant.create(id, id, id, "SKU", value, null, null, List.of()));
+            }
+        }
+    }
+
+    private static void assertTextParity(JsonNode schema, String value, Runnable ownerValidation) {
+        boolean admitted = true;
+        try { ownerValidation.run(); } catch (IllegalArgumentException failure) { admitted = false; }
+        boolean described = value == null ? schema.path("type").toString().contains("null")
+                : value.codePointCount(0, value.length()) >= schema.path("minLength").asInt(0)
+                && value.codePointCount(0, value.length()) <= schema.path("maxLength").asInt(Integer.MAX_VALUE)
+                && java.util.regex.Pattern.compile(schema.path("pattern").asText()).matcher(value).matches();
+        assertThat(described).as("Catalog owner/string contract parity").isEqualTo(admitted);
+    }
+
+    @Test
     void swaggerUsesLocalContractAndNeverPersistsAuthorization() throws Exception {
         var settings = json.readTree(mvc.perform(get("/v3/api-docs/swagger-config")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
         assertThat(settings.path("persistAuthorization").asBoolean()).isFalse();
