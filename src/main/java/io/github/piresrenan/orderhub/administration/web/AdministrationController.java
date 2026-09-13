@@ -396,6 +396,7 @@ public final class AdministrationController {
             @Schema(
                     description = "Organization or Tenant name: nonblank after surrounding Unicode whitespace is stripped, at most 120 code points after normalization",
                     minLength = 1,
+                    pattern = "^[\\u0009-\\u000D\\u001C-\\u0020\\u1680\\u2000-\\u2006\\u2008-\\u200A\\u2028\\u2029\\u205F\\u3000]*[^\\u0009-\\u000D\\u001C-\\u0020\\u1680\\u2000-\\u2006\\u2008-\\u200A\\u2028\\u2029\\u205F\\u3000](?:[\\s\\S]{0,118}[^\\u0009-\\u000D\\u001C-\\u0020\\u1680\\u2000-\\u2006\\u2008-\\u200A\\u2028\\u2029\\u205F\\u3000])?[\\u0009-\\u000D\\u001C-\\u0020\\u1680\\u2000-\\u2006\\u2008-\\u200A\\u2028\\u2029\\u205F\\u3000]*$",
                     requiredMode = Schema.RequiredMode.REQUIRED)
             String name) {
     }

@@ -113,6 +113,21 @@ class OpenApiContractTest {
     }
 
     @Test
+    void administrativeNamePatternBoundsNormalizedUnicodeWithoutRejectingAcceptedPadding() throws Exception {
+        var name = document().at("/components/schemas/AdministrativeNameRequest/properties/name");
+        var pattern = java.util.regex.Pattern.compile(name.path("pattern").asText());
+        assertThat(name.path("pattern").asText()).isNotBlank();
+        var validator = new io.github.piresrenan.orderhub.administration.web.NormalizedAdministrativeName.Validator();
+        for (var input : List.of("", " ", "a", "a".repeat(120), "a".repeat(121),
+                " " + "😀".repeat(120) + " ", " " + "😀".repeat(121) + " ",
+                "\u2000" + "a".repeat(120) + "\u3000", "\u00A0" + "a".repeat(120),
+                "\u2007" + "a".repeat(120), "\u202F" + "a".repeat(120))) {
+            assertThat(pattern.matcher(input).matches()).as("Normalized code point count %s", input.strip().codePointCount(0, input.strip().length()))
+                    .isEqualTo(validator.isValid(input, null));
+        }
+    }
+
+    @Test
     void swaggerUsesLocalContractAndNeverPersistsAuthorization() throws Exception {
         var settings = json.readTree(mvc.perform(get("/v3/api-docs/swagger-config")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
         assertThat(settings.path("persistAuthorization").asBoolean()).isFalse();

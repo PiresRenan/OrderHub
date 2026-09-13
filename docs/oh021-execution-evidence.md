@@ -119,8 +119,31 @@ all capabilities dropped. Its database recorded `44 | SQL_BASELINE | true`.
 Packaged-JAR inspection confirmed B44 and absence of development/test identity
 classes. The owned Compose project and its disposable storage were removed.
 
-Pending: final clean verify including the added ownership regression, documented
-launcher smoke, exact-HEAD GitHub CI and Codex review, squash integration,
+Implementation checkpoint `08ec6c6d2ba0f2f8cf5f87bf1d27949bca5f0296`
+was published in [PR #47](https://github.com/PiresRenan/OrderHub/pull/47).
+All three required checks passed on that candidate: [Java CI](https://github.com/PiresRenan/OrderHub/actions/runs/34769634131),
+[platform CI](https://github.com/PiresRenan/OrderHub/actions/runs/34769634073)
+and [branch policy](https://github.com/PiresRenan/OrderHub/actions/runs/34769634096).
+
+The documented launcher was executed on the default ports with real PowerShell
+token, Customer create/replay/read and Staff Catalog/stock/receipt commands.
+The flow passed with one commitment of two units and on-hand 105 after receipt.
+The abbreviated README command initially failed because an existing replica
+test worker also has a main method; README now names the same explicit launcher
+as the detailed guide. No credentials were printed.
+
+[GitHub Codex review](https://github.com/PiresRenan/OrderHub/pull/47#pullrequestreview-5191413121)
+found a P2 machine-readable administrative-name bound omission. The original
+schema accepted a rejected 121-code-point name. A raw `maxLength: 120` would
+incorrectly reject existing supported whitespace-padded names, already covered
+by an HTTP test with 120 astral Unicode characters. The correction expresses
+the actual stripped 1–120-code-point invariant as an anchored Unicode pattern,
+without changing runtime normalization. Fifteen targeted HTTP/contract/docs
+tests passed; independent JSON Schema validation rejects 121 while accepting
+120 astral characters with padding. A new generated-contract regression compares
+the schema pattern with the real validator, including nonbreaking spaces.
+
+Pending: final local clean verify, exact-HEAD GitHub CI and repeat Codex review, squash integration,
 post-merge governance and cleanup. Detailed local raw logs are retained outside
 the repository under `C:/Dev/oh021-evidence`; CI and PR links will provide the
 portable final record.

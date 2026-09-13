@@ -32,10 +32,10 @@ Install a Java 21 JDK and Docker with Linux containers. Maven comes from the
 checked-in Wrapper. From the repository root:
 
 ```powershell
-.\mvnw.cmd -B spring-boot:test-run
+.\mvnw.cmd -B spring-boot:test-run "-Dspring-boot.run.main-class=io.github.piresrenan.orderhub.development.LocalDevelopmentApplication"
 ```
 
-On Linux/macOS use `./mvnw -B spring-boot:test-run`. The explicit test-classpath
+On Linux/macOS use `./mvnw` with the same arguments. The explicit test-classpath
 launcher owns a disposable PostgreSQL container, synthetic fixtures and an
 ephemeral loopback JWT issuer. The API listens at `127.0.0.1:8080`, the fixture
 issuer at `127.0.0.1:9090`. Wait for application startup, then open
