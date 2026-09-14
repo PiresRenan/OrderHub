@@ -1,6 +1,6 @@
 # ADR-0019 — API contract and production readiness
 
-Status: DESIGNED
+Status: TESTED
 
 Task: OH-021, [Issue #40](https://github.com/PiresRenan/OrderHub/issues/40).
 
@@ -186,9 +186,32 @@ promotion, `main` change or v1.0.0 tag; those remain OH-022.
 
 ## Validation status
 
-Design only. Discovery establishes scope, not implementation qualification.
-Status changes to TESTED only after executable and adversarial evidence. See
-[execution evidence](../oh021-execution-evidence.md).
+TESTED. Final implementation candidate
+`b738b8850b139060d9001c90aa82860c28d3d4f3`, tree
+`b11d27346d49f7087fd2d8ec8c7aa1adb067cdeb`, passed a fresh Maven Wrapper
+`clean verify` with **1541 tests, zero failures/errors/skips**. Independent
+aggregation of 295 Surefire/Failsafe XML reports reproduced the same totals, and
+320 generated OpenAPI string cases passed in ECMAScript legacy and Unicode modes.
+The final documentation-only evidence correction passed `DocumentationDriftTest`
+with two tests and zero failures/errors/skips.
+
+All recorded material review findings were reproduced, corrected and resolved.
+The final candidate passed exact-head `CI`, `Platform CI` and `Branch Policy`.
+At the user's direction, Codex was not invoked again after its final P2 finding;
+the corrective delta received an explicit exact-head governance review instead,
+and no unresolved material finding remained.
+
+PR #47 was squash-integrated into `pre-release` as signed/verified commit
+`6e6efc1d8bb13f636c5639afee3fb420abf3105e`, with tree
+`b11d27346d49f7087fd2d8ec8c7aa1adb067cdeb` identical to the qualified
+candidate and parent `c741cb0bfbfd3c8ec66e2c96ad4bc636d357390f`. The B44 baseline
+remains frozen at SHA-256
+`ad1b03dbbfd4b1d9ec3a04be4961dfa6a54aaf75bb36b19fd9d93b441f5c07a6`;
+all 42 accepted versioned scripts remain immutable. This ADR does not qualify,
+tag or promote v1.0.0; those actions remain OH-022.
+
+See [execution evidence](../oh021-execution-evidence.md) for the full RED/GREEN,
+review, runtime, migration and integration record.
 
 ## Authoritative references
 
