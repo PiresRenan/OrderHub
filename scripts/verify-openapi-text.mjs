@@ -24,6 +24,42 @@ function verify(component, field, cases, rawMaximum) {
   }
 }
 
+const idempotencyKey =
+  document.paths['/orders'].post.parameters
+    .find(parameter => parameter.name === 'Idempotency-Key')?.schema;
+
+assert.ok(idempotencyKey, 'POST /orders Idempotency-Key schema');
+assert.equal(idempotencyKey.minLength, 1, 'Idempotency-Key minimum');
+assert.equal(idempotencyKey.maxLength, 128, 'Idempotency-Key maximum');
+assert.ok(idempotencyKey.pattern, 'Idempotency-Key pattern');
+
+for (const flags of ['', 'u']) {
+  const pattern = new RegExp(idempotencyKey.pattern, flags);
+
+  for (const [value, expected] of [
+    ['key', true],
+    ['order-key_123', true],
+    ['!'.repeat(128), true],
+    ['~'.repeat(128), true],
+    ['', false],
+    ['a'.repeat(129), false],
+    ['order key', false],
+    ['order,key', false],
+    ['caf\u00E9', false],
+    ['key\n', false],
+    ['\tkey', false],
+    ['key\u007F', false],
+  ]) {
+    assert.equal(
+      pattern.test(value),
+      expected,
+      `Idempotency-Key, flags=${flags || 'legacy'}, value=${JSON.stringify(value)}`,
+    );
+
+    checks++;
+  }
+}
+
 verify('AdministrativeNameRequest', 'name', [
   ['', false], [' ', false], ['a', true], ['😀'.repeat(120), true],
   [' ' + '😀'.repeat(120) + ' ', true], ['😀'.repeat(121), false],

@@ -81,6 +81,68 @@ class OpenApiContractTest {
     }
 
     @Test
+    void idempotencyKeySchemaMatchesRuntimeVisibleAsciiGrammar() throws Exception {
+        var parameters =
+                document()
+                        .at("/paths/~1orders/post/parameters");
+
+        JsonNode schema = null;
+
+        for (var parameter : parameters) {
+            if ("Idempotency-Key".equals(
+                    parameter.path("name").asText())) {
+
+                schema =
+                        parameter.path("schema");
+
+                break;
+            }
+        }
+
+        assertThat(schema)
+                .isNotNull();
+
+        assertThat(schema.path("minLength").asInt())
+                .isEqualTo(1);
+
+        assertThat(schema.path("maxLength").asInt())
+                .isEqualTo(128);
+
+        assertThat(schema.path("pattern").asText())
+                .isNotBlank();
+
+        var pattern =
+                java.util.regex.Pattern.compile(
+                        schema.path("pattern").asText());
+
+        for (var value : List.of(
+                "key",
+                "order-key_123",
+                "!".repeat(128),
+                "~".repeat(128))) {
+
+            assertThat(pattern.matcher(value).matches())
+                    .as("accepted Idempotency-Key: %s", value)
+                    .isTrue();
+        }
+
+        for (var value : List.of(
+                "",
+                "a".repeat(129),
+                "order key",
+                "order,key",
+                "caf\u00E9",
+                "key\n",
+                "\tkey",
+                "key\u007F")) {
+
+            assertThat(pattern.matcher(value).matches())
+                    .as("rejected Idempotency-Key: %s", value)
+                    .isFalse();
+        }
+    }
+
+    @Test
     void exactNumbersAndFlattenedProblemsMatchActualWireRepresentations() throws Exception {
         var schemas = document().path("components").path("schemas");
         for (var name : List.of("CatalogPriceRequest", "CatalogPriceView")) {

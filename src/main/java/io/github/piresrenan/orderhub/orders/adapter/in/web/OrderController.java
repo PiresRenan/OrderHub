@@ -105,7 +105,11 @@ public final class OrderController {
                             description = "Opaque idempotency identity for this create-Order request. 1 to 128 "
                                     + "visible ASCII characters (0x21-0x7E) excluding comma; whitespace is forbidden. Reusing this "
                                     + "key with different canonical request content is rejected.",
-                            schema = @Schema(type = "string", minLength = 1, maxLength = OrderIdempotencyKeyHeader.MAX_LENGTH))
+                            schema = @Schema(
+                                    type = "string",
+                                    minLength = 1,
+                                    maxLength = OrderIdempotencyKeyHeader.MAX_LENGTH,
+                                    pattern = OrderIdempotencyKeyHeader.OPENAPI_PATTERN))
             })
     @ApiResponse(
             responseCode = "201",

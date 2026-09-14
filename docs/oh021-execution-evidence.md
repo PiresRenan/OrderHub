@@ -155,14 +155,43 @@ SKU, MPN and attribute values likewise expose their existing nonblank, unpadded,
 control-free constraints. Explicit end-of-input assertions prevent regex engines
 from accepting a final newline in otherwise bounded identifiers.
 
-Sixteen focused Java tests and **296 ECMAScript string cases** passed. The latter
-run as `node scripts/verify-openapi-text.mjs` after Maven in CI; no application
-Node dependency is introduced. Python JSON Schema checks also confirm normalized
-brand/Unicode acceptance and final-newline rejection. The local full run for
-the superseded candidate was interrupted when the second review required these
-changes; its partial execution is not claimed as final qualification.
+Sixteen focused Java tests and **296 ECMAScript string cases** passed on the
+second-review correction. The latter run as
+`node scripts/verify-openapi-text.mjs` after Maven in CI; no application Node
+dependency is introduced. Python JSON Schema checks also confirm normalized
+brand/Unicode acceptance and final-newline rejection.
 
-Pending: final local clean verify, exact-HEAD GitHub CI and repeat Codex review, squash integration,
-post-merge governance and cleanup. Detailed local raw logs are retained outside
-the repository under `C:/Dev/oh021-evidence`; CI and PR links will provide the
-portable final record.
+A third exact-HEAD Codex review identified one further P2 contract-fidelity gap:
+`POST /orders` documented the `Idempotency-Key` visible-ASCII grammar in prose,
+while the generated schema exposed only its 1-128 length bounds. The runtime
+already rejects whitespace, comma, controls and non-ASCII input. RED reproduced
+the omission against the generated OpenAPI without changing runtime behavior.
+The correction publishes the existing grammar as a strict OpenAPI/ECMAScript
+pattern: visible ASCII `0x21`-`0x7E`, comma excluded, one through 128 characters,
+with explicit end-of-input semantics.
+
+The generated-contract regression covers accepted and rejected keys, including
+length, whitespace, comma, controls and non-ASCII input. The existing
+ECMAScript portability gate now exercises the same boundary both without flags
+and with Unicode mode. After correcting a local shell-encoding test-vector
+artifact to use the source escape `\u00E9`, the focused OpenAPI suite passed
+**7 tests, zero failures/errors/skips**, and the portability gate passed
+**320 generated OpenAPI string cases** in ECMAScript legacy and Unicode modes.
+
+Final local qualification of this implementation candidate used a fresh
+Wrapper:
+
+```powershell
+.\mvnw.cmd -B clean verify
+```
+
+It passed **1541 tests, zero failures/errors/skips** with `BUILD SUCCESS` in
+11:41, finishing at `2026-09-14T00:03:33-03:00`. Independent aggregation of the
+fresh Surefire/Failsafe XML reports reproduced the same totals. The post-verify
+OpenAPI portability gate again passed all **320** ECMAScript cases, and
+`git diff --check` remained clean. Raw local qualification logs are retained
+outside the repository under `C:/Dev/oh021-evidence`.
+
+Pending: publish the final corrective checkpoint, obtain exact-HEAD GitHub CI
+and repeat Codex review with no unresolved material finding, then perform
+governed squash integration, post-merge governance and cleanup.
