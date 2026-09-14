@@ -1,7 +1,7 @@
 # OH-021 execution evidence
 
-Status: IMPLEMENTED / QUALIFICATION IN PROGRESS. Integration qualification is
-not yet claimed.
+Status: COMPLETE — implementation integrated into `pre-release`; post-merge
+governance recorded by the dedicated docs-only closure change.
 
 ## Authority rediscovery — 2026-09-12
 
@@ -192,6 +192,39 @@ OpenAPI portability gate again passed all **320** ECMAScript cases, and
 `git diff --check` remained clean. Raw local qualification logs are retained
 outside the repository under `C:/Dev/oh021-evidence`.
 
-Pending: publish the final corrective checkpoint, obtain exact-HEAD GitHub CI
-and repeat Codex review with no unresolved material finding, then perform
-governed squash integration, post-merge governance and cleanup.
+## Final integration — 2026-09-14
+
+The final corrective checkpoint was
+`b738b8850b139060d9001c90aa82860c28d3d4f3`, tree
+`b11d27346d49f7087fd2d8ec8c7aa1adb067cdeb`. The exact-head required workflows
+all passed:
+
+- CI run `34801905358` — success;
+- Platform CI run `34801905443` — success;
+- Branch Policy run `34801905339` — success.
+
+All recorded GitHub review threads were resolved. The remaining
+`Idempotency-Key` P2 was answered with the exact regression and qualification
+evidence above. At the user's direction no further Codex review was invoked
+after that finding because external Codex capacity was unavailable; an explicit
+exact-head governance review of the five-file corrective delta found no
+unresolved material issue. This limitation is recorded rather than represented
+as a Codex approval.
+
+PR [#47](https://github.com/PiresRenan/OrderHub/pull/47) was then squash-integrated
+into `pre-release` as
+`6e6efc1d8bb13f636c5639afee3fb420abf3105e`. The integrated commit is
+signed/verified, has parent
+`c741cb0bfbfd3c8ec66e2c96ad4bc636d357390f`, and tree
+`b11d27346d49f7087fd2d8ec8c7aa1adb067cdeb`, exactly matching the qualified
+candidate tree. The integration therefore introduces no post-qualification
+source drift.
+
+The accepted 42 versioned migrations remain immutable. B44 remains the derived
+fresh-install checkpoint at SHA-256
+`ad1b03dbbfd4b1d9ec3a04be4961dfa6a54aaf75bb36b19fd9d93b441f5c07a6`;
+normal evolution continues with V45+. No `main` promotion, release tag or
+v1.0.0 qualification occurred; those remain exclusively OH-022.
+
+Post-merge governance promotes ADR-0019 to `TESTED`, marks OH-021 complete in
+the roadmap and records this evidence before Issue #40 is closed as completed.
