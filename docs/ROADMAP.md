@@ -498,14 +498,30 @@ Issue #38 is closed after governed integration. Implementation completion does
 not authorize release. Delivery infrastructure, generic registration,
 orphan-account recovery and OH-021/OH-022 remain deferred.
 
-## API contract and production readiness — OH-021 IN PROGRESS
+## API contract and production readiness — OH-021 COMPLETE
 
-OH-021 implements the generated contract for 60 existing operations, a disposable
-authenticated local runtime, a history-preserving fresh-install baseline and
-engineering/operations guides. Qualification and governed integration remain
-pending in the [execution evidence](oh021-execution-evidence.md).
+Status: COMPLETE — implementation qualified and squash-integrated into
+`pre-release` as signed/verified commit
+`6e6efc1d8bb13f636c5639afee3fb420abf3105e`; the integrated tree
+`b11d27346d49f7087fd2d8ec8c7aa1adb067cdeb` is identical to the final qualified
+candidate tree.
 
-Implemented runtime posture:
+OH-021 delivers a generated OpenAPI 3.1 contract for all 60 existing business
+operations, a disposable authenticated local runtime, a history-preserving B44
+fresh-install baseline, runtime/security hardening and coherent engineering and
+operations documentation. [ADR-0019](adr/ADR-0019-api-contract-and-production-readiness.md)
+is `TESTED`, and the [execution evidence](oh021-execution-evidence.md) records the
+RED/GREEN, migration equivalence, review and integration proofs.
+
+Final qualification passed a fresh Maven Wrapper `clean verify` with **1541
+tests, zero failures/errors/skips**, independent aggregation across 295 XML
+reports, and **320** generated OpenAPI string cases in ECMAScript legacy and
+Unicode modes. Exact-head CI, Platform CI and Branch Policy all passed. All
+recorded material review findings were resolved; the final corrective delta was
+independently reviewed without another Codex invocation after external capacity
+was exhausted.
+
+Delivered runtime posture:
 
 - local/development: OpenAPI document and Swagger UI enabled;
 - pre-release/staging: enabled only when required and protected by authentication;
@@ -513,9 +529,13 @@ Implemented runtime posture:
   disabled unless an explicit operational/product requirement later changes the
   decision;
 - CI: generated OpenAPI contract is checked against real handlers and published
-  as a qualification artifact.
+  as a qualification artifact;
+- browser documentation does not persist production bearer credentials;
+- accepted V migrations remain immutable while B44 provides the qualified fresh
+  installation checkpoint and V45+ remains the forward-evolution authority.
 
-Production bearer tokens must not be persisted by browser documentation tooling.
+OH-021 does not promote `main`, create a release tag or qualify v1.0.0. Those
+release actions remain exclusively in OH-022, the next v1 closure step.
 
 ## Privileged access and audit — planned and incrementally enforced
 
