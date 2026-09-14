@@ -26,6 +26,16 @@ final class OrderIdempotencyKeyHeader {
     static final int MAX_LENGTH =
             128;
 
+    /*
+     * OpenAPI/ECMAScript representation of the existing transport grammar:
+     * visible ASCII 0x21-0x7E, excluding comma, with strict end-of-input.
+     *
+     * Runtime validation remains owned by isValid(); this constant exists only
+     * so generated clients can enforce the same public boundary.
+     */
+    static final String OPENAPI_PATTERN =
+            "^(?![\\s\\S]*,)[!-~]{1,128}(?![\\s\\S])";
+
     private OrderIdempotencyKeyHeader() {
     }
 

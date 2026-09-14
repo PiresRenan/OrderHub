@@ -8,6 +8,14 @@ The project follows Semantic Versioning.
 
 ### Added
 
+- OH-021 generated OpenAPI 3.1 contract for all 60 business operations, opt-in
+  development Swagger UI, and executable contract/documentation drift checks.
+- Disposable local PostgreSQL/JWT development launcher with four synthetic
+  personas, owner-mediated seed data, and real HTTP acceptance coverage.
+- Frozen Flyway B44 fresh-install baseline with historical checksum,
+  schema/permission equivalence, upgrade and future-migration proofs.
+- Engineering entry point and API, architecture, security, development,
+  configuration, migration and operations guides.
 - Two-stage integration and release governance using `pre-release` and `main`.
 - Task-based branch naming and hierarchical integration workflow.
 - Automated CI verification for Java 21 and Maven.
@@ -32,5 +40,8 @@ The project follows Semantic Versioning.
 
 ### Fixed
 
+- JSON parser environment aliases now configure the actual Jackson limits.
+- Resource Server authentication and access denials return bounded Problem
+  Details without reflecting credentials, selectors or internal causes.
 - Pull request CI now fetches the Git history required to compare changes
   against the exact pull request base commit during repository hygiene checks.

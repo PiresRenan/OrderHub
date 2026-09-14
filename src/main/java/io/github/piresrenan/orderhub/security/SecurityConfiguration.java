@@ -230,7 +230,8 @@ public class SecurityConfiguration {
                                         .authenticated())
                 .oauth2ResourceServer(
                         resourceServer ->
-                                resourceServer.jwt(
+                                resourceServer.authenticationEntryPoint(new SanitizedBearerAuthenticationEntryPoint())
+                                        .accessDeniedHandler(new SanitizedBearerAccessDeniedHandler()).jwt(
                                         jwt ->
                                                 jwt
                                                         .decoder(
