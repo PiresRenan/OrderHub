@@ -62,7 +62,9 @@ Configure exact frontend origins with
 `orderhub.security.cors.allowed-origins` (for example an indexed YAML list or
 `ORDERHUB_SECURITY_CORS_ALLOWED_ORIGINS=https://shop.example.com`). The default
 list is empty. HTTPS origins identify scheme, host and optional port with no
-path/trailing slash, userinfo, query or fragment. HTTP is only for explicit
+path/trailing slash, userinfo, query or fragment. Omit default ports (`:443` for
+HTTPS, `:80` for HTTP), as browsers omit them from Origin; explicit default ports
+are rejected at startup. HTTP is only for explicit
 loopback development origins. Wildcards, opaque `null` and patterns are rejected.
 
 CORS runs before bearer authentication on business and proof-bootstrap routes.

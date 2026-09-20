@@ -30,7 +30,10 @@ public record BrowserCorsProperties(List<String> allowedOrigins) {
             var scheme = uri.getScheme();
             if (host == null || uri.getRawUserInfo() != null || uri.getRawQuery() != null
                     || uri.getRawFragment() != null || uri.getRawPath() == null || !uri.getRawPath().isEmpty()
-                    || uri.getPort() == 0 || uri.getPort() > 65535) {
+                    || uri.getPort() == 0 || uri.getPort() > 65535
+                    // Browsers omit the scheme's default port from Origin.
+                    || ("https".equals(scheme) && uri.getPort() == 443)
+                    || ("http".equals(scheme) && uri.getPort() == 80)) {
                 return false;
             }
             // Require the serialized origin shape; reject a trailing colon or other authority ambiguity.

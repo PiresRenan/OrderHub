@@ -170,7 +170,8 @@ class ReleaseSecurityBoundaryTest {
 
     @Test void malformedOriginConfigurationFailsClosed() {
         for (var origin : new String[]{"*", "null", "https://*.example.test", "https://example.test/", "https://user@example.test",
-                "http://example.test", "https://example.test?q=a", "https://example.test#fragment", "https://example.test:0"}) {
+                "http://example.test", "https://example.test?q=a", "https://example.test#fragment", "https://example.test:0",
+                "https://example.test:443", "http://localhost:80", "http://127.0.0.1:80", "http://[::1]:80"}) {
             runner().withPropertyValues("orderhub.security.cors.allowed-origins[0]=" + origin)
                     .run(context -> assertThat(context).hasFailed());
         }
