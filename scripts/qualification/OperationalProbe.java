@@ -170,5 +170,3 @@ public class OperationalProbe {
   }
  }
 }
-
-
