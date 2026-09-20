@@ -6,6 +6,20 @@ The project follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Release qualification
+
+- OH-022 adds explicit browser-origin admission without a mandatory BFF,
+  requires JWT expiry, and supports a per-issuer Cognito access-token profile
+  while retaining generic provider migration.
+- Continuous real HTTP qualification connects Platform/Organization, first
+  Staff, Catalog, Inventory, Customer linking, Orders and Tenant recovery,
+  with durable state and authority-boundary assertions.
+- Human Cognito/PKCE guidance distinguishes delegated human access from
+  POST-v1 machine, payment and AI/ML capabilities.
+- A reproducible mixed-workload experiment measures contention, pool saturation
+  and recovery. Artifact metadata is aligned to the 1.0.0 candidate; stable
+  publication remains subject to recorded qualification gates.
+
 ### Added
 
 - OH-021 generated OpenAPI 3.1 contract for all 60 business operations, opt-in

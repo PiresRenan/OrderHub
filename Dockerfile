@@ -74,7 +74,7 @@ RUN --mount=type=cache,id=orderhub-maven,target=/root/.m2,sharing=locked \
 
 FROM eclipse-temurin:21.0.12_8-jre-noble@sha256:96975602e131485862eb8cd32927face8a06d7591a5e865944b634a701d9df72 AS runtime
 
-ARG APP_VERSION=0.1.0-SNAPSHOT
+ARG APP_VERSION=1.0.0
 ARG VCS_REF=development
 
 LABEL org.opencontainers.image.title="OrderHub" \

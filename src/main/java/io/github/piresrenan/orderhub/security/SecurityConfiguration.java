@@ -28,6 +28,10 @@ import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalId
 import io.github.piresrenan.orderhub.users.application.port.out.TrustedExternalIdentityProviders;
 import io.github.piresrenan.orderhub.security.adapter.in.authentication.jwt.AdditionalJwtTrustProperties;
 import io.github.piresrenan.orderhub.security.adapter.in.authentication.jwt.ConfiguredIssuerJwtDecoder;
+import io.github.piresrenan.orderhub.security.adapter.in.authentication.jwt.JwtTokenProfile;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 /**
  * Spring composition root for the Security module.
@@ -37,15 +41,36 @@ import io.github.piresrenan.orderhub.security.adapter.in.authentication.jwt.Conf
  */
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(
-        {JwtResourceServerProperties.class, AdditionalJwtTrustProperties.class})
+        {JwtResourceServerProperties.class, AdditionalJwtTrustProperties.class, BrowserCorsProperties.class})
 public class SecurityConfiguration {
+
+    /** Exact opt-in browser origins; preflight never grants identity or business authority. */
+    @Bean
+    CorsConfigurationSource browserCorsConfigurationSource(BrowserCorsProperties properties) {
+        var policy = new CorsConfiguration();
+        policy.setAllowedOrigins(properties.allowedOrigins());
+        policy.setAllowedMethods(List.of("GET", "HEAD", "POST", "PUT", "DELETE"));
+        policy.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Tenant-Id", "Idempotency-Key", "Accept"));
+        policy.setExposedHeaders(List.of("Location", "WWW-Authenticate", "Retry-After"));
+        policy.setAllowCredentials(false);
+        policy.setMaxAge(600L);
+        var source = new UrlBasedCorsConfigurationSource();
+        for (var path : List.of("/orders", "/catalog", "/inventory", "/identity", "/administration",
+                "/platform", "/organizations", "/tenants")) {
+            source.registerCorsConfiguration(path, policy);
+            source.registerCorsConfiguration(path + "/**", policy);
+        }
+        return source;
+    }
 
     /** Only these proof-consumption paths accept a verified identity without an internal binding. */
     @Bean
     @org.springframework.core.annotation.Order(1)
     @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
-    SecurityFilterChain identityBootstrapFilterChain(HttpSecurity http, JwtDecoder decoder) throws Exception {
+    SecurityFilterChain identityBootstrapFilterChain(HttpSecurity http, JwtDecoder decoder,
+            CorsConfigurationSource browserCorsConfigurationSource) throws Exception {
         http.securityMatcher("/identity/bootstrap/staff", "/identity/bootstrap/external-links")
+                .cors(cors -> cors.configurationSource(browserCorsConfigurationSource))
                 .csrf(csrf -> csrf.disable()).requestCache(cache -> cache.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .formLogin(login -> login.disable()).httpBasic(basic -> basic.disable()).logout(logout -> logout.disable())
@@ -194,11 +219,13 @@ public class SecurityConfiguration {
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             JwtDecoder decoder,
+            CorsConfigurationSource browserCorsConfigurationSource,
             AuthenticatedUserJwtAuthenticationConverter
                     authenticationConverter)
             throws Exception {
 
         http
+                .cors(cors -> cors.configurationSource(browserCorsConfigurationSource))
                 .csrf(
                         csrf ->
                                 csrf.disable())
@@ -257,13 +284,13 @@ public class SecurityConfiguration {
     JwtDecoder jwtDecoder(
             JwtResourceServerProperties properties, AdditionalJwtTrustProperties additional) {
 
-        var primary = decoder(properties.issuer(), properties.audience(), properties.jwkSetUri());
+        var primary = decoder(properties.issuer(), properties.audience(), properties.jwkSetUri(), properties.tokenProfile());
         if (additional.additionalIssuers().isEmpty()) { return primary; }
         var decoders = new java.util.HashMap<String, JwtDecoder>();
         decoders.put(properties.issuer(), primary);
         for (var provider : additional.additionalIssuers()) {
             if (decoders.containsKey(provider.issuer())) { throw new IllegalArgumentException("JWT trusted issuers must be unique"); }
-            decoders.put(provider.issuer(), decoder(provider.issuer(), properties.audience(), provider.jwkSetUri()));
+            decoders.put(provider.issuer(), decoder(provider.issuer(), properties.audience(), provider.jwkSetUri(), provider.tokenProfile()));
         }
         return new ConfiguredIssuerJwtDecoder(decoders);
     }
@@ -279,7 +306,7 @@ public class SecurityConfiguration {
     }
 
     /** Uses Nimbus verification and the shared issuer, audience and temporal policy for one configured provider. */
-    private JwtDecoder decoder(String issuer, String audience, String jwkSetUri) {
+    private JwtDecoder decoder(String issuer, String audience, String jwkSetUri, JwtTokenProfile profile) {
 
         var decoder =
                 NimbusJwtDecoder
@@ -290,7 +317,7 @@ public class SecurityConfiguration {
         decoder.setJwtValidator(
                 new JwtValidationPolicy(
                         issuer,
-                        audience));
+                        audience, profile));
 
         return decoder;
     }

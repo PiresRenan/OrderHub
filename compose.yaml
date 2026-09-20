@@ -35,7 +35,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        APP_VERSION: ${ORDERHUB_APP_VERSION:-0.1.0-SNAPSHOT}
+        APP_VERSION: ${ORDERHUB_APP_VERSION:-1.0.0}
         VCS_REF: ${ORDERHUB_VCS_REF:-development}
 
     # Initial application startup waits until PostgreSQL reports that it accepts
@@ -58,6 +58,8 @@ services:
       ORDERHUB_SECURITY_JWT_ISSUER: ${ORDERHUB_SECURITY_JWT_ISSUER:?ORDERHUB_SECURITY_JWT_ISSUER is required}
       ORDERHUB_SECURITY_JWT_AUDIENCE: ${ORDERHUB_SECURITY_JWT_AUDIENCE:?ORDERHUB_SECURITY_JWT_AUDIENCE is required}
       ORDERHUB_SECURITY_JWT_JWK_SET_URI: ${ORDERHUB_SECURITY_JWT_JWK_SET_URI:?ORDERHUB_SECURITY_JWT_JWK_SET_URI is required}
+      ORDERHUB_SECURITY_JWT_TOKEN_PROFILE: ${ORDERHUB_SECURITY_JWT_TOKEN_PROFILE:-GENERIC}
+      ORDERHUB_SECURITY_CORS_ALLOWED_ORIGINS: ${ORDERHUB_SECURITY_CORS_ALLOWED_ORIGINS:-}
 
     # Binding only to loopback avoids exposing the development API to other
     # interfaces on the host by default.

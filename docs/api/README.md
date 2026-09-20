@@ -110,10 +110,16 @@ pending proof when authorized and issue under a new operation identity.
 Successful lifecycle responses use `Cache-Control: no-store`. Staff TTL is
 configured (default 30 minutes); Customer/external-link TTL is 15 minutes.
 
-Error bodies use `application/problem+json` with RFC 9457 fields and owner
+Application and authentication error bodies use `application/problem+json` with RFC 9457 fields and owner
 machine-readable `code` when provided. Validation errors may include field/code/
 fixed-message entries, never rejected values. Clients should branch on status
 and documented codes, not parse English messages or infer target existence.
+
+Rejected CORS preflights/origins are transport admission failures handled by
+Spring's CORS processor and need not have a Problem Details body. A browser
+cannot read a response without origin admission. Allowed-origin application
+401/403 responses retain their normal Problem Details and CORS headers. See
+[direct browser integration](../integration/README.md).
 
 | Status | Actual meaning |
 | --- | --- |
@@ -126,6 +132,7 @@ and documented codes, not parse English messages or infer target existence.
 | 413 | Structurally valid Order exceeds the configured technical item-count limit |
 | 422 | Orders idempotency key reused for different canonical content |
 | 500 | Sanitized technical uncertainty; do not reinterpret as authorization denial |
+| 503 | Identity verification is temporarily unavailable; bounded retry guidance, not an instruction to replace valid credentials |
 
 429 is not an implemented application rate-limit contract. A deployment proxy
 may have its own errors, which must be configured/documented separately. Error

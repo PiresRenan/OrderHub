@@ -105,9 +105,10 @@ Pool acquisition, JDBC transactions, PostgreSQL row locks, JWT key retrieval
 and HTTP connector waiting are different boundaries. A 5-second Order
 transaction setting is not a 5-second total HTTP deadline. Consult the
 [verified inherited defaults](configuration.md#logging-and-inherited-infrastructure-defaults)
-before tuning. No PgBouncer, load shedding, custom retry/backpressure layer or
-capacity benchmark is supplied. Increase replicas or pool sizes only against an
-explicit database budget and measured behavior.
+before tuning. No PgBouncer, load shedding or custom retry/backpressure layer is
+supplied. The [qualification experiment](release-qualification.md) reports a
+bounded local workload, saturation and recovery. Increase replicas or pool sizes
+only against an explicit database budget and deployment-specific measurements.
 
 ## Failure diagnosis and recovery
 

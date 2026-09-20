@@ -6,6 +6,9 @@ import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtAudienceValidator;
 import org.springframework.security.oauth2.jwt.JwtValidators;
+import org.springframework.security.oauth2.jwt.JwtTimestampValidator;
+import org.springframework.security.oauth2.jwt.JwtIssuerValidator;
+import org.springframework.security.oauth2.jwt.JwtClaimValidator;
 
 /**
  * Defines the validation policy applied to externally issued JWT access tokens.
@@ -33,13 +36,21 @@ public final class JwtValidationPolicy
     public JwtValidationPolicy(
             String expectedIssuer,
             String expectedAudience) {
+        this(expectedIssuer, expectedAudience, JwtTokenProfile.GENERIC);
+    }
 
-        this.delegate =
-                new DelegatingOAuth2TokenValidator<>(
-                        JwtValidators.createDefaultWithIssuer(
-                                expectedIssuer),
-                        new JwtAudienceValidator(
-                                expectedAudience));
+    /** Requires bounded expiry for every provider and access-token purpose for explicit Cognito trust. */
+    public JwtValidationPolicy(String expectedIssuer, String expectedAudience, JwtTokenProfile profile) {
+        java.util.Objects.requireNonNull(profile, "JWT token profile is required").validateAudience(expectedAudience);
+        var timestamps = new JwtTimestampValidator();
+        timestamps.setAllowEmptyExpiryClaim(false);
+        var validators = new java.util.ArrayList<OAuth2TokenValidator<Jwt>>();
+        validators.add(JwtValidators.createDefaultWithValidators(timestamps, new JwtIssuerValidator(expectedIssuer)));
+        validators.add(new JwtAudienceValidator(expectedAudience));
+        if (profile == JwtTokenProfile.COGNITO) {
+            validators.add(new JwtClaimValidator<Object>("token_use", value -> "access".equals(value)));
+        }
+        this.delegate = new DelegatingOAuth2TokenValidator<>(validators);
     }
 
     /**

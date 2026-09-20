@@ -62,6 +62,7 @@ class OpenApiContractTest {
         assertThat(actual).hasSize(60);
         assertThat(documented).containsExactlyElementsOf(actual);
         assertThat(document.path("openapi").asText()).startsWith("3.1.");
+        assertThat(document.at("/info/version").asText()).isEqualTo("1.0.0");
         assertThat(document.at("/components/securitySchemes/bearerAuth/type").asText()).isEqualTo("http");
         assertThat(document.at("/components/securitySchemes/bearerAuth/scheme").asText()).isEqualTo("bearer");
         assertThat(document.at("/servers/0/url").asText()).isEqualTo("/");
@@ -74,7 +75,8 @@ class OpenApiContractTest {
     void contractPreservesOrdersAndCredentialResponseSemantics() throws Exception {
         var document = document();
         var orders = document.at("/paths/~1orders/post");
-        assertThat(orders.path("responses").propertyNames()).contains("201", "400", "401", "403", "409", "413", "422", "500");
+        assertThat(orders.path("responses").propertyNames()).contains("201", "400", "401", "403", "409", "413", "422", "500", "503");
+        assertThat(orders.at("/responses/503/headers/Retry-After").isMissingNode()).isFalse();
         assertThat(document.at("/components/schemas/ProblemDetail/properties/status").isMissingNode()).isFalse();
         assertThat(document.at("/paths/~1identity~1bootstrap~1staff/post/responses/200/headers/Cache-Control").isMissingNode()).isFalse();
         assertThat(document()).isEqualTo(document);

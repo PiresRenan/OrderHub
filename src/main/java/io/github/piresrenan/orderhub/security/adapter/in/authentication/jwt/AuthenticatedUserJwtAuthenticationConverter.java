@@ -1,13 +1,17 @@
 package io.github.piresrenan.orderhub.security.adapter.in.authentication.jwt;
 
+import java.util.Optional;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2Error;
 
 import io.github.piresrenan.orderhub.security.adapter.in.authentication.AuthenticatedUserAuthenticationToken;
 import io.github.piresrenan.orderhub.security.application.port.in.ResolveAuthenticatedUserQuery;
 import io.github.piresrenan.orderhub.security.application.port.in.ResolveAuthenticatedUserUseCase;
+import io.github.piresrenan.orderhub.security.application.model.AuthenticatedUserPrincipal;
 
 /**
  * Adapts a validated JWT into OrderHub's internal authenticated User identity.
@@ -74,15 +78,17 @@ public final class AuthenticatedUserJwtAuthenticationConverter
             throw authenticationFailure();
         }
 
-        var principal =
-                authenticatedUsers
-                        .resolve(
-                                new ResolveAuthenticatedUserQuery(
-                                        issuer,
-                                        subject))
-                        .orElseThrow(
-                                AuthenticatedUserJwtAuthenticationConverter::
-                                        authenticationFailure);
+        Optional<AuthenticatedUserPrincipal> resolved;
+        try {
+            resolved = authenticatedUsers.resolve(new ResolveAuthenticatedUserQuery(issuer, subject));
+        } catch (RuntimeException failure) {
+            // A failed identity store is not an invalid credential. Keep private
+            // persistence causes outside servlet error dispatch and diagnostics.
+            throw new OAuth2AuthenticationException(
+                    new OAuth2Error("temporarily_unavailable"),
+                    "Identity verification is temporarily unavailable");
+        }
+        var principal = resolved.orElseThrow(AuthenticatedUserJwtAuthenticationConverter::authenticationFailure);
 
         return new AuthenticatedUserAuthenticationToken(
                 principal);

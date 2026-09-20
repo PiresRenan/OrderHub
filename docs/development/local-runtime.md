@@ -36,6 +36,12 @@ listed personas are admitted. There is no arbitrary-subject or role claim input,
 no CORS access, and requests carrying a browser `Origin` are rejected. Tokens and
 private keys are never printed by the launcher or written to a fixture file.
 
+The launcher pins its owned JWT profile to `GENERIC`, even when the surrounding
+environment is configured for production Cognito. For a separate local frontend,
+set `ORDERHUB_SECURITY_CORS_ALLOWED_ORIGINS=http://localhost:5173` before launch
+(substitute its exact loopback origin). Obtain tokens through the documented CLI;
+the signing endpoint still rejects browser Origin. See [client integration](../integration/README.md).
+
 | Persona | Authoritative relationship | Useful operation |
 | --- | --- | --- |
 | `platform` | Internal User with explicit Platform grants | Create/manage Tenants and Organizations; no implicit Tenant-private access |

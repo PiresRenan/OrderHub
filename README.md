@@ -9,8 +9,9 @@ Spring Modulith verifies module boundaries and persists the one implemented
 asynchronous analytics publication. JDBC and explicit application transactions
 keep stock commitments, order creation and idempotency outcomes atomic.
 
-Development is below 1.0.0. OH-021 prepares the contract and operating model;
-release qualification, production promotion and the v1.0.0 tag belong to OH-022.
+The 1.0.0 candidate is undergoing OH-022 qualification. Stable publication
+requires the governed main promotion and immutable release tag; a version field
+alone is not release approval.
 
 ## Start here
 
@@ -19,6 +20,7 @@ release qualification, production promotion and the v1.0.0 tag belong to OH-022.
 | Run and authenticate locally | [Development guide](docs/development/local-runtime.md) |
 | Understand ownership and consistency | [Architecture](docs/architecture/overview.md) |
 | Integrate or use Swagger | [API guide](docs/api/README.md) |
+| Connect a Cognito SPA/mobile client or evaluate backend integration | [Client integration](docs/integration/README.md) |
 | Understand identities, Tenants and permissions | [Security](docs/security/README.md) |
 | Supply runtime configuration | [Configuration reference](docs/operations/configuration.md) |
 | Operate, diagnose and recover | [Operations runbook](docs/operations/README.md) |

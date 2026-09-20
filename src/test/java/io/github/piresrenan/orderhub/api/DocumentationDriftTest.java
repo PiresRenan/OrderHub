@@ -14,7 +14,7 @@ class DocumentationDriftTest {
     void currentEngineeringGuidesHaveResolvableLocalLinks() throws Exception {
         var guides = List.of("README.md", "docs/testing.md", "docs/api/README.md", "docs/architecture/overview.md",
                 "docs/development/local-runtime.md", "docs/operations/README.md", "docs/operations/configuration.md",
-                "docs/operations/migrations.md", "docs/security/README.md");
+                "docs/operations/migrations.md", "docs/security/README.md", "docs/integration/README.md");
         var links = Pattern.compile("\\[[^\\]]*]\\(([^)]+)\\)");
         for (var guide : guides) {
             var file = Path.of(guide);

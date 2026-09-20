@@ -20,6 +20,23 @@ class LocalDevelopmentAcceptanceTest {
     private final ObjectMapper json = new ObjectMapper();
 
     @Test
+    void ambientProductionTokenProfileCannotReplaceOwnedSyntheticTrust() throws Exception {
+        // Why: the local issuer is generic; Covers: production profile leakage;
+        // Prevents: an operator environment making the disposable launcher unusable.
+        var key = "orderhub.security.jwt.token-profile";
+        var previous = System.getProperty(key);
+        try {
+            System.setProperty(key, "COGNITO");
+            try (var context = LocalDevelopmentApplication.start(0, 0)) {
+                assertThat(context.getBean(io.github.piresrenan.orderhub.security.adapter.in.authentication.jwt.JwtResourceServerProperties.class)
+                        .tokenProfile()).isEqualTo(io.github.piresrenan.orderhub.security.adapter.in.authentication.jwt.JwtTokenProfile.GENERIC);
+            }
+        } finally {
+            if (previous == null) System.clearProperty(key); else System.setProperty(key, previous);
+        }
+    }
+
+    @Test
     void ambientHikariConnectionSettingsCannotRedirectFixtureWrites() throws Exception {
         var key = "spring.datasource.hikari.jdbc-url";
         var previous = System.getProperty(key);

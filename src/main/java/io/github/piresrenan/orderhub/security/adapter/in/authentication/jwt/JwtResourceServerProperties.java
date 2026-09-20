@@ -18,7 +18,13 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record JwtResourceServerProperties(
         String issuer,
         String audience,
-        String jwkSetUri) {
+        String jwkSetUri,
+        JwtTokenProfile tokenProfile) {
+
+    /** Preserves explicit generic-provider construction used by provider-neutral consumers. */
+    public JwtResourceServerProperties(String issuer, String audience, String jwkSetUri) {
+        this(issuer, audience, jwkSetUri, JwtTokenProfile.GENERIC);
+    }
 
     /**
      * Ensures that the complete production JWT trust boundary is configured.
@@ -29,6 +35,7 @@ public record JwtResourceServerProperties(
      * @throws IllegalArgumentException when issuer, audience or JWK Set location
      *                                  is missing or blank
      */
+    @org.springframework.boot.context.properties.bind.ConstructorBinding
     public JwtResourceServerProperties {
         if (issuer == null || issuer.isBlank()) {
             throw new IllegalArgumentException(
@@ -44,5 +51,7 @@ public record JwtResourceServerProperties(
             throw new IllegalArgumentException(
                     "JWT JWK Set URI is required");
         }
+        tokenProfile = tokenProfile == null ? JwtTokenProfile.GENERIC : tokenProfile;
+        tokenProfile.validateAudience(audience);
     }
 }

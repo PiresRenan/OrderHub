@@ -17,7 +17,11 @@ and [ADR-0017](../adr/ADR-0017-tenant-identity-provisioning-and-account-lifecycl
 ## Authentication and Tenant selection
 
 The Resource Server verifies the JWT signature, temporal validity, exact issuer
-and required audience using Spring Security/Nimbus. Normal authentication then
+and required audience using Spring Security/Nimbus. Expiry is mandatory for
+every trusted provider. The per-issuer `COGNITO` token profile also requires
+`token_use=access` and an HTTPS resource audience; `GENERIC` retains other
+explicitly configured providers. See [client integration](../integration/README.md)
+for public-client PKCE/resource binding and provider migration. Normal authentication then
 resolves the exact `(issuer, subject)` through an active Users-owned binding to
 an internal User. Unknown or revoked bindings do not become automatic
 registration. The application principal carries internal identity, not the raw
@@ -118,10 +122,13 @@ login session, refresh-token storage or cookie authentication. CSRF is disabled
 for that bearer-only model. A future cookie-authenticated interface requires a
 separate CSRF decision; this configuration is not permission to inherit it.
 
-The repository does not configure a cross-origin allowlist or general CORS
-access. Same-origin development Swagger use does not require admitting arbitrary
-browser origins. No wildcard origin or credentialed cross-origin contract is
-established by enabling documentation.
+Business API CORS is opt-in through `orderhub.security.cors.allowed-origins`.
+The default empty list admits no cross-origin browser client. Exact configured
+HTTPS origins (HTTP only for loopback development), bounded methods/headers and
+no cookie credentials permit direct frontend consumption. Preflight precedes
+authentication on both business and proof-bootstrap chains; it never grants
+User or Tenant authority. See the integration guide for examples and error
+semantics. Documentation and health exposure do not inherit this allowlist.
 
 Only `/livez`, `/readyz` and `/actuator/health` are public operational endpoints.
 Health details are hidden, and the HTTP Actuator exposure includes only health.
@@ -154,6 +161,9 @@ seed, signing key or token issuer.
 
 Ordinary missing/invalid/unbound bearer credentials receive the same bounded
 401 Problem Detail, with `WWW-Authenticate: Bearer` and `Cache-Control: no-store`.
+An unavailable identity store instead returns a fixed 503 Problem Detail with
+`Retry-After: 1` and no authentication challenge. The filter boundary discards
+private persistence causes rather than passing them into servlet error dispatch.
 The two bootstrap paths use their dedicated bounded authentication code. No
 decoder exception, raw token, claim value or subject is reflected in those
 responses. Business/framework failures retain operation-specific HTTP semantics;

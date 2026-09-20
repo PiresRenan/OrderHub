@@ -13,12 +13,18 @@ public record AdditionalJwtTrustProperties(List<Provider> additionalIssuers) {
             throw new IllegalArgumentException("JWT trusted issuers must be unique");
         }
     }
-    public record Provider(String issuer, String jwkSetUri) {
+    public record Provider(String issuer, String jwkSetUri, JwtTokenProfile tokenProfile) {
+        /** Retains the existing generic provider overlap contract. */
+        public Provider(String issuer, String jwkSetUri) {
+            this(issuer, jwkSetUri, JwtTokenProfile.GENERIC);
+        }
         /** Requires both server-owned trust endpoints; incomplete migration configuration must fail startup. */
+        @org.springframework.boot.context.properties.bind.ConstructorBinding
         public Provider {
             if (issuer == null || issuer.isBlank() || jwkSetUri == null || jwkSetUri.isBlank()) {
                 throw new IllegalArgumentException("JWT provider trust configuration is incomplete");
             }
+            tokenProfile = tokenProfile == null ? JwtTokenProfile.GENERIC : tokenProfile;
         }
     }
 }

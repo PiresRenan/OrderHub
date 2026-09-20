@@ -58,6 +58,7 @@ public final class LocalDevelopmentApplication {
                         Map.entry("springdoc.swagger-ui.enabled", true),
                         Map.entry("orderhub.security.jwt.issuer", ownedIssuer.baseUri()),
                         Map.entry("orderhub.security.jwt.audience", DevelopmentIssuer.AUDIENCE),
+                        Map.entry("orderhub.security.jwt.token-profile", "GENERIC"),
                         Map.entry("orderhub.security.jwt.jwk-set-uri", ownedIssuer.baseUri() + "/jwks"))));
                 context.getEnvironment().setActiveProfiles("dev");
                 var beans = (DefaultListableBeanFactory) context.getBeanFactory();
