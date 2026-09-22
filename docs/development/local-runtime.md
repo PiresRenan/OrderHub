@@ -1,7 +1,8 @@
 # Disposable local development
 
 > **SYNTHETIC / DEVELOPMENT ONLY / NEVER PRODUCTION.** The launcher, issuer and seed live only on the test
-> classpath; see [seed data](seed-data.md) for the full dataset, personas and journeys.
+> classpath; see [seed data](seed-data.md) for the full dataset, personas and journeys, and the
+> [system usage guide](../guides/system-usage.md) for end-to-end walkthroughs.
 
 Run the real application with synthetic identities, a fresh PostgreSQL container
 and a loopback JWT issuer:

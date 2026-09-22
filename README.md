@@ -17,6 +17,9 @@ alone is not release approval.
 
 | Need | Guide |
 | --- | --- |
+| Use the system end to end | [System usage guide](docs/guides/system-usage.md) |
+| Build a browser or mobile-web client | [Frontend integration guide](docs/guides/frontend-integration.md) |
+| Build a desktop, native, CLI, server-side or BFF integration | [Application integration guide](docs/guides/application-integration.md) |
 | Run and authenticate locally | [Development guide](docs/development/local-runtime.md) |
 | Explore the seeded development dataset | [Seed data](docs/development/seed-data.md) |
 | Understand ownership and consistency | [Architecture](docs/architecture/overview.md) |

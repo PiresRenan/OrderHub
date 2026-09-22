@@ -13,6 +13,10 @@ hand-maintained specification.
 
 ## Swagger and authentication
 
+For task-oriented walkthroughs of these operations see the [system usage guide](../guides/system-usage.md); for
+client-side contracts see the [frontend](../guides/frontend-integration.md) and
+[application](../guides/application-integration.md) integration guides.
+
 Start the [explicit local launcher](../development/local-runtime.md), then open
 [local Swagger UI](http://127.0.0.1:8080/swagger-ui/index.html). Retrieve a token
 for the appropriate synthetic persona from the loopback issuer, paste the token

@@ -146,6 +146,10 @@ interfaces, not a complete public backoffice API. A deployment needing automated
 new-customer acquisition needs an explicitly governed provisioning integration;
 these limitations must be evaluated before choosing v1 for that use case.
 
+Client-side contracts, error mapping, retry semantics and worked examples are in the
+[frontend integration guide](../guides/frontend-integration.md) and the
+[application integration guide](../guides/application-integration.md).
+
 The [local launcher](../development/local-runtime.md) owns synthetic root grants,
 Users, Customer profile, proof flows and stock. It is a demonstrable local
 fixture, not a production bootstrap script. Obtain a synthetic token through the
