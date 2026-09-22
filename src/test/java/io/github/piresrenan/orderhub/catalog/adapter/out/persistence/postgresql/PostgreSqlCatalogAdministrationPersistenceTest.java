@@ -7,11 +7,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.TestPropertySource;
 import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
 
 /** Real PostgreSQL proof that stale writes and historical evidence need durable state. */
 @SpringBootTest
 @Import(PostgreSqlTestConfiguration.class)
+@TestPropertySource(properties = "orderhub.security.jwt.token-profile=GENERIC")
 class PostgreSqlCatalogAdministrationPersistenceTest {
     @Autowired JdbcTemplate jdbc;
 

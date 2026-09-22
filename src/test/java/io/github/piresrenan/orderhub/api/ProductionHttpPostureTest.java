@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.TestPropertySource;
 
 import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
 
@@ -21,6 +22,7 @@ import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
 @ActiveProfiles("production")
 @AutoConfigureMockMvc
 @Import(PostgreSqlTestConfiguration.class)
+@TestPropertySource(properties = "orderhub.security.jwt.token-profile=GENERIC")
 class ProductionHttpPostureTest {
     @Autowired MockMvc mvc;
     @Autowired org.springframework.web.context.WebApplicationContext context;

@@ -20,6 +20,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.TestPropertySource;
 
 import io.github.piresrenan.orderhub.security.adapter.in.authentication.AuthenticatedUserAuthenticationToken;
 import io.github.piresrenan.orderhub.security.application.model.AuthenticatedUserPrincipal;
@@ -31,6 +32,7 @@ import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import(PostgreSqlTestConfiguration.class)
+@TestPropertySource(properties = "orderhub.security.jwt.token-profile=GENERIC")
 class CreateOrderIntegrationTest {
 
     @Autowired

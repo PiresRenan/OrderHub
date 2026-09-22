@@ -9,11 +9,13 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.env.Environment;
 import org.springframework.util.ClassUtils;
+import org.springframework.test.context.TestPropertySource;
 
 import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
 
 @SpringBootTest
 @Import(PostgreSqlTestConfiguration.class)
+@TestPropertySource(properties = "orderhub.security.jwt.token-profile=GENERIC")
 class PlatformEventPublicationRegistryRuntimeConfigurationTest {
 
     private static final String EVENT_PUBLICATION_REGISTRY_TYPE =

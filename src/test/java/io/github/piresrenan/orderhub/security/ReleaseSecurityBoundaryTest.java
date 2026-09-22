@@ -46,7 +46,7 @@ import io.github.piresrenan.orderhub.tenants.application.port.in.operational.Ten
 import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolvedUserIdentity;
-import io.github.piresrenan.orderhub.users.application.port.out.ExternalIdentityBindingPersistenceException;
+import io.github.piresrenan.orderhub.users.application.port.in.ExternalIdentityResolutionUnavailableException;
 
 /** Real signed tokens and the production configured decoder/chains, without database fixtures. */
 class ReleaseSecurityBoundaryTest {
@@ -306,7 +306,7 @@ class ReleaseSecurityBoundaryTest {
         return new WebApplicationContextRunner().withUserConfiguration(WebConfiguration.class, SecurityConfiguration.class)
                 .withBean(ResolveExternalIdentityUseCase.class, () -> query -> {
                     if (identityDefect) throw new IllegalStateException("synthetic-private-invariant-diagnostic");
-                    if (identityUnavailable) throw new ExternalIdentityBindingPersistenceException(new IllegalStateException("synthetic-private-database-diagnostic"));
+                    if (identityUnavailable) throw new ExternalIdentityResolutionUnavailableException(new IllegalStateException("synthetic-private-database-diagnostic"));
                     bindings.incrementAndGet(); return Optional.of(new ResolvedUserIdentity(USER));
                 })
                 .withBean(IsTenantMembershipOperationallyActiveUseCase.class, () -> query -> true)

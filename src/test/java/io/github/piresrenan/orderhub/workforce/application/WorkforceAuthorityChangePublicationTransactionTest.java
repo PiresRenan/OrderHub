@@ -18,6 +18,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.TestPropertySource;
 
 import io.github.piresrenan.orderhub.OrderHubApplication;
 import io.github.piresrenan.orderhub.authorization.domain.model.PermissionCode;
@@ -55,6 +56,7 @@ import io.github.piresrenan.orderhub.workforce.domain.model.WorkforceMutationDec
             WorkforceAuthorityChangePublicationTransactionTest
                     .TestPublicationTargetConfiguration.class
         })
+@TestPropertySource(properties = "orderhub.security.jwt.token-profile=GENERIC")
 class WorkforceAuthorityChangePublicationTransactionTest {
 
     /**

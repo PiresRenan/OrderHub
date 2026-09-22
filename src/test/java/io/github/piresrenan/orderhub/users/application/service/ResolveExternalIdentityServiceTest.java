@@ -10,6 +10,8 @@ import org.junit.jupiter.api.Test;
 
 import io.github.piresrenan.orderhub.users.application.port.in.ResolvedUserIdentity;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityQuery;
+import io.github.piresrenan.orderhub.users.application.port.in.ExternalIdentityResolutionUnavailableException;
+import io.github.piresrenan.orderhub.users.application.port.out.ExternalIdentityBindingPersistenceException;
 import io.github.piresrenan.orderhub.users.application.port.out.ExternalIdentityBindingRepository;
 import io.github.piresrenan.orderhub.users.domain.model.ExternalIdentityBinding;
 
@@ -53,6 +55,20 @@ class ResolveExternalIdentityServiceTest {
 
         assertThat(repository.findCount)
                 .isEqualTo(1);
+    }
+
+    @Test
+    void translatesPersistenceFailureToResolutionUnavailability() {
+        // Why: persistence ports are Users-internal; Covers: failed binding lookup;
+        // Prevents: consumers depending on Users persistence exceptions.
+        var failure = new ExternalIdentityBindingPersistenceException(new IllegalStateException("synthetic"));
+        var service = new ResolveExternalIdentityService(new RecordingExternalIdentityBindingRepository(Optional.empty()) {
+            @Override public Optional<ExternalIdentityBinding> find(String issuer, String subject) { throw failure; }
+        });
+
+        assertThatThrownBy(() -> service.resolve(new ResolveExternalIdentityQuery("https://issuer.example.test", "synthetic-subject")))
+                .isInstanceOf(ExternalIdentityResolutionUnavailableException.class)
+                .hasCause(failure);
     }
 
     @Test
@@ -194,7 +210,7 @@ class ResolveExternalIdentityServiceTest {
                 .isZero();
     }
 
-    private static final class RecordingExternalIdentityBindingRepository
+    private static class RecordingExternalIdentityBindingRepository
             implements ExternalIdentityBindingRepository {
 
         private final Optional<ExternalIdentityBinding> result;

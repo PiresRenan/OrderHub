@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.TestPropertySource;
 import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
 
 /** Membership transitions need owner-local attribution without erasing historical identities. */
@@ -17,6 +18,7 @@ import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
  */
 @SpringBootTest
 @Import(PostgreSqlTestConfiguration.class)
+@TestPropertySource(properties = "orderhub.security.jwt.token-profile=GENERIC")
 class TenantMembershipEvidenceSchemaTest {
     @Autowired private JdbcTemplate jdbc;
 

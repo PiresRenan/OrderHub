@@ -9,6 +9,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.test.context.TestPropertySource;
 import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityQuery;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveOrCreateExternalUserUseCase;
@@ -20,6 +21,7 @@ import io.github.piresrenan.orderhub.users.application.port.in.ResolveOrCreateEx
  */
 @SpringBootTest
 @Import(PostgreSqlTestConfiguration.class)
+@TestPropertySource(properties = "orderhub.security.jwt.token-profile=GENERIC")
 class ExternalIdentityLifecycleSchemaTest {
     @Autowired private JdbcTemplate jdbc;
     @Autowired private ResolveOrCreateExternalUserUseCase users;

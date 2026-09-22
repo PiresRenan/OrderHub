@@ -18,6 +18,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.test.context.TestPropertySource;
 import io.github.piresrenan.orderhub.catalog.adapter.out.persistence.postgresql.*;
 import io.github.piresrenan.orderhub.catalog.adapter.out.transaction.postgresql.PostgreSqlCatalogAdminTransactionExecutor;
 import io.github.piresrenan.orderhub.catalog.application.port.in.administration.CatalogAdminContext;
@@ -37,6 +38,7 @@ import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
  * Authentication is isolated here; real JWT and Staff composition have separate HTTP acceptance. */
 @SpringBootTest
 @Import(PostgreSqlTestConfiguration.class)
+@TestPropertySource(properties = "orderhub.security.jwt.token-profile=GENERIC")
 class OrderAdministrationConcurrencyAcceptanceTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager manager;

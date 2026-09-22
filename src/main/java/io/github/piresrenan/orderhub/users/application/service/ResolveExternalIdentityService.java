@@ -5,7 +5,10 @@ import java.util.Optional;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityQuery;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolvedUserIdentity;
+import io.github.piresrenan.orderhub.users.application.port.in.ExternalIdentityResolutionUnavailableException;
+import io.github.piresrenan.orderhub.users.application.port.out.ExternalIdentityBindingPersistenceException;
 import io.github.piresrenan.orderhub.users.application.port.out.ExternalIdentityBindingRepository;
+import io.github.piresrenan.orderhub.users.domain.model.ExternalIdentityBinding;
 
 public final class ResolveExternalIdentityService
         implements ResolveExternalIdentityUseCase {
@@ -48,10 +51,14 @@ public final class ResolveExternalIdentityService
     public Optional<ResolvedUserIdentity> resolve(
             ResolveExternalIdentityQuery query) {
 
-        return externalIdentityBindingRepository
-                .find(
-                        query.issuer(),
-                        query.subject())
+        Optional<ExternalIdentityBinding> found;
+        try {
+            found = externalIdentityBindingRepository.find(query.issuer(), query.subject());
+        } catch (ExternalIdentityBindingPersistenceException failure) {
+            // Persistence ports stay internal; consumers see only the API classification.
+            throw new ExternalIdentityResolutionUnavailableException(failure);
+        }
+        return found
                 .map(binding ->
                         new ResolvedUserIdentity(
                                 binding.userId()));

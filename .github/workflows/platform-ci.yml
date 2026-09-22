@@ -26,7 +26,6 @@ env:
 
   KUBECTL_VERSION: v1.36.1
   ORDERHUB_IMAGE: orderhub:1.0.0
-  ORDERHUB_APP_VERSION: 1.0.0
   # Synthetic database configuration used only by automated platform
   # validation. These values are not production credentials.
   ORDERHUB_DB_NAME: orderhub_ci
@@ -148,7 +147,7 @@ jobs:
             --load \
             --platform linux/amd64 \
             --tag "${ORDERHUB_IMAGE}" \
-            --build-arg APP_VERSION="${ORDERHUB_APP_VERSION}" \
+            --build-arg APP_VERSION=1.0.0 \
             --build-arg VCS_REF="${GITHUB_SHA}" \
             .
 
@@ -173,7 +172,7 @@ jobs:
               --format '{{index .Config.Labels "org.opencontainers.image.version"}}'
           )"
 
-          test "${image_version}" = "${ORDERHUB_APP_VERSION}"
+          test "${image_version}" = "1.0.0"
 
           image_revision="$(
             docker image inspect \

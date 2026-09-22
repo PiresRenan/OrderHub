@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.TestPropertySource;
 
 import io.github.piresrenan.orderhub.inventory.adapter.out.persistence.postgresql.PostgreSqlInventoryCommitmentRepository;
 import io.github.piresrenan.orderhub.inventory.adapter.out.persistence.postgresql.PostgreSqlInventoryPolicyRepository;
@@ -19,6 +20,7 @@ import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
 
 @SpringBootTest
 @Import(PostgreSqlTestConfiguration.class)
+@TestPropertySource(properties = "orderhub.security.jwt.token-profile=GENERIC")
 class InventoryConfigurationTest {
 
     @Autowired

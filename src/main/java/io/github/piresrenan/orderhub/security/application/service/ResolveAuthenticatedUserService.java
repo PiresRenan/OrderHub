@@ -5,8 +5,11 @@ import java.util.Optional;
 import io.github.piresrenan.orderhub.security.application.model.AuthenticatedUserPrincipal;
 import io.github.piresrenan.orderhub.security.application.port.in.ResolveAuthenticatedUserQuery;
 import io.github.piresrenan.orderhub.security.application.port.in.ResolveAuthenticatedUserUseCase;
+import io.github.piresrenan.orderhub.security.application.port.in.AuthenticatedUserResolutionUnavailableException;
+import io.github.piresrenan.orderhub.users.application.port.in.ExternalIdentityResolutionUnavailableException;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityQuery;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityUseCase;
+import io.github.piresrenan.orderhub.users.application.port.in.ResolvedUserIdentity;
 
 /**
  * Resolves an external authenticated identity through the Users application
@@ -57,8 +60,14 @@ public final class ResolveAuthenticatedUserService
                 query.issuer(),
                 query.subject());
 
-        return externalIdentityResolver
-                .resolve(usersQuery)
+        Optional<ResolvedUserIdentity> identity;
+        try {
+            identity = externalIdentityResolver.resolve(usersQuery);
+        } catch (ExternalIdentityResolutionUnavailableException failure) {
+            // Security adapters depend only on the Security application classification.
+            throw new AuthenticatedUserResolutionUnavailableException(failure);
+        }
+        return identity
                 .map(resolved ->
                         new AuthenticatedUserPrincipal(
                                 resolved.userId()));

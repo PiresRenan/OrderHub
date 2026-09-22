@@ -20,6 +20,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
+import org.springframework.test.context.TestPropertySource;
 
 import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
 import tools.jackson.databind.JsonNode;
@@ -30,6 +31,7 @@ import tools.jackson.databind.json.JsonMapper;
 @ActiveProfiles("dev")
 @AutoConfigureMockMvc
 @Import(PostgreSqlTestConfiguration.class)
+@TestPropertySource(properties = "orderhub.security.jwt.token-profile=GENERIC")
 class OpenApiContractTest {
     @Autowired MockMvc mvc;
     @Autowired JsonMapper json;
