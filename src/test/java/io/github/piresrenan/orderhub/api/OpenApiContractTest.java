@@ -85,6 +85,18 @@ class OpenApiContractTest {
     }
 
     @Test
+    void nullableVariantDisplayNameTypeOrderIsDeterministic() throws Exception {
+        // Why: contract artifacts must be byte-reproducible; Covers: the generated
+        // type array; Prevents: JVM hash-seed dependent Set.of iteration order.
+        var types = document().at("/components/schemas/CatalogVariantSummary/properties/displayName/type");
+
+        assertThat(types.isArray()).isTrue();
+        assertThat(types.size()).isEqualTo(2);
+        assertThat(types.get(0).asString()).isEqualTo("string");
+        assertThat(types.get(1).asString()).isEqualTo("null");
+    }
+
+    @Test
     void idempotencyKeySchemaMatchesRuntimeVisibleAsciiGrammar() throws Exception {
         var parameters =
                 document()

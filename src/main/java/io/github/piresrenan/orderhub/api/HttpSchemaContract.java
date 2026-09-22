@@ -3,6 +3,7 @@ package io.github.piresrenan.orderhub.api;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -60,7 +61,7 @@ final class HttpSchemaContract {
             requireAll(component(schemas, name));
         }
         var displayName = property(schemas, "CatalogVariantSummary", "displayName");
-        displayName.setTypes(Set.of("string", "null"));
+        displayName.setTypes(new LinkedHashSet<>(List.of("string", "null")));
         for (var name : List.of("CatalogVariantCreate", "CatalogVariantUpdate", "CatalogVariantView", "CatalogVariantSummary")) {
             strictText(property(schemas, name, "sku"), 64);
         }
