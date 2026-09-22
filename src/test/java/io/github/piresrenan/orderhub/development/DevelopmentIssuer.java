@@ -19,7 +19,7 @@ import tools.jackson.databind.ObjectMapper;
 /** Ephemeral loopback fixture issuer, deliberately excluded from the application HTTP surface. */
 public final class DevelopmentIssuer implements AutoCloseable {
     static final String AUDIENCE = "orderhub-disposable-development";
-    private static final Set<String> PERSONAS = Set.of("platform", "staff", "customer", "outsider");
+    private static final Set<String> PERSONAS = Set.copyOf(DevelopmentSeedCatalog.PERSONA_NAMES);
     private final RSAKey key = RealJwtTestSupport.generateRsaKey("disposable-development");
     private final ObjectMapper json = new ObjectMapper();
     private final HttpServer server;
