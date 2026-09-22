@@ -18,6 +18,7 @@ alone is not release approval.
 | Need | Guide |
 | --- | --- |
 | Run and authenticate locally | [Development guide](docs/development/local-runtime.md) |
+| Explore the seeded development dataset | [Seed data](docs/development/seed-data.md) |
 | Understand ownership and consistency | [Architecture](docs/architecture/overview.md) |
 | Integrate or use Swagger | [API guide](docs/api/README.md) |
 | Connect a Cognito SPA/mobile client or evaluate backend integration | [Client integration](docs/integration/README.md) |
