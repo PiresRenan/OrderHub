@@ -10,6 +10,7 @@ package io.github.piresrenan.orderhub.users.application.port.out;
  * information.
  * </p>
  */
+@org.springframework.modulith.NamedInterface("identity-persistence-failure")
 public final class ExternalIdentityBindingPersistenceException
         extends RuntimeException {
 

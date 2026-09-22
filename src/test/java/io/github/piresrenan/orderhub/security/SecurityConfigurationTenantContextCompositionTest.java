@@ -77,6 +77,7 @@ class SecurityConfigurationTenantContextCompositionTest {
                         IsTenantMembershipOperationallyActiveUseCase.class,
                         () -> memberships)
                 .withPropertyValues(
+                        "orderhub.security.jwt.token-profile=GENERIC",
                         "orderhub.security.jwt.issuer="
                                 + ISSUER,
                         "orderhub.security.jwt.audience="

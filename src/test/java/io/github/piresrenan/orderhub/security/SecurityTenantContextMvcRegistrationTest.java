@@ -18,6 +18,7 @@ import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershi
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityUseCase;
 
 @SpringBootTest(properties = {
+        "orderhub.security.jwt.token-profile=GENERIC",
         "orderhub.security.jwt.issuer=https://issuer.example.test",
         "orderhub.security.jwt.audience=orderhub-api",
         "orderhub.security.jwt.jwk-set-uri=http://127.0.0.1:1/test-only-jwks"

@@ -13,4 +13,4 @@ patches:
 images:
   - name: orderhub
     newName: orderhub
-    newTag: oh-006
+    newTag: 1.0.0

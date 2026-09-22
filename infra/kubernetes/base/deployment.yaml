@@ -71,7 +71,7 @@ spec:
 
       containers:
         - name: orderhub
-          image: orderhub:oh-006
+          image: orderhub:1.0.0
           imagePullPolicy: IfNotPresent
 
           ports:

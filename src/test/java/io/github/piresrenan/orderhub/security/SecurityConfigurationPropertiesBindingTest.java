@@ -45,6 +45,18 @@ class SecurityConfigurationPropertiesBindingTest {
                             });
 
     @Test
+    void omittedTokenProfileRejectsBindingInsteadOfSelectingGeneric() {
+        // Why: official production trust is Cognito; Covers: externally omitted
+        // profile; Prevents: incomplete Cognito configuration running as GENERIC.
+        contextRunner
+                .withPropertyValues(
+                        "orderhub.security.jwt.issuer=" + ISSUER,
+                        "orderhub.security.jwt.audience=" + AUDIENCE,
+                        "orderhub.security.jwt.jwk-set-uri=" + JWK_SET_URI)
+                .run(context -> assertThat(context).hasFailed());
+    }
+
+    @Test
     void bindsCompleteExternalizedJwtTrustConfiguration() {
         // Why: production authentication configuration must be supplied by the
         // Spring Environment rather than constructed with embedded defaults.
@@ -55,6 +67,7 @@ class SecurityConfigurationPropertiesBindingTest {
 
         contextRunner
                 .withPropertyValues(
+                        "orderhub.security.jwt.token-profile=GENERIC",
                         "orderhub.security.jwt.issuer=" + ISSUER,
                         "orderhub.security.jwt.audience=" + AUDIENCE,
                         "orderhub.security.jwt.jwk-set-uri=" + JWK_SET_URI)
@@ -113,6 +126,7 @@ class SecurityConfigurationPropertiesBindingTest {
 
         contextRunner
                 .withPropertyValues(
+                        "orderhub.security.jwt.token-profile=GENERIC",
                         "orderhub.security.jwt.issuer=   ",
                         "orderhub.security.jwt.audience=" + AUDIENCE,
                         "orderhub.security.jwt.jwk-set-uri=" + JWK_SET_URI)
@@ -139,6 +153,7 @@ class SecurityConfigurationPropertiesBindingTest {
 
         contextRunner
                 .withPropertyValues(
+                        "orderhub.security.jwt.token-profile=GENERIC",
                         "orderhub.security.jwt.issuer=" + ISSUER,
                         "orderhub.security.jwt.jwk-set-uri=" + JWK_SET_URI)
                 .run(context -> {
@@ -163,6 +178,7 @@ class SecurityConfigurationPropertiesBindingTest {
 
         contextRunner
                 .withPropertyValues(
+                        "orderhub.security.jwt.token-profile=GENERIC",
                         "orderhub.security.jwt.issuer=" + ISSUER,
                         "orderhub.security.jwt.audience=   ",
                         "orderhub.security.jwt.jwk-set-uri=" + JWK_SET_URI)
@@ -189,6 +205,7 @@ class SecurityConfigurationPropertiesBindingTest {
 
         contextRunner
                 .withPropertyValues(
+                        "orderhub.security.jwt.token-profile=GENERIC",
                         "orderhub.security.jwt.issuer=" + ISSUER,
                         "orderhub.security.jwt.audience=" + AUDIENCE)
                 .run(context -> {
@@ -213,6 +230,7 @@ class SecurityConfigurationPropertiesBindingTest {
 
         contextRunner
                 .withPropertyValues(
+                        "orderhub.security.jwt.token-profile=GENERIC",
                         "orderhub.security.jwt.issuer=" + ISSUER,
                         "orderhub.security.jwt.audience=" + AUDIENCE,
                         "orderhub.security.jwt.jwk-set-uri=   ")

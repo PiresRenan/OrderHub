@@ -284,13 +284,15 @@ public class SecurityConfiguration {
     JwtDecoder jwtDecoder(
             JwtResourceServerProperties properties, AdditionalJwtTrustProperties additional) {
 
-        var primary = decoder(properties.issuer(), properties.audience(), properties.jwkSetUri(), properties.tokenProfile());
+        var primary = decoder(properties.issuer(), properties.audience(), properties.jwkSetUri(),
+                properties.tokenProfile(), properties.allowedClientIds());
         if (additional.additionalIssuers().isEmpty()) { return primary; }
         var decoders = new java.util.HashMap<String, JwtDecoder>();
         decoders.put(properties.issuer(), primary);
         for (var provider : additional.additionalIssuers()) {
             if (decoders.containsKey(provider.issuer())) { throw new IllegalArgumentException("JWT trusted issuers must be unique"); }
-            decoders.put(provider.issuer(), decoder(provider.issuer(), properties.audience(), provider.jwkSetUri(), provider.tokenProfile()));
+            decoders.put(provider.issuer(), decoder(provider.issuer(), properties.audience(), provider.jwkSetUri(),
+                    provider.tokenProfile(), provider.allowedClientIds()));
         }
         return new ConfiguredIssuerJwtDecoder(decoders);
     }
@@ -306,7 +308,8 @@ public class SecurityConfiguration {
     }
 
     /** Uses Nimbus verification and the shared issuer, audience and temporal policy for one configured provider. */
-    private JwtDecoder decoder(String issuer, String audience, String jwkSetUri, JwtTokenProfile profile) {
+    private JwtDecoder decoder(String issuer, String audience, String jwkSetUri, JwtTokenProfile profile,
+            List<String> allowedClientIds) {
 
         var decoder =
                 NimbusJwtDecoder
@@ -317,7 +320,7 @@ public class SecurityConfiguration {
         decoder.setJwtValidator(
                 new JwtValidationPolicy(
                         issuer,
-                        audience, profile));
+                        audience, profile, allowedClientIds));
 
         return decoder;
     }

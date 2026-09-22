@@ -13,10 +13,10 @@ public record AdditionalJwtTrustProperties(List<Provider> additionalIssuers) {
             throw new IllegalArgumentException("JWT trusted issuers must be unique");
         }
     }
-    public record Provider(String issuer, String jwkSetUri, JwtTokenProfile tokenProfile) {
-        /** Retains the existing generic provider overlap contract. */
+    public record Provider(String issuer, String jwkSetUri, JwtTokenProfile tokenProfile, List<String> allowedClientIds) {
+        /** Retains the existing generic provider overlap contract for explicit Java construction. */
         public Provider(String issuer, String jwkSetUri) {
-            this(issuer, jwkSetUri, JwtTokenProfile.GENERIC);
+            this(issuer, jwkSetUri, JwtTokenProfile.GENERIC, List.of());
         }
         /** Requires both server-owned trust endpoints; incomplete migration configuration must fail startup. */
         @org.springframework.boot.context.properties.bind.ConstructorBinding
@@ -24,7 +24,10 @@ public record AdditionalJwtTrustProperties(List<Provider> additionalIssuers) {
             if (issuer == null || issuer.isBlank() || jwkSetUri == null || jwkSetUri.isBlank()) {
                 throw new IllegalArgumentException("JWT provider trust configuration is incomplete");
             }
-            tokenProfile = tokenProfile == null ? JwtTokenProfile.GENERIC : tokenProfile;
+            if (tokenProfile == null) {
+                throw new IllegalArgumentException("JWT provider token profile is required");
+            }
+            allowedClientIds = tokenProfile.validateAllowedClientIds(allowedClientIds);
         }
     }
 }

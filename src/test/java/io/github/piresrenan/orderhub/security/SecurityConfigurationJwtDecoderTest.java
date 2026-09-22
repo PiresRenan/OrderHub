@@ -244,6 +244,7 @@ class SecurityConfigurationJwtDecoderTest {
     @Test
     void explicitAdditionalProviderUsesTheSameSignatureIssuerAndAudienceValidation() {
         contextRunner().withPropertyValues(
+                "orderhub.security.jwt.additional-issuers[0].token-profile=GENERIC",
                 "orderhub.security.jwt.additional-issuers[0].issuer=" + OTHER_ISSUER,
                 "orderhub.security.jwt.additional-issuers[0].jwk-set-uri=" + jwkSetUri)
                 .run(context -> {
@@ -265,6 +266,7 @@ class SecurityConfigurationJwtDecoderTest {
     @Test
     void additionalProviderCannotShadowPrimaryTrustOrOmitItsKeyEndpoint() {
         contextRunner().withPropertyValues(
+                "orderhub.security.jwt.additional-issuers[0].token-profile=GENERIC",
                 "orderhub.security.jwt.additional-issuers[0].issuer=" + ISSUER,
                 "orderhub.security.jwt.additional-issuers[0].jwk-set-uri=" + jwkSetUri)
                 .run(context -> assertThat(context).hasFailed());
@@ -294,6 +296,7 @@ class SecurityConfigurationJwtDecoderTest {
                                     "JWT decoder composition must not resolve tenant membership");
                         })
                 .withPropertyValues(
+                        "orderhub.security.jwt.token-profile=GENERIC",
                         "orderhub.security.jwt.issuer="
                                 + ISSUER,
                         "orderhub.security.jwt.audience="

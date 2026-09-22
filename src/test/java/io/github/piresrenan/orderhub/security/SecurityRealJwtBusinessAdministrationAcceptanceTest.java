@@ -46,6 +46,7 @@ import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
  * Prevents: individually green layers hiding a bypass at their actual composition.
  */
 @SpringBootTest(properties = {
+        "orderhub.security.jwt.token-profile=GENERIC",
         "orderhub.security.jwt.issuer=https://business-admin.example.test",
         "orderhub.security.jwt.audience=orderhub-business-test",
         "orderhub.security.jwt.jwk-set-uri=http://127.0.0.1:1/business-admin-unused-jwks"

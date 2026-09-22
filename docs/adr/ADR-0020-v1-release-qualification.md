@@ -32,8 +32,12 @@ Require expiry through Spring's timestamp validator for every provider, retainin
 its clock skew and optional not-before behavior. Nimbus continues to verify
 signatures against operator-configured keys. Add an explicit per-issuer
 `GENERIC`/`COGNITO` profile; Cognito requires access-token purpose and an HTTPS
-resource audience. No app-client-ID audience fallback or claim-to-business-role
-mapping is introduced. Existing generic providers and mixed migration remain
+resource audience plus a string `client_id` in that issuer's explicit
+`allowed-client-ids` (empty list fails startup). `aud` identifies the Resource
+Server and `client_id` the admitted App Client; neither is business authority.
+The profile must be configured explicitly for every issuer; omission fails
+startup rather than defaulting to `GENERIC`. No app-client-ID audience fallback
+or claim-to-business-role mapping is introduced. Existing generic providers and mixed migration remain
 supported. These changes were preceded by failing signed/filter regressions.
 
 Browser/mobile human clients use Cognito code+PKCE and resource-bound access
@@ -50,9 +54,10 @@ needed for these corrections. Stable package/OpenAPI/image metadata is 1.0.0.
 A controlled connection-pool outage found another boundary defect: unchecked
 identity lookup failures escaped the bearer filter, logged the persistence
 cause and ended as a misleading 401 on error dispatch. A signed-filter RED
-reproduced that escape. The converter now maps only identity-resolution runtime
+reproduced that escape. The converter now maps only the typed identity-persistence
 failure to sanitized OAuth temporary unavailability; the entry point emits 503
-with no-store and bounded retry guidance. Missing bindings remain 401. No
+with no-store and `Retry-After: 1` as a backoff floor. An unexpected
+identity-resolution defect is a sanitized 500 without retry advice. Missing bindings remain 401. No
 business effect is admitted while identity cannot be established.
 
 ## Qualification and consequences

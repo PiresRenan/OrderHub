@@ -48,6 +48,7 @@ import io.github.piresrenan.orderhub.users.application.port.in.ResolvedUserIdent
  * Prevents: Cross-scope retry effects and invalid setup masking business failures.
  */
 @SpringBootTest(properties = {
+        "orderhub.security.jwt.token-profile=GENERIC",
         "orderhub.security.jwt.issuer=https://issuer.idempotency.test",
         "orderhub.security.jwt.audience=orderhub-api",
         "orderhub.security.jwt.jwk-set-uri=http://127.0.0.1:1/unused-idempotency-jwks"

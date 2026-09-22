@@ -29,8 +29,10 @@ Compose file does not prove that the application consumed a value.
 | `orderhub.security.jwt.issuer` | Exact string / environment | Required; no default | Null/blank rejects startup. Identity matching preserves the supplied value exactly. |
 | `orderhub.security.jwt.audience` | Exact string / environment | Required; no default | Null/blank rejects startup; tokens for another audience are rejected. |
 | `orderhub.security.jwt.jwk-set-uri` | URI string / environment | Required; no default | Null/blank rejects startup. Configure a trusted, reachable JWK endpoint. A nonblank value alone does not prove reachability. |
-| `orderhub.security.jwt.token-profile` | `GENERIC` / `COGNITO` | `GENERIC` | Cognito requires access purpose and HTTPS resource audience. Environment: `ORDERHUB_SECURITY_JWT_TOKEN_PROFILE`. Invalid enum values reject binding. Every profile requires expiry. |
-| `orderhub.security.jwt.additional-issuers[n].token-profile` | `GENERIC` / `COGNITO` | `GENERIC` per issuer | Mixed provider migration keeps independent policies. Indexed environment example: `ORDERHUB_SECURITY_JWT_ADDITIONALISSUERS_0_TOKENPROFILE`. |
+| `orderhub.security.jwt.token-profile` | `GENERIC` / `COGNITO` | Required; no default | Omission rejects startup. Cognito requires access purpose, HTTPS resource audience and an allowed `client_id`. Environment: `ORDERHUB_SECURITY_JWT_TOKEN_PROFILE`. Invalid enum values reject binding. Every profile requires expiry. |
+| `orderhub.security.jwt.allowed-client-ids` | Exact App Client ID list | Empty | Required non-empty for `COGNITO`; rejected for `GENERIC`. Environment: `ORDERHUB_SECURITY_JWT_ALLOWEDCLIENTIDS`, comma-separated. Admits an App Client only; never an audience fallback or business authority. |
+| `orderhub.security.jwt.additional-issuers[n].allowed-client-ids` | Indexed exact list | Empty | Same rules per issuer; each issuer uses only its own list. Environment example: `ORDERHUB_SECURITY_JWT_ADDITIONALISSUERS_0_ALLOWEDCLIENTIDS`. |
+| `orderhub.security.jwt.additional-issuers[n].token-profile` | `GENERIC` / `COGNITO` | Required per issuer | Omission rejects startup. Mixed provider migration keeps independent policies. Indexed environment example: `ORDERHUB_SECURITY_JWT_ADDITIONALISSUERS_0_TOKENPROFILE`. |
 | `orderhub.security.cors.allowed-origins` | Exact origin list | Empty | Environment: `ORDERHUB_SECURITY_CORS_ALLOWED_ORIGINS`, comma-separated. HTTPS or literal HTTP loopback only; no path, wildcard, userinfo, query, fragment or duplicates. Omit scheme-default ports (`:443`/`:80`); browsers omit them and explicit defaults reject startup. |
 | `orderhub.security.jwt.additional-issuers[n].issuer` | Indexed string / environment | Optional list; empty by default | Each configured provider requires both fields. Duplicate issuers, including the primary issuer, reject composition. |
 | `orderhub.security.jwt.additional-issuers[n].jwk-set-uri` | Indexed URI string / environment | Required for each additional issuer | No discovery or caller-selected endpoint; each decoder shares the primary audience policy. |
@@ -47,8 +49,8 @@ The committed launcher contracts are:
 
 | Surface | Inputs / behavior |
 | --- | --- |
-| Packaged application | `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`; `ORDERHUB_SECURITY_JWT_ISSUER`, `ORDERHUB_SECURITY_JWT_AUDIENCE`, `ORDERHUB_SECURITY_JWT_JWK_SET_URI`. |
-| Compose | Requires `ORDERHUB_DB_NAME`, `ORDERHUB_DB_USER`, `ORDERHUB_DB_PASSWORD` and the three JWT variables; constructs datasource settings for the internal `postgres` service. `ORDERHUB_HTTP_PORT` defaults to `8080`. |
+| Packaged application | `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`; `ORDERHUB_SECURITY_JWT_ISSUER`, `ORDERHUB_SECURITY_JWT_AUDIENCE`, `ORDERHUB_SECURITY_JWT_JWK_SET_URI`, `ORDERHUB_SECURITY_JWT_TOKEN_PROFILE`; `ORDERHUB_SECURITY_JWT_ALLOWEDCLIENTIDS` for Cognito. |
+| Compose | Requires `ORDERHUB_DB_NAME`, `ORDERHUB_DB_USER`, `ORDERHUB_DB_PASSWORD` and the four JWT variables including `ORDERHUB_SECURITY_JWT_TOKEN_PROFILE`; constructs datasource settings for the internal `postgres` service. `ORDERHUB_HTTP_PORT` defaults to `8080`. |
 | Compose image metadata | Optional `ORDERHUB_APP_VERSION=1.0.0` and `ORDERHUB_VCS_REF=development` supply build labels; they do not select an application feature or release. |
 | Kubernetes | Required `orderhub-database` Secret keys `url`, `username`, `password`; required `orderhub-security` ConfigMap containing the JWT environment variables; `orderhub-runtime-config` supplies parser/Orders limits. |
 | Disposable development launcher | Owns a new PostgreSQL Testcontainer and ephemeral loopback issuer; forces their connection/trust values. It does not consume `.env` or connect to an operator database. |
@@ -58,7 +60,7 @@ Synthetic health-smoke JWT settings are not a usable external identity provider.
 Use the [development launcher](../development/local-runtime.md) for authenticated
 business examples. Do not put credentials inside a JDBC URL or run unrestricted
 configuration dumps when collecting incident evidence. Compose forwards the
-optional token-profile and CORS variables; Kubernetes loads them from the existing
+required token-profile plus optional allowed-client-ID and CORS variables; Kubernetes loads them from the existing
 `orderhub-security` ConfigMap. See [Cognito and frontend integration](../integration/README.md).
 
 ## HTTP and JSON safeguards

@@ -12,6 +12,7 @@ import io.github.piresrenan.orderhub.security.adapter.in.authentication.Authenti
 import io.github.piresrenan.orderhub.security.application.port.in.ResolveAuthenticatedUserQuery;
 import io.github.piresrenan.orderhub.security.application.port.in.ResolveAuthenticatedUserUseCase;
 import io.github.piresrenan.orderhub.security.application.model.AuthenticatedUserPrincipal;
+import io.github.piresrenan.orderhub.users.application.port.out.ExternalIdentityBindingPersistenceException;
 
 /**
  * Adapts a validated JWT into OrderHub's internal authenticated User identity.
@@ -81,12 +82,18 @@ public final class AuthenticatedUserJwtAuthenticationConverter
         Optional<AuthenticatedUserPrincipal> resolved;
         try {
             resolved = authenticatedUsers.resolve(new ResolveAuthenticatedUserQuery(issuer, subject));
-        } catch (RuntimeException failure) {
+        } catch (ExternalIdentityBindingPersistenceException failure) {
             // A failed identity store is not an invalid credential. Keep private
             // persistence causes outside servlet error dispatch and diagnostics.
             throw new OAuth2AuthenticationException(
                     new OAuth2Error("temporarily_unavailable"),
                     "Identity verification is temporarily unavailable");
+        } catch (RuntimeException failure) {
+            // An unexpected defect is neither retryable unavailability nor an
+            // invalid credential; it remains sanitized and fail-closed.
+            throw new OAuth2AuthenticationException(
+                    new OAuth2Error("server_error"),
+                    "Identity verification failed");
         }
         var principal = resolved.orElseThrow(AuthenticatedUserJwtAuthenticationConverter::authenticationFailure);
 

@@ -50,9 +50,11 @@ class SecurityRealJwtIdentityLifecycleAcceptanceTest {
     @Autowired private ExternalIdentityLifecycleUseCase links;
 
     @DynamicPropertySource static void properties(DynamicPropertyRegistry registry) {
+        registry.add("orderhub.security.jwt.token-profile", () -> "GENERIC");
         registry.add("orderhub.security.jwt.issuer", () -> ISSUER);
         registry.add("orderhub.security.jwt.audience", () -> AUDIENCE);
         registry.add("orderhub.security.jwt.jwk-set-uri", () -> "http://127.0.0.1:" + JWK_SERVER.getAddress().getPort() + "/jwks");
+        registry.add("orderhub.security.jwt.additional-issuers[0].token-profile", () -> "GENERIC");
         registry.add("orderhub.security.jwt.additional-issuers[0].issuer", () -> SECOND_ISSUER);
         registry.add("orderhub.security.jwt.additional-issuers[0].jwk-set-uri", () -> "http://127.0.0.1:" + JWK_SERVER.getAddress().getPort() + "/second-jwks");
     }

@@ -19,8 +19,12 @@ and [ADR-0017](../adr/ADR-0017-tenant-identity-provisioning-and-account-lifecycl
 The Resource Server verifies the JWT signature, temporal validity, exact issuer
 and required audience using Spring Security/Nimbus. Expiry is mandatory for
 every trusted provider. The per-issuer `COGNITO` token profile also requires
-`token_use=access` and an HTTPS resource audience; `GENERIC` retains other
-explicitly configured providers. See [client integration](../integration/README.md)
+`token_use=access`, an HTTPS resource audience and a string `client_id` in that
+issuer's explicit `allowed-client-ids`; `GENERIC` retains other explicitly
+configured providers and does not require `client_id`. The profile itself must
+be configured explicitly for every issuer. `aud` binds the target Resource
+Server, `client_id` the admitted App Client and `token_use` the token purpose;
+none of them confers Tenant, Staff or Customer authority. See [client integration](../integration/README.md)
 for public-client PKCE/resource binding and provider migration. Normal authentication then
 resolves the exact `(issuer, subject)` through an active Users-owned binding to
 an internal User. Unknown or revoked bindings do not become automatic
@@ -162,8 +166,13 @@ seed, signing key or token issuer.
 Ordinary missing/invalid/unbound bearer credentials receive the same bounded
 401 Problem Detail, with `WWW-Authenticate: Bearer` and `Cache-Control: no-store`.
 An unavailable identity store instead returns a fixed 503 Problem Detail with
-`Retry-After: 1` and no authentication challenge. The filter boundary discards
-private persistence causes rather than passing them into servlet error dispatch.
+`Retry-After: 1` and no authentication challenge. `Retry-After: 1` is a
+deployment/client backoff floor; clients apply bounded exponential backoff. Only
+the typed identity-persistence failure is presented as unavailability; an
+unexpected identity-resolution defect returns a fixed sanitized 500
+(`authentication-failed`) without `Retry-After` or challenge. The filter
+boundary discards private causes rather than passing them into servlet error
+dispatch.
 The two bootstrap paths use their dedicated bounded authentication code. No
 decoder exception, raw token, claim value or subject is reflected in those
 responses. Business/framework failures retain operation-specific HTTP semantics;

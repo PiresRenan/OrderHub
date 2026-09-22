@@ -341,6 +341,7 @@ class WorkforceAuthorityChangeRestartRecoveryE2ETest {
                                 + postgres.getUsername(),
                         "spring.datasource.password="
                                 + postgres.getPassword(),
+                        "orderhub.security.jwt.token-profile=GENERIC",
                         "orderhub.security.jwt.issuer="
                                 + "https://issuer.orderhub.test",
                         "orderhub.security.jwt.audience=orderhub-api-test",

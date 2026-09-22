@@ -20,6 +20,14 @@ final class SanitizedBearerAuthenticationEntryPoint implements AuthenticationEnt
             response.getWriter().write("{\"type\":\"urn:orderhub:problem:authentication-unavailable\",\"title\":\"Service Unavailable\",\"status\":503,\"detail\":\"Identity verification is temporarily unavailable\",\"code\":\"authentication-unavailable\"}");
             return;
         }
+        if (exception instanceof org.springframework.security.oauth2.core.OAuth2AuthenticationException oauth
+                && "server_error".equals(oauth.getError().getErrorCode())) {
+            response.setStatus(500);
+            response.setContentType("application/problem+json");
+            response.setHeader("Cache-Control", "no-store");
+            response.getWriter().write("{\"type\":\"urn:orderhub:problem:authentication-failed\",\"title\":\"Internal Server Error\",\"status\":500,\"detail\":\"Identity verification failed\",\"code\":\"authentication-failed\"}");
+            return;
+        }
         response.setStatus(401);
         response.setContentType("application/problem+json");
         response.setHeader("WWW-Authenticate", "Bearer");

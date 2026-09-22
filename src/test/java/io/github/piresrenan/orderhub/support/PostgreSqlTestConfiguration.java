@@ -61,6 +61,13 @@ public class PostgreSqlTestConfiguration {
             }
 
             if (!environment.containsProperty(
+                    "orderhub.security.jwt.token-profile")) {
+                registry.add(
+                        "orderhub.security.jwt.token-profile",
+                        () -> "GENERIC");
+            }
+
+            if (!environment.containsProperty(
                     "orderhub.security.jwt.audience")) {
                 registry.add(
                         "orderhub.security.jwt.audience",

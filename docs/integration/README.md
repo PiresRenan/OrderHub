@@ -30,11 +30,26 @@ ORDERHUB_SECURITY_JWT_ISSUER=https://cognito-idp.<region>.amazonaws.com/<pool-id
 ORDERHUB_SECURITY_JWT_JWK_SET_URI=https://cognito-idp.<region>.amazonaws.com/<pool-id>/.well-known/jwks.json
 ORDERHUB_SECURITY_JWT_AUDIENCE=https://api.example.com
 ORDERHUB_SECURITY_JWT_TOKEN_PROFILE=COGNITO
+ORDERHUB_SECURITY_JWT_ALLOWEDCLIENTIDS=<spa-app-client-id>,<mobile-app-client-id>
 ```
+
+The token profile is mandatory configuration: omitting it fails startup rather
+than silently selecting `GENERIC`. Under `COGNITO` the checks are independent:
+
+- `aud` must equal the configured resource URL of the target Resource Server;
+- `client_id` must be a string listed in `allowed-client-ids` for that issuer,
+  identifying an admitted Cognito App Client (list each SPA/mobile client that
+  may call the API; an empty list fails startup);
+- `token_use` must be exactly `access`.
+
+None of these claims is Tenant, Staff, Customer or Platform authority. A token
+from the same User Pool but another App Client is rejected. Scopes are not
+business permissions.
 
 The Cognito profile requires `token_use=access`; all profiles require expiry,
 exact issuer/audience and framework signature/time validation. Provider migration
-can configure each additional issuer's profile separately. Generic provider mode
+can configure each additional issuer's profile and its own
+`additional-issuers[n].allowed-client-ids` separately. Generic provider mode
 exists for other explicitly trusted issuers and the synthetic local issuer; it
 is not a recommendation to disable the production Cognito policy. No
 `client_id`-for-`aud` fallback exists. Optional `nbf` is not required merely to

@@ -29,7 +29,7 @@ services:
   orderhub:
     # Local development image. `docker compose up --build` rebuilds it from the
     # repository Dockerfile while preserving a stable local image reference.
-    image: orderhub:oh-006
+    image: orderhub:1.0.0
 
     build:
       context: .
@@ -58,7 +58,8 @@ services:
       ORDERHUB_SECURITY_JWT_ISSUER: ${ORDERHUB_SECURITY_JWT_ISSUER:?ORDERHUB_SECURITY_JWT_ISSUER is required}
       ORDERHUB_SECURITY_JWT_AUDIENCE: ${ORDERHUB_SECURITY_JWT_AUDIENCE:?ORDERHUB_SECURITY_JWT_AUDIENCE is required}
       ORDERHUB_SECURITY_JWT_JWK_SET_URI: ${ORDERHUB_SECURITY_JWT_JWK_SET_URI:?ORDERHUB_SECURITY_JWT_JWK_SET_URI is required}
-      ORDERHUB_SECURITY_JWT_TOKEN_PROFILE: ${ORDERHUB_SECURITY_JWT_TOKEN_PROFILE:-GENERIC}
+      ORDERHUB_SECURITY_JWT_TOKEN_PROFILE: ${ORDERHUB_SECURITY_JWT_TOKEN_PROFILE:?ORDERHUB_SECURITY_JWT_TOKEN_PROFILE is required}
+      ORDERHUB_SECURITY_JWT_ALLOWEDCLIENTIDS: ${ORDERHUB_SECURITY_JWT_ALLOWEDCLIENTIDS:-}
       ORDERHUB_SECURITY_CORS_ALLOWED_ORIGINS: ${ORDERHUB_SECURITY_CORS_ALLOWED_ORIGINS:-}
 
     # Binding only to loopback avoids exposing the development API to other

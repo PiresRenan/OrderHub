@@ -39,9 +39,16 @@ public final class JwtValidationPolicy
         this(expectedIssuer, expectedAudience, JwtTokenProfile.GENERIC);
     }
 
-    /** Requires bounded expiry for every provider and access-token purpose for explicit Cognito trust. */
+    /** Preserves explicit profile construction; Cognito still requires a client allowlist. */
     public JwtValidationPolicy(String expectedIssuer, String expectedAudience, JwtTokenProfile profile) {
+        this(expectedIssuer, expectedAudience, profile, java.util.List.of());
+    }
+
+    /** Requires bounded expiry for every provider, plus access purpose and an admitted App Client for explicit Cognito trust. */
+    public JwtValidationPolicy(String expectedIssuer, String expectedAudience, JwtTokenProfile profile,
+            java.util.List<String> allowedClientIds) {
         java.util.Objects.requireNonNull(profile, "JWT token profile is required").validateAudience(expectedAudience);
+        var clients = java.util.Set.copyOf(profile.validateAllowedClientIds(allowedClientIds));
         var timestamps = new JwtTimestampValidator();
         timestamps.setAllowEmptyExpiryClaim(false);
         var validators = new java.util.ArrayList<OAuth2TokenValidator<Jwt>>();
@@ -49,6 +56,8 @@ public final class JwtValidationPolicy
         validators.add(new JwtAudienceValidator(expectedAudience));
         if (profile == JwtTokenProfile.COGNITO) {
             validators.add(new JwtClaimValidator<Object>("token_use", value -> "access".equals(value)));
+            validators.add(new JwtClaimValidator<Object>("client_id",
+                    value -> value instanceof String client && clients.contains(client)));
         }
         this.delegate = new DelegatingOAuth2TokenValidator<>(validators);
     }

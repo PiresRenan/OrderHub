@@ -46,6 +46,7 @@ import io.github.piresrenan.orderhub.tenants.application.port.in.operational.Ten
 import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolvedUserIdentity;
+import io.github.piresrenan.orderhub.users.application.port.out.ExternalIdentityBindingPersistenceException;
 
 /** Real signed tokens and the production configured decoder/chains, without database fixtures. */
 class ReleaseSecurityBoundaryTest {
@@ -60,6 +61,7 @@ class ReleaseSecurityBoundaryTest {
     private final AtomicInteger keyRequests = new AtomicInteger();
     private final AtomicInteger bindings = new AtomicInteger();
     private boolean identityUnavailable;
+    private boolean identityDefect;
 
     @BeforeEach void start() throws Exception {
         key = new RSAKeyGenerator(2048).keyID("synthetic-release-key").generate();
@@ -104,8 +106,8 @@ class ReleaseSecurityBoundaryTest {
     }
 
     @Test void configuredCognitoDecoderRejectsIdTokenBeforeOrdinaryOrBootstrapIdentity() {
-        runner().withPropertyValues("orderhub.security.jwt.token-profile=COGNITO").run(context -> {
-            var token = token(ISSUER, AUDIENCE, "id", Instant.now().plusSeconds(300));
+        runner().withPropertyValues("orderhub.security.jwt.token-profile=COGNITO", "orderhub.security.jwt.allowed-client-ids[0]=spa-client").run(context -> {
+            var token = token(ISSUER, AUDIENCE, "id", Instant.now().plusSeconds(300), "spa-client");
             assertThatThrownBy(() -> context.getBean(JwtDecoder.class).decode(token)).isInstanceOf(JwtException.class);
             var mvc = mvc(context.getSourceApplicationContext());
             for (var path : new String[]{"/orders", "/identity/bootstrap/staff", "/identity/bootstrap/external-links"}) {
@@ -122,10 +124,10 @@ class ReleaseSecurityBoundaryTest {
     }
 
     @Test void idTokenIsRejectedByBothBootstrapHttpPaths() {
-        runner().withPropertyValues("orderhub.security.jwt.token-profile=COGNITO").run(context -> {
+        runner().withPropertyValues("orderhub.security.jwt.token-profile=COGNITO", "orderhub.security.jwt.allowed-client-ids[0]=spa-client").run(context -> {
             var mvc = mvc(context.getSourceApplicationContext());
             for (var path : new String[]{"/identity/bootstrap/staff", "/identity/bootstrap/external-links"}) {
-                mvc.perform(post(path).header("Authorization", "Bearer " + token(ISSUER, AUDIENCE, "id", Instant.now().plusSeconds(300))))
+                mvc.perform(post(path).header("Authorization", "Bearer " + token(ISSUER, AUDIENCE, "id", Instant.now().plusSeconds(300), "spa-client")))
                         .andExpect(status().isUnauthorized());
             }
         });
@@ -182,22 +184,23 @@ class ReleaseSecurityBoundaryTest {
             runner().withPropertyValues("orderhub.security.jwt.token-profile=" + (cognitoPrimary ? "COGNITO" : "GENERIC"),
                     "orderhub.security.jwt.additional-issuers[0].issuer=" + OTHER,
                     "orderhub.security.jwt.additional-issuers[0].jwk-set-uri=" + jwks,
-                    "orderhub.security.jwt.additional-issuers[0].token-profile=" + (cognitoPrimary ? "GENERIC" : "COGNITO"))
+                    "orderhub.security.jwt.additional-issuers[0].token-profile=" + (cognitoPrimary ? "GENERIC" : "COGNITO"),
+                    (cognitoPrimary ? "orderhub.security.jwt" : "orderhub.security.jwt.additional-issuers[0]") + ".allowed-client-ids[0]=spa-client")
                     .run(context -> {
                         var decoder = context.getBean(JwtDecoder.class);
                         var cognito = cognitoPrimary ? ISSUER : OTHER;
                         var generic = cognitoPrimary ? OTHER : ISSUER;
                         var expiry = Instant.now().plusSeconds(300);
-                        assertThat(decoder.decode(token(cognito, AUDIENCE, "access", expiry)).getSubject()).isEqualTo("synthetic-user");
+                        assertThat(decoder.decode(token(cognito, AUDIENCE, "access", expiry, "spa-client")).getSubject()).isEqualTo("synthetic-user");
                         assertThat(decoder.decode(token(generic, AUDIENCE, null, expiry)).getSubject()).isEqualTo("synthetic-user");
                         for (var purpose : new Object[]{null, "id", "refresh", java.util.List.of("access")}) {
-                            assertThatThrownBy(() -> decoder.decode(token(cognito, AUDIENCE, purpose, expiry))).isInstanceOf(JwtException.class);
+                            assertThatThrownBy(() -> decoder.decode(token(cognito, AUDIENCE, purpose, expiry, "spa-client"))).isInstanceOf(JwtException.class);
                         }
                         assertThatThrownBy(() -> decoder.decode(token(generic, AUDIENCE, null, null))).isInstanceOf(JwtException.class);
-                        assertThatThrownBy(() -> decoder.decode(token(cognito, "app-client-id", "access", expiry))).isInstanceOf(JwtException.class);
+                        assertThatThrownBy(() -> decoder.decode(token(cognito, "app-client-id", "access", expiry, "spa-client"))).isInstanceOf(JwtException.class);
                     });
         }
-        runner().withPropertyValues("orderhub.security.jwt.token-profile=COGNITO", "orderhub.security.jwt.audience=app-client-id")
+        runner().withPropertyValues("orderhub.security.jwt.token-profile=COGNITO", "orderhub.security.jwt.allowed-client-ids[0]=spa-client", "orderhub.security.jwt.audience=app-client-id")
                 .run(context -> assertThat(context).hasFailed());
         runner().withPropertyValues("orderhub.security.jwt.token-profile=TYPO")
                 .run(context -> assertThat(context).hasFailed());
@@ -220,10 +223,90 @@ class ReleaseSecurityBoundaryTest {
         });
     }
 
+    @Test void identityProgrammingDefectIsSanitizedInternalErrorWithoutRetryAdvice() {
+        identityDefect = true;
+        runner().run(context -> {
+            var response = mvc(context.getSourceApplicationContext()).perform(post("/orders")
+                    .header("Authorization", "Bearer " + token(ISSUER, AUDIENCE, null, Instant.now().plusSeconds(300))))
+                    .andExpect(status().isInternalServerError())
+                    .andExpect(content().contentTypeCompatibleWith("application/problem+json"))
+                    .andExpect(header().string("Cache-Control", "no-store"))
+                    .andExpect(header().doesNotExist("WWW-Authenticate"))
+                    .andExpect(header().doesNotExist("Retry-After"))
+                    .andExpect(jsonPath("$.code").value("authentication-failed")).andReturn().getResponse();
+            assertThat(response.getContentAsString()).doesNotContain("synthetic-private", "Exception", "jdbc", "SQL");
+        });
+    }
+
+    @Test void cognitoAdmitsOnlyConfiguredAppClientsAndNeverTreatsClientAsAudience() {
+        runner().withPropertyValues("orderhub.security.jwt.token-profile=COGNITO",
+                "orderhub.security.jwt.allowed-client-ids[0]=spa-client",
+                "orderhub.security.jwt.allowed-client-ids[1]=mobile-client").run(context -> {
+            var decoder = context.getBean(JwtDecoder.class);
+            var expiry = Instant.now().plusSeconds(300);
+            for (var client : new String[]{"spa-client", "mobile-client"}) {
+                assertThat(decoder.decode(token(ISSUER, AUDIENCE, "access", expiry, client)).getSubject()).isEqualTo("synthetic-user");
+            }
+            for (var client : new Object[]{"foreign-client", null, 42, java.util.List.of("spa-client"), "SPA-CLIENT"}) {
+                assertThatThrownBy(() -> decoder.decode(token(ISSUER, AUDIENCE, "access", expiry, client))).isInstanceOf(JwtException.class);
+            }
+            assertThatThrownBy(() -> decoder.decode(token(ISSUER, AUDIENCE, "id", expiry, "spa-client"))).isInstanceOf(JwtException.class);
+            assertThatThrownBy(() -> decoder.decode(token(ISSUER, "spa-client", "access", expiry, "spa-client"))).isInstanceOf(JwtException.class);
+            assertThatThrownBy(() -> decoder.decode(token(ISSUER, "https://other-api.example.test", "access", expiry, "spa-client"))).isInstanceOf(JwtException.class);
+            assertThatThrownBy(() -> decoder.decode(token(ISSUER, AUDIENCE, "access", null, "spa-client"))).isInstanceOf(JwtException.class);
+            mvc(context.getSourceApplicationContext()).perform(post("/orders")
+                    .header("Authorization", "Bearer " + token(ISSUER, AUDIENCE, "access", expiry, "foreign-client")))
+                    .andExpect(status().isUnauthorized()).andExpect(header().string("WWW-Authenticate", "Bearer"));
+            assertThat(bindings).hasValue(0);
+        });
+    }
+
+    @Test void genericProfileDoesNotRequireClientId() {
+        runner().run(context -> assertThat(context.getBean(JwtDecoder.class)
+                .decode(token(ISSUER, AUDIENCE, null, Instant.now().plusSeconds(300))).getSubject()).isEqualTo("synthetic-user"));
+    }
+
+    @Test void additionalCognitoIssuerUsesItsOwnClientAllowlist() {
+        runner().withPropertyValues("orderhub.security.jwt.token-profile=COGNITO",
+                "orderhub.security.jwt.allowed-client-ids[0]=primary-client",
+                "orderhub.security.jwt.additional-issuers[0].issuer=" + OTHER,
+                "orderhub.security.jwt.additional-issuers[0].jwk-set-uri=" + jwks,
+                "orderhub.security.jwt.additional-issuers[0].token-profile=COGNITO",
+                "orderhub.security.jwt.additional-issuers[0].allowed-client-ids[0]=other-client").run(context -> {
+            var decoder = context.getBean(JwtDecoder.class);
+            var expiry = Instant.now().plusSeconds(300);
+            assertThat(decoder.decode(token(ISSUER, AUDIENCE, "access", expiry, "primary-client")).getSubject()).isEqualTo("synthetic-user");
+            assertThat(decoder.decode(token(OTHER, AUDIENCE, "access", expiry, "other-client")).getSubject()).isEqualTo("synthetic-user");
+            assertThatThrownBy(() -> decoder.decode(token(ISSUER, AUDIENCE, "access", expiry, "other-client"))).isInstanceOf(JwtException.class);
+            assertThatThrownBy(() -> decoder.decode(token(OTHER, AUDIENCE, "access", expiry, "primary-client"))).isInstanceOf(JwtException.class);
+        });
+    }
+
+    @Test void cognitoWithoutClientAllowlistFailsStartup() {
+        runner().withPropertyValues("orderhub.security.jwt.token-profile=COGNITO")
+                .run(context -> assertThat(context).hasFailed());
+        runner().withPropertyValues("orderhub.security.jwt.additional-issuers[0].issuer=" + OTHER,
+                "orderhub.security.jwt.additional-issuers[0].jwk-set-uri=" + jwks,
+                "orderhub.security.jwt.additional-issuers[0].token-profile=COGNITO")
+                .run(context -> assertThat(context).hasFailed());
+    }
+
+    @Test void omittedTokenProfileFailsStartupInsteadOfBecomingGeneric() {
+        baseRunner().run(context -> assertThat(context).hasFailed());
+        runner().withPropertyValues("orderhub.security.jwt.additional-issuers[0].issuer=" + OTHER,
+                "orderhub.security.jwt.additional-issuers[0].jwk-set-uri=" + jwks)
+                .run(context -> assertThat(context).hasFailed());
+    }
+
     private WebApplicationContextRunner runner() {
+        return baseRunner().withPropertyValues("orderhub.security.jwt.token-profile=GENERIC");
+    }
+
+    private WebApplicationContextRunner baseRunner() {
         return new WebApplicationContextRunner().withUserConfiguration(WebConfiguration.class, SecurityConfiguration.class)
                 .withBean(ResolveExternalIdentityUseCase.class, () -> query -> {
-                    if (identityUnavailable) throw new IllegalStateException("synthetic-private-database-diagnostic");
+                    if (identityDefect) throw new IllegalStateException("synthetic-private-invariant-diagnostic");
+                    if (identityUnavailable) throw new ExternalIdentityBindingPersistenceException(new IllegalStateException("synthetic-private-database-diagnostic"));
                     bindings.incrementAndGet(); return Optional.of(new ResolvedUserIdentity(USER));
                 })
                 .withBean(IsTenantMembershipOperationallyActiveUseCase.class, () -> query -> true)
@@ -236,10 +319,14 @@ class ReleaseSecurityBoundaryTest {
         return MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     }
     private String token(String issuer, String audience, Object purpose, Instant expiry) throws Exception {
+        return token(issuer, audience, purpose, expiry, null);
+    }
+    private String token(String issuer, String audience, Object purpose, Instant expiry, Object client) throws Exception {
         var claims = new JWTClaimsSet.Builder().issuer(issuer).subject("synthetic-user").audience(audience)
                 .issueTime(Date.from(Instant.now().minusSeconds(5)));
         if (purpose != null) { claims.claim("token_use", purpose); }
         if (expiry != null) { claims.expirationTime(Date.from(expiry)); }
+        if (client != null) { claims.claim("client_id", client); }
         var signed = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(key.getKeyID()).build(), claims.build());
         signed.sign(new RSASSASigner(key));
         return signed.serialize();

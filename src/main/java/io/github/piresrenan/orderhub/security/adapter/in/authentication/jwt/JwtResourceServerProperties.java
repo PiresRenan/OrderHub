@@ -1,5 +1,6 @@
 package io.github.piresrenan.orderhub.security.adapter.in.authentication.jwt;
 
+import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -13,17 +14,20 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param issuer exact trusted JWT issuer
  * @param audience exact audience required for OrderHub access tokens
  * @param jwkSetUri trusted JWK Set endpoint used for signature verification
+ * @param tokenProfile deliberately selected provider policy; never defaulted by binding
+ * @param allowedClientIds admitted Cognito App Client IDs; required for COGNITO, rejected for GENERIC
  */
 @ConfigurationProperties(prefix = "orderhub.security.jwt")
 public record JwtResourceServerProperties(
         String issuer,
         String audience,
         String jwkSetUri,
-        JwtTokenProfile tokenProfile) {
+        JwtTokenProfile tokenProfile,
+        List<String> allowedClientIds) {
 
     /** Preserves explicit generic-provider construction used by provider-neutral consumers. */
     public JwtResourceServerProperties(String issuer, String audience, String jwkSetUri) {
-        this(issuer, audience, jwkSetUri, JwtTokenProfile.GENERIC);
+        this(issuer, audience, jwkSetUri, JwtTokenProfile.GENERIC, List.of());
     }
 
     /**
@@ -51,7 +55,11 @@ public record JwtResourceServerProperties(
             throw new IllegalArgumentException(
                     "JWT JWK Set URI is required");
         }
-        tokenProfile = tokenProfile == null ? JwtTokenProfile.GENERIC : tokenProfile;
+        if (tokenProfile == null) {
+            throw new IllegalArgumentException(
+                    "JWT token profile is required");
+        }
         tokenProfile.validateAudience(audience);
+        allowedClientIds = tokenProfile.validateAllowedClientIds(allowedClientIds);
     }
 }
