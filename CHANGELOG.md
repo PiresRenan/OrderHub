@@ -19,12 +19,29 @@ The project follows Semantic Versioning.
 - A reproducible mixed-workload experiment measures contention, pool saturation
   and recovery. Artifact metadata is aligned to the 1.0.0 candidate; stable
   publication remains subject to recorded qualification gates.
+- The Cognito profile admits only App Client IDs on an explicit per-issuer
+  allowlist, and the JWT token profile must be configured explicitly instead of
+  defaulting to the generic policy.
+- Identity failures are classified at their owning boundary: a typed Users
+  persistence failure becomes a sanitized 503, an unbound identity stays 401 and
+  an unexpected defect is a sanitized 500 without retry advice.
+- The generated OpenAPI is byte-reproducible across JVMs.
+- The disposable development launcher seeds a multi-tenant catalog: three
+  Organizations, five Tenants, thirteen documented personas, Staff, Customers,
+  catalog and inventory states, Orders covering every allocation outcome and
+  outstanding proofs, published through a deterministic fixture manifest.
+- Real-socket end-to-end suites cover all 60 public business operations, with a
+  coverage contract that fails when a served operation has no classified test.
+- Verified system usage, frontend integration and application integration
+  guides, with executable documentation contracts.
+- A production-artifact isolation gate rejects development seed classes,
+  resources or markers in the packaged JAR.
 
 ### Added
 
 - OH-021 generated OpenAPI 3.1 contract for all 60 business operations, opt-in
   development Swagger UI, and executable contract/documentation drift checks.
-- Disposable local PostgreSQL/JWT development launcher with four synthetic
+- Disposable local PostgreSQL/JWT development launcher with synthetic
   personas, owner-mediated seed data, and real HTTP acceptance coverage.
 - Frozen Flyway B44 fresh-install baseline with historical checksum,
   schema/permission equivalence, upgrade and future-migration proofs.

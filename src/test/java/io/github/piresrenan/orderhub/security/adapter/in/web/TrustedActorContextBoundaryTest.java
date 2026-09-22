@@ -148,10 +148,11 @@ class TrustedActorContextBoundaryTest {
         }
     }
 
-    private static final class TestEndpoint {
+    /** Package-private so the reflectively resolved handler methods are not local-only. */
+    static final class TestEndpoint {
 
-        @SuppressWarnings("unused")
-        void authorizedEndpoint(
+        // Resolved reflectively by the argument-resolver tests below.
+        public void authorizedEndpoint(
                 TrustedActorContext context) {
         }
     }

@@ -86,9 +86,8 @@ class OrderIdempotencyRecoveryHttpContractTest {
             method.setAccessible(
                     true);
 
-            @SuppressWarnings("unchecked")
             var response =
-                    (ResponseEntity<Object>) method.invoke(
+                    (ResponseEntity<?>) method.invoke(
                             new ApiExceptionHandler());
 
             assertProblem(
@@ -115,7 +114,7 @@ class OrderIdempotencyRecoveryHttpContractTest {
         }
     }
 
-    private static ResponseEntity<Object> invokeNoArgumentHandler(
+    private static ResponseEntity<?> invokeNoArgumentHandler(
             String methodName,
             Class<?> handledException) {
 
@@ -145,9 +144,8 @@ class OrderIdempotencyRecoveryHttpContractTest {
             method.setAccessible(
                     true);
 
-            @SuppressWarnings("unchecked")
             var response =
-                    (ResponseEntity<Object>) method.invoke(
+                    (ResponseEntity<?>) method.invoke(
                             new ApiExceptionHandler());
 
             return response;
@@ -172,7 +170,7 @@ class OrderIdempotencyRecoveryHttpContractTest {
     }
 
     private static void assertProblem(
-            ResponseEntity<Object> response,
+            ResponseEntity<?> response,
             HttpStatus expectedStatus,
             String expectedType,
             String expectedCode,
