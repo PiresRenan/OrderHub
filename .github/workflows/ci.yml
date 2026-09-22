@@ -56,6 +56,12 @@ jobs:
           chmod +x mvnw
           ./mvnw --batch-mode --no-transfer-progress clean verify
 
+      # Inspects the final repackaged JAR produced by verify; development seed fixtures must never ship.
+      - name: Verify production artifact isolation
+        run: |
+          node --test scripts/verify-production-artifact-isolation.test.mjs
+          node scripts/verify-production-artifact-isolation.mjs
+
       - name: Verify generated text contracts in ECMAScript
         run: node scripts/verify-openapi-text.mjs
 

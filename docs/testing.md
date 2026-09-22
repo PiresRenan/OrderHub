@@ -43,6 +43,13 @@ executable proof; a passing route-count test does not prove every schema is
 correct. Generated OpenAPI is exported to `target/contracts/openapi.json`.
 Migration proof artifacts are under `target/migration-proof` when generated.
 
+After `clean verify`, `node scripts/verify-production-artifact-isolation.mjs` inspects the
+final repackaged `target/orderhub-*.jar` (entries and application class/resource bytes) and fails
+if any development seed class, resource or synthetic subject is present. CI runs it right after
+full verification, after `node --test scripts/verify-production-artifact-isolation.test.mjs`
+proves the guard rejects fixture entries, names, resources and markers in synthetic archives and
+accepts legitimate production classes and the real main output.
+
 After generation, `node scripts/verify-openapi-text.mjs` checks normalized text
 constraints in ECMAScript with and without the Unicode flag. It prevents a
 Java-only regex test from accepting patterns that reject supplementary Unicode
