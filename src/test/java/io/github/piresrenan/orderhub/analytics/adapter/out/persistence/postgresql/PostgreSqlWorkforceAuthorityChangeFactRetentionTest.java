@@ -12,7 +12,6 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -52,10 +51,13 @@ class PostgreSqlWorkforceAuthorityChangeFactRetentionTest {
 
     @Container
     private static final PostgreSQLContainer POSTGRES =
-            new PostgreSQLContainer(POSTGRES_IMAGE)
-                    .withDatabaseName("orderhub_test")
+            new PostgreSQLContainer(POSTGRES_IMAGE);
+
+    static {
+        POSTGRES.withDatabaseName("orderhub_test")
                     .withUsername("orderhub_test")
                     .withPassword("synthetic-test-password");
+    }
 
     private static final UUID TENANT_A =
             UUID.fromString("00000000-0000-4000-8000-00000000a101");

@@ -169,7 +169,7 @@ public final class OrganizationAdministrationService
                 .orElseThrow(OrganizationUnavailableException::new);
         return placements.findTenantIdsByOrganizationId(organization.id()).stream()
                 .map(tenants::findById)
-                .flatMap(java.util.Optional::stream)
+                .flatMap(value -> value.stream())
                 .map(tenant -> new OrganizationTenantSummary(
                         tenant.id(), tenant.name(), tenant.status()))
                 .toList();

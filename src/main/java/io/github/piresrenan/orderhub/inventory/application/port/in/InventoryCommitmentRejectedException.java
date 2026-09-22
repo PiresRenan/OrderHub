@@ -10,6 +10,8 @@ package io.github.piresrenan.orderhub.inventory.application.port.in;
  */
 public final class InventoryCommitmentRejectedException
         extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+
 
     public InventoryCommitmentRejectedException() {
 

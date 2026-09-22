@@ -11,6 +11,8 @@ package io.github.piresrenan.orderhub.orders.application.port.out;
  * </p>
  */
 public final class OrderPersistenceException extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+
 
     /**
      * Creates a framework-neutral persistence failure while retaining the

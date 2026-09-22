@@ -54,20 +54,20 @@ class OpenApiContractTest {
             if (!Set.of("get", "post", "put", "delete", "patch").contains(method.getKey())) return;
             documented.add(method.getKey() + " " + path.getKey());
             var operation = method.getValue();
-            assertThat(operation.path("operationId").asText()).isNotBlank();
-            assertThat(operationIds.add(operation.path("operationId").asText())).isTrue();
-            assertThat(operation.path("summary").asText()).isNotBlank();
-            assertThat(operation.path("description").asText()).isNotBlank();
+            assertThat(operation.path("operationId").asString()).isNotBlank();
+            assertThat(operationIds.add(operation.path("operationId").asString())).isTrue();
+            assertThat(operation.path("summary").asString()).isNotBlank();
+            assertThat(operation.path("description").asString()).isNotBlank();
             assertThat(operation.path("tags").isEmpty()).isFalse();
             assertThat(operation.path("responses").has("401")).isTrue();
         }));
         assertThat(actual).hasSize(60);
         assertThat(documented).containsExactlyElementsOf(actual);
-        assertThat(document.path("openapi").asText()).startsWith("3.1.");
-        assertThat(document.at("/info/version").asText()).isEqualTo("1.0.0");
-        assertThat(document.at("/components/securitySchemes/bearerAuth/type").asText()).isEqualTo("http");
-        assertThat(document.at("/components/securitySchemes/bearerAuth/scheme").asText()).isEqualTo("bearer");
-        assertThat(document.at("/servers/0/url").asText()).isEqualTo("/");
+        assertThat(document.path("openapi").asString()).startsWith("3.1.");
+        assertThat(document.at("/info/version").asString()).isEqualTo("1.0.0");
+        assertThat(document.at("/components/securitySchemes/bearerAuth/type").asString()).isEqualTo("http");
+        assertThat(document.at("/components/securitySchemes/bearerAuth/scheme").asString()).isEqualTo("bearer");
+        assertThat(document.at("/servers/0/url").asString()).isEqualTo("/");
         assertThat(document.toString()).doesNotContain("TrustedActorContext", "AuthenticatedUserPrincipal", "VerifiedExternalIdentity", "\"keyDigest\"", "\"fingerprint\"", "jwk-set-uri");
         Files.createDirectories(Path.of("target", "contracts"));
         Files.writeString(Path.of("target", "contracts", "openapi.json"), json.writerWithDefaultPrettyPrinter().writeValueAsString(document));
@@ -94,7 +94,7 @@ class OpenApiContractTest {
 
         for (var parameter : parameters) {
             if ("Idempotency-Key".equals(
-                    parameter.path("name").asText())) {
+                    parameter.path("name").asString())) {
 
                 schema =
                         parameter.path("schema");
@@ -103,8 +103,10 @@ class OpenApiContractTest {
             }
         }
 
-        assertThat(schema)
-                .isNotNull();
+        if (schema == null) {
+            throw new AssertionError(
+                    "Idempotency-Key parameter schema must be documented");
+        }
 
         assertThat(schema.path("minLength").asInt())
                 .isEqualTo(1);
@@ -112,12 +114,12 @@ class OpenApiContractTest {
         assertThat(schema.path("maxLength").asInt())
                 .isEqualTo(128);
 
-        assertThat(schema.path("pattern").asText())
+        assertThat(schema.path("pattern").asString())
                 .isNotBlank();
 
         var pattern =
                 java.util.regex.Pattern.compile(
-                        schema.path("pattern").asText());
+                        schema.path("pattern").asString());
 
         for (var value : List.of(
                 "key",
@@ -150,17 +152,17 @@ class OpenApiContractTest {
     void exactNumbersAndFlattenedProblemsMatchActualWireRepresentations() throws Exception {
         var schemas = document().path("components").path("schemas");
         for (var name : List.of("CatalogPriceRequest", "CatalogPriceView")) {
-            assertThat(schemas.path(name).path("properties").path("minorUnits").path("type").asText()).isEqualTo("integer");
+            assertThat(schemas.path(name).path("properties").path("minorUnits").path("type").asString()).isEqualTo("integer");
         }
         schemas.properties().forEach(component -> component.getValue().path("properties").properties().forEach(field -> {
-            if (Set.of("int32", "int64").contains(field.getValue().path("format").asText())) {
-                assertThat(field.getValue().path("type").asText()).as("%s.%s", component.getKey(), field.getKey()).isEqualTo("integer");
+            if (Set.of("int32", "int64").contains(field.getValue().path("format").asString())) {
+                assertThat(field.getValue().path("type").asString()).as("%s.%s", component.getKey(), field.getKey()).isEqualTo("integer");
             }
         }));
         assertThat(schemas.path("CatalogPriceRequest").path("additionalProperties").asBoolean(true)).isFalse();
         var listParameters = document().at("/paths/~1catalog~1categories/get/parameters");
         for (var parameter : listParameters) {
-            if (parameter.path("name").asText().equals("limit")) {
+            if (parameter.path("name").asString().equals("limit")) {
                 assertThat(parameter.path("schema").path("default").isIntegralNumber()).isTrue();
                 assertThat(parameter.path("schema").path("default").asInt()).isEqualTo(50);
             }
@@ -181,8 +183,8 @@ class OpenApiContractTest {
     @Test
     void administrativeNamePatternBoundsNormalizedUnicodeWithoutRejectingAcceptedPadding() throws Exception {
         var name = document().at("/components/schemas/AdministrativeNameRequest/properties/name");
-        var pattern = java.util.regex.Pattern.compile(name.path("pattern").asText());
-        assertThat(name.path("pattern").asText()).isNotBlank();
+        var pattern = java.util.regex.Pattern.compile(name.path("pattern").asString());
+        assertThat(name.path("pattern").asString()).isNotBlank();
         var validator = new io.github.piresrenan.orderhub.administration.web.NormalizedAdministrativeName.Validator();
         for (var input : List.of("", " ", "a", "a".repeat(120), "a".repeat(121),
                 " " + "😀".repeat(120) + " ", " " + "😀".repeat(121) + " ",
@@ -221,7 +223,7 @@ class OpenApiContractTest {
         boolean described = value == null ? schema.path("type").toString().contains("null")
                 : value.codePointCount(0, value.length()) >= schema.path("minLength").asInt(0)
                 && value.codePointCount(0, value.length()) <= schema.path("maxLength").asInt(Integer.MAX_VALUE)
-                && java.util.regex.Pattern.compile(schema.path("pattern").asText()).matcher(value).matches();
+                && java.util.regex.Pattern.compile(schema.path("pattern").asString()).matcher(value).matches();
         assertThat(described).as("Catalog owner/string contract parity").isEqualTo(admitted);
     }
 
@@ -229,7 +231,7 @@ class OpenApiContractTest {
     void swaggerUsesLocalContractAndNeverPersistsAuthorization() throws Exception {
         var settings = json.readTree(mvc.perform(get("/v3/api-docs/swagger-config")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
         assertThat(settings.path("persistAuthorization").asBoolean()).isFalse();
-        assertThat(settings.path("validatorUrl").asText()).isEmpty();
+        assertThat(settings.path("validatorUrl").asString()).isEmpty();
         mvc.perform(get("/swagger-ui/index.html")).andExpect(status().isOk());
         mvc.perform(get("/orders")).andExpect(status().isUnauthorized());
     }

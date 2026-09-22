@@ -82,7 +82,7 @@ class PostgreSqlWorkforcePositionPermissionLockTest {
                                     snapshot.requestedTargetPosition()
                                             .permissionEnvelope()
                                             .permissions())
-                                    .extracting(Enum::name)
+                                    .extracting(value -> value.name())
                                     .containsExactly(
                                             "CATALOG_VIEW");
 

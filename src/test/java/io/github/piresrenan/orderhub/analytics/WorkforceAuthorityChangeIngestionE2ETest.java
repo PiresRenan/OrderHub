@@ -569,7 +569,7 @@ class WorkforceAuthorityChangeIngestionE2ETest {
 
             assertThat(
                     tags.stream()
-                            .map(io.micrometer.core.instrument.Tag::getKey)
+                            .map(value -> value.getKey())
                             .toList())
                     .as("The projection metric must carry exactly one bounded"
                             + " dimension")

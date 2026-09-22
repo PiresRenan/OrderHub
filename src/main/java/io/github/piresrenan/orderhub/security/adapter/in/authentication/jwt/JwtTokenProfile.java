@@ -27,7 +27,7 @@ public enum JwtTokenProfile {
     /** Cognito admits only explicitly configured App Clients; a client ID is never audience or business authority. */
     public List<String> validateAllowedClientIds(List<String> allowedClientIds) {
         var clients = allowedClientIds == null ? List.<String>of() : List.copyOf(allowedClientIds);
-        if (clients.stream().anyMatch(String::isBlank)) {
+        if (clients.stream().anyMatch(value -> value.isBlank())) {
             throw new IllegalArgumentException("JWT allowed client IDs must not be blank");
         }
         if (this == COGNITO && clients.isEmpty()) {

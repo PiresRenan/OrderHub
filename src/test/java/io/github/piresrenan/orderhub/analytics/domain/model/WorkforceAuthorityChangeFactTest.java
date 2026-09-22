@@ -211,7 +211,7 @@ class WorkforceAuthorityChangeFactTest {
                 java.util.Arrays.stream(components)
                         .filter(component ->
                                 component.getType() == UUID.class)
-                        .map(java.lang.reflect.RecordComponent::getName)
+                        .map(value -> value.getName())
                         .toList();
 
         assertThat(rawUuidComponents)
@@ -225,7 +225,7 @@ class WorkforceAuthorityChangeFactTest {
                 java.util.Arrays.stream(components)
                         .filter(component ->
                                 component.getType() == String.class)
-                        .map(java.lang.reflect.RecordComponent::getName)
+                        .map(value -> value.getName())
                         .toList();
 
         assertThat(stringComponents)
@@ -267,8 +267,8 @@ class WorkforceAuthorityChangeFactTest {
                                         .getRecordComponents())
                         .collect(
                                 java.util.stream.Collectors.toMap(
-                                        java.lang.reflect.RecordComponent::getName,
-                                        java.lang.reflect.RecordComponent::getType));
+                                        value -> value.getName(),
+                                        value -> value.getType()));
 
         assertThat(componentTypes)
                 .as("Analytical schema identity must belong to the fact"
@@ -282,7 +282,7 @@ class WorkforceAuthorityChangeFactTest {
                         + " text")
                 .isNotEqualTo(String.class)
                 .matches(
-                        Class::isEnum,
+                        value -> value.isEnum(),
                         "a bounded enum type");
 
         assertThat(componentTypes.get("schemaVersion"))

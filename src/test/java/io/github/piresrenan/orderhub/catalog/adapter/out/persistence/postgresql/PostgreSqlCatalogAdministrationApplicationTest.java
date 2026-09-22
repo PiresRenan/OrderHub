@@ -17,7 +17,6 @@ import org.springframework.test.context.TestPropertySource;
 import io.github.piresrenan.orderhub.catalog.adapter.out.transaction.postgresql.PostgreSqlCatalogAdminTransactionExecutor;
 import io.github.piresrenan.orderhub.catalog.application.port.in.administration.*;
 import io.github.piresrenan.orderhub.catalog.application.port.in.identity.*;
-import io.github.piresrenan.orderhub.catalog.application.port.out.*;
 import io.github.piresrenan.orderhub.catalog.application.service.*;
 import io.github.piresrenan.orderhub.catalog.domain.model.*;
 import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;

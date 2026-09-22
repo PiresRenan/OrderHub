@@ -11,6 +11,8 @@ package io.github.piresrenan.orderhub.orders.application.port.out;
  */
 public final class TransactionExecutionException
         extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+
 
     public TransactionExecutionException(
             Throwable cause) {

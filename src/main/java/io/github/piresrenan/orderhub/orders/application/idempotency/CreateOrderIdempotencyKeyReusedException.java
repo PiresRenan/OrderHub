@@ -11,6 +11,8 @@ package io.github.piresrenan.orderhub.orders.application.idempotency;
  */
 public final class CreateOrderIdempotencyKeyReusedException
         extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+
 
     public CreateOrderIdempotencyKeyReusedException() {
 

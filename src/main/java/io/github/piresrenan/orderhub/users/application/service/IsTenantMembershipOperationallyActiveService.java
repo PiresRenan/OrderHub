@@ -3,7 +3,6 @@ package io.github.piresrenan.orderhub.users.application.service;
 import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveQuery;
 import io.github.piresrenan.orderhub.users.application.port.in.IsTenantMembershipOperationallyActiveUseCase;
 import io.github.piresrenan.orderhub.users.application.port.out.TenantMembershipRepository;
-import io.github.piresrenan.orderhub.users.domain.model.TenantMembership;
 
 /**
  * Evaluates membership operational eligibility inside Users.
@@ -45,7 +44,7 @@ public final class IsTenantMembershipOperationallyActiveService
         return tenantMembershipRepository.find(
                         query.userId(),
                         query.tenantId())
-                .filter(TenantMembership::isOperationallyActive)
+                .filter(value -> value.isOperationallyActive())
                 .isPresent();
     }
 }

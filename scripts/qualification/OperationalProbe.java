@@ -54,7 +54,7 @@ public class OperationalProbe {
   m.computeIfAbsent(label,k->new Metric()).add(System.nanoTime()-start,r.status,expected);return r;
  }
  static void require(Reply r,int status,String label){if(r.status!=status)throw new IllegalStateException(label+" unexpected status "+r.status);}
- static String token(String persona)throws Exception{var r=request("POST",issuer+"/tokens/"+persona,null,null,"",null);require(r,200,"token issuance");return JSON.readTree(r.body).get("access_token").asText();}
+ static String token(String persona)throws Exception{var r=request("POST",issuer+"/tokens/"+persona,null,null,"",null);require(r,200,"token issuance");return JSON.readTree(r.body).get("access_token").asString();}
  static void refresh()throws Exception{staff=token("staff");customerToken=token("customer");platform=token("platform");}
  static String movement(String key,int quantity,boolean adjustment){return "{\"operationId\":\""+key+"\",\"variantId\":\""+variant+"\",\""+(adjustment?"delta":"quantity")+"\":"+quantity+",\"reason\":\"QUALIFICATION\"}";}
  static String order(int quantity){return "{\"customerId\":\""+customer+"\",\"items\":[{\"variantId\":\""+variant+"\",\"quantity\":"+quantity+"}]}";}
@@ -101,7 +101,7 @@ public class OperationalProbe {
   var aggregate=new Metric();metrics.values().forEach(x->{aggregate.nanos.addAll(x.nanos);aggregate.unexpected.add(x.unexpected.sum());x.statuses.forEach((k,v)->aggregate.statuses.computeIfAbsent(k,z->new LongAdder()).add(v.sum()));});report.put("aggregateLatency",aggregate.report());var operations=new TreeMap<String,Object>();metrics.forEach((k,v)->operations.put(k,v.report()));report.put("operations",operations);emit("stage",report);
  }
  static Map<String,Object> dockerStats(){
-  try{String raw=docker("stats","--no-stream","--format","{{json .}}",ownedContainerId);var n=JSON.readTree(raw);return Map.of("cpuPercent",n.path("CPUPerc").asText(),"memoryUsage",n.path("MemUsage").asText(),"memoryPercent",n.path("MemPerc").asText(),"pids",n.path("PIDs").asText());}
+  try{String raw=docker("stats","--no-stream","--format","{{json .}}",ownedContainerId);var n=JSON.readTree(raw);return Map.of("cpuPercent",n.path("CPUPerc").asString(),"memoryUsage",n.path("MemUsage").asString(),"memoryPercent",n.path("MemPerc").asString(),"pids",n.path("PIDs").asString());}
   catch(Exception e){return Map.of("unavailable",true);}
  }
  static String docker(String... arguments)throws Exception{
@@ -155,7 +155,7 @@ public class OperationalProbe {
    app="http://127.0.0.1:"+((WebServerApplicationContext)context).getWebServer().getPort();var bean=context.getBean("developmentIssuer");issuer=(String)bean.getClass().getMethod("baseUri").invoke(bean);
    var dbBean=(org.testcontainers.postgresql.PostgreSQLContainer)context.getBean("developmentDatabase");ownedContainerId=dbBean.getContainerId();if(ownedContainerId==null||!ownedContainerId.matches("[0-9a-f]{12,64}"))throw new IllegalStateException("Owned fixture container identity unavailable");
    source=context.getBean(DataSource.class);var hikari=source.unwrap(HikariDataSource.class);pool=hikari.getHikariPoolMXBean();
-   var fixture=request("GET",issuer+"/fixture",null,null,null,null);require(fixture,200,"fixture");var f=JSON.readTree(fixture.body);tenant=f.get("tenantId").asText();variant=f.get("variantId").asText();customer=f.get("customerId").asText();product=f.get("productId").asText();refresh();
+   var fixture=request("GET",issuer+"/fixture",null,null,null,null);require(fixture,200,"fixture");var f=JSON.readTree(fixture.body);tenant=f.get("tenantId").asString();variant=f.get("variantId").asString();customer=f.get("customerId").asString();product=f.get("productId").asString();refresh();
    emit("runtime",Map.of("poolMaximum",hikari.getMaximumPoolSize(),"poolAcquisitionTimeoutMs",hikari.getConnectionTimeout(),"postgres","18.6 pinned fixture","dataset","one synthetic tenant/product/variant/customer; one contended inventory position","distribution","10 requests/cycle: 3 reads, 2 movement writes + 2 replays, 1 order + replay + expected conflict","requestTimeoutSeconds",15));
    int live=request("GET",app+"/livez",null,null,null,null).status,ready=request("GET",app+"/readyz",null,null,null,null).status;
    var preflight=HTTP.send(HttpRequest.newBuilder(URI.create(app+"/orders")).timeout(Duration.ofSeconds(15)).header("Origin","https://qualification.example").header("Access-Control-Request-Method","POST").header("Access-Control-Request-Headers","authorization,x-tenant-id,idempotency-key,content-type").method("OPTIONS",HttpRequest.BodyPublishers.noBody()).build(),HttpResponse.BodyHandlers.discarding());

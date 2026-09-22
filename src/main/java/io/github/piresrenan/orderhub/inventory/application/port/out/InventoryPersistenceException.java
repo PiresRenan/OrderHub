@@ -13,6 +13,8 @@ package io.github.piresrenan.orderhub.inventory.application.port.out;
  */
 public final class InventoryPersistenceException
         extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+
 
     public InventoryPersistenceException(
             Throwable cause) {

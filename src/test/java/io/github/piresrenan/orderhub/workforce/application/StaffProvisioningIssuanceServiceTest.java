@@ -638,8 +638,8 @@ class StaffProvisioningIssuanceServiceTest {
 
         private static final long serialVersionUID = 1L;
 
-        private final List<byte[]> templates;
-        private final List<byte[]> targets =
+        private final transient List<byte[]> templates;
+        private final transient List<byte[]> targets =
                 new ArrayList<>();
 
         private int index;
@@ -651,7 +651,7 @@ class StaffProvisioningIssuanceServiceTest {
                     Arrays.stream(
                             templates)
                             .map(
-                                    byte[]::clone)
+                                    value -> value.clone())
                             .toList();
         }
 

@@ -6,6 +6,8 @@ package io.github.piresrenan.orderhub.orders.adapter.in.web;
  */
 final class OrderIdempotencyKeyInvalidException
         extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+
 
     OrderIdempotencyKeyInvalidException() {
 

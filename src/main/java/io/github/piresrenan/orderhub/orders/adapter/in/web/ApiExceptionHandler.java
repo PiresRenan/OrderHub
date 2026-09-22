@@ -17,7 +17,6 @@ import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.HttpMediaTypeNotAcceptableException;
-import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
@@ -73,7 +72,7 @@ public final class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         protected ResponseEntity<Object> handleCreateOrderIdempotencyKeyReused() {
 
                 var status =
-                                HttpStatus.UNPROCESSABLE_ENTITY;
+                                HttpStatus.UNPROCESSABLE_CONTENT;
 
                 var problem =
                                 problem(
@@ -164,7 +163,7 @@ public final class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         @ExceptionHandler(OrderRequestTooLargeException.class)
         protected ResponseEntity<Object> handleOrderRequestTooLarge() {
 
-                var status = HttpStatus.PAYLOAD_TOO_LARGE;
+                var status = HttpStatus.CONTENT_TOO_LARGE;
 
                 var problem = problem(
                                 status,

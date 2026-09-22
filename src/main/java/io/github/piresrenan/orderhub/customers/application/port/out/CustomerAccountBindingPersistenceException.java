@@ -12,6 +12,8 @@ package io.github.piresrenan.orderhub.customers.application.port.out;
  */
 public final class CustomerAccountBindingPersistenceException
         extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+
 
     public CustomerAccountBindingPersistenceException(
             Throwable cause) {

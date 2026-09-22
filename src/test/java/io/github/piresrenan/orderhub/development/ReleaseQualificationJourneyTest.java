@@ -41,7 +41,7 @@ class ReleaseQualificationJourneyTest {
             var jdbc = new JdbcTemplate(context.getBean(javax.sql.DataSource.class));
             var identities = context.getBean(ResolveExternalIdentityUseCase.class);
             var fixture = read(request("GET", issuer + "/fixture", null, null, null), 200);
-            var originalTenant = fixture.get("tenantId").asText();
+            var originalTenant = fixture.get("tenantId").asString();
             var platform = token(issuer, "platform");
             var staff = token(issuer, "outsider");
             var customer = token(issuer, "customer");
@@ -56,11 +56,11 @@ class ReleaseQualificationJourneyTest {
                     DevelopmentIssuer.subject("outsider")))).isEmpty();
 
             var organization = call(app, "POST", "/platform/organizations", platform, null,
-                    Map.of("name", "Release qualification organization"), 201).get("id").asText();
+                    Map.of("name", "Release qualification organization"), 201).get("id").asString();
             var unrelatedOrganization = call(app, "POST", "/platform/organizations", platform, null,
-                    Map.of("name", "Unrelated qualification organization"), 201).get("id").asText();
+                    Map.of("name", "Unrelated qualification organization"), 201).get("id").asString();
             var tenant = call(app, "POST", "/platform/tenants", platform, null,
-                    Map.of("name", "Release qualification tenant"), 201).get("id").asText();
+                    Map.of("name", "Release qualification tenant"), 201).get("id").asString();
             var tenantId = UUID.fromString(tenant);
             call(app, "PUT", "/platform/organizations/" + organization + "/tenants/" + tenant,
                     platform, null, null, 204);
@@ -76,7 +76,7 @@ class ReleaseQualificationJourneyTest {
             var issuanceReplay = call(app, "POST", issuePath, platform, null, issuanceBody, 200);
             assertThat(issuanceReplay.has("credential")).isFalse();
             assertThat(issuanceReplay.get("intentId")).isEqualTo(proof.get("intentId"));
-            var staffCredential = Map.of("credential", proof.get("credential").asText());
+            var staffCredential = Map.of("credential", proof.get("credential").asString());
             call(app, "POST", "/identity/bootstrap/staff", staff, null, staffCredential, 200);
             call(app, "POST", "/identity/bootstrap/staff", staff, null, staffCredential, 403);
             call(app, "GET", "/catalog/products", staff, tenant, null, 200);
@@ -95,7 +95,7 @@ class ReleaseQualificationJourneyTest {
                     organizationViewer, null, null, 200);
             assertThat(listed.isArray()).isTrue();
             assertThat(listed.size()).isEqualTo(1);
-            assertThat(listed.get(0).get("id").asText()).isEqualTo(tenant);
+            assertThat(listed.get(0).get("id").asString()).isEqualTo(tenant);
             call(app, "GET", "/organizations/" + unrelatedOrganization + "/tenants",
                     organizationViewer, null, null, 404); // Owner anti-enumeration contract.
             call(app, "GET", "/inventory/positions", organizationViewer, tenant, null, 403);
@@ -115,14 +115,14 @@ class ReleaseQualificationJourneyTest {
                     Map.of("expectedRevision", variant.get("revision").asLong()), 200);
             product = call(app, "POST", "/catalog/products/" + productId + "/activate", staff, tenant,
                     Map.of("expectedRevision", product.get("revision").asLong()), 200);
-            assertThat(product.get("status").asText()).isEqualTo("ACTIVE");
-            assertThat(variant.get("status").asText()).isEqualTo("ACTIVE");
+            assertThat(product.get("status").asString()).isEqualTo("ACTIVE");
+            assertThat(variant.get("status").asString()).isEqualTo("ACTIVE");
             call(app, "PUT", "/catalog/variants/" + variantId + "/prices/BRL", staff, tenant,
                     Map.of("expectedRevision", 0, "minorUnits", 1290), 200);
             var price = call(app, "GET", "/catalog/variants/" + variantId + "/prices/BRL", staff, tenant, null, 200);
             assertThat(price.get("minorUnits").asLong()).isEqualTo(1290);
             assertThat(call(app, "GET", "/catalog/products/" + productId, staff, tenant, null, 200)
-                    .get("categoryIds").get(0).asText()).isEqualTo(categoryId.toString());
+                    .get("categoryIds").get(0).asString()).isEqualTo(categoryId.toString());
             call(app, "GET", "/catalog/products", staff, tenant, null, 200);
             call(app, "GET", "/catalog/products/" + productId, organizationViewer, originalTenant, null, 404);
             call(app, "PUT", "/catalog/variants/" + variantId + "/prices/BRL", staff, tenant,
@@ -155,7 +155,7 @@ class ReleaseQualificationJourneyTest {
             var customerProof = call(app, "POST", "/administration/tenants/" + tenant + "/customers/"
                     + customerProfile.customerId() + "/account-link-proofs", staff, null, operation(), 200);
             call(app, "POST", "/tenants/" + tenant + "/customer-account-links", customer, null,
-                    Map.of("credential", customerProof.get("credential").asText()), 200);
+                    Map.of("credential", customerProof.get("credential").asString()), 200);
             call(app, "GET", stockPath, customer, tenant, null, 403);
             assertThat(count(jdbc, "SELECT count(*) FROM customers.account_link_events WHERE tenant_id = ? AND action = 'CONSUMED'", tenantId)).isEqualTo(1);
 
@@ -163,7 +163,7 @@ class ReleaseQualificationJourneyTest {
             var idempotencyKey = "qualification-" + UUID.randomUUID();
             var first = read(createOrder(app, customer, tenant, orderBody, idempotencyKey), 201);
             assertThat(read(createOrder(app, customer, tenant, orderBody, idempotencyKey), 201)).isEqualTo(first);
-            var orderPath = "/orders/" + first.get("id").asText();
+            var orderPath = "/orders/" + first.get("id").asString();
             call(app, "GET", orderPath, customer, tenant, null, 200);
             // Same Customer User is bound in both tenants: changing only the
             // selector must still hide the order that belongs to this tenant.
@@ -207,7 +207,7 @@ class ReleaseQualificationJourneyTest {
     }
 
     private String token(String issuer, String persona) throws Exception {
-        return read(request("POST", issuer + "/tokens/" + persona, null, null, ""), 200).get("access_token").asText();
+        return read(request("POST", issuer + "/tokens/" + persona, null, null, ""), 200).get("access_token").asString();
     }
 
     private JsonNode call(String app, String method, String path, String token, String tenant,

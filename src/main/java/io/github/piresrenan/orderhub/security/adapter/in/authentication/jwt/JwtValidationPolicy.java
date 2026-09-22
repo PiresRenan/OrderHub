@@ -52,7 +52,8 @@ public final class JwtValidationPolicy
         var timestamps = new JwtTimestampValidator();
         timestamps.setAllowEmptyExpiryClaim(false);
         var validators = new java.util.ArrayList<OAuth2TokenValidator<Jwt>>();
-        validators.add(JwtValidators.createDefaultWithValidators(timestamps, new JwtIssuerValidator(expectedIssuer)));
+        validators.add(JwtValidators.createDefaultWithValidators(
+                new java.util.ArrayList<>(java.util.List.of(timestamps, new JwtIssuerValidator(expectedIssuer)))));
         validators.add(new JwtAudienceValidator(expectedAudience));
         if (profile == JwtTokenProfile.COGNITO) {
             validators.add(new JwtClaimValidator<Object>("token_use", value -> "access".equals(value)));

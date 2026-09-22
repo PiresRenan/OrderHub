@@ -24,7 +24,6 @@ import org.springframework.test.context.TestPropertySource;
 
 import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryOperationException;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
-import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderIdempotencyKeyDigest;
 import io.github.piresrenan.orderhub.orders.support.TestCreateOrderIdempotencyKeyDigests;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
 import io.github.piresrenan.orderhub.orders.application.port.out.OrderPersistenceException;

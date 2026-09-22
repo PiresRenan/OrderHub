@@ -9,7 +9,7 @@ public record AdditionalJwtTrustProperties(List<Provider> additionalIssuers) {
     /** Freezes the explicit allowlist and rejects duplicate issuer trust instead of silently shadowing it. */
     public AdditionalJwtTrustProperties {
         additionalIssuers = additionalIssuers == null ? List.of() : List.copyOf(additionalIssuers);
-        if (additionalIssuers.stream().map(Provider::issuer).distinct().count() != additionalIssuers.size()) {
+        if (additionalIssuers.stream().map(value -> value.issuer()).distinct().count() != additionalIssuers.size()) {
             throw new IllegalArgumentException("JWT trusted issuers must be unique");
         }
     }

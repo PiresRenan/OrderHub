@@ -2,7 +2,6 @@ package io.github.piresrenan.orderhub.orders.adapter.out.persistence.postgresql;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.List;
 
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
@@ -35,13 +34,16 @@ class PostgreSqlOrderIdempotencySchemaContractTest {
     @Container
     private static final PostgreSQLContainer POSTGRES =
             new PostgreSQLContainer(
-                    POSTGRES_IMAGE)
-                    .withDatabaseName(
+                    POSTGRES_IMAGE);
+
+    static {
+        POSTGRES.withDatabaseName(
                             "orderhub_test")
                     .withUsername(
                             "orderhub_test")
                     .withPassword(
                             "synthetic-test-password");
+    }
 
     @Test
     void migratesDurableCreateOrderIdempotencyPersistenceContract() {

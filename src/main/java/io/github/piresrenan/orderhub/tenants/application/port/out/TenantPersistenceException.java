@@ -11,6 +11,8 @@ package io.github.piresrenan.orderhub.tenants.application.port.out;
  * </p>
  */
 public final class TenantPersistenceException extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+
 
     /**
      * Creates a framework-neutral Tenant persistence failure while retaining the

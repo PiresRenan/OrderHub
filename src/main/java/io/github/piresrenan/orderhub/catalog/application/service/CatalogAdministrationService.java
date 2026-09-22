@@ -102,17 +102,17 @@ public final class CatalogAdministrationService {
     /** Makes a nonarchived Variant eligible for new business subject to Product eligibility. */
     public CatalogRevision<ProductVariant> activateVariant(CatalogAdminContext actor, UUID id, long expected) {
         authorizer.require(actor,CatalogAdminPermission.MANAGE);
-        return transactions.execute(() -> mutateVariant(actor,id,expected,"VARIANT_ACTIVATED",ProductVariant::activate));
+        return transactions.execute(() -> mutateVariant(actor,id,expected,"VARIANT_ACTIVATED",value -> value.activate()));
     }
     /** Temporarily removes an active Variant from new business. */
     public CatalogRevision<ProductVariant> deactivateVariant(CatalogAdminContext actor, UUID id, long expected) {
         authorizer.require(actor,CatalogAdminPermission.MANAGE);
-        return transactions.execute(() -> mutateVariant(actor,id,expected,"VARIANT_DEACTIVATED",ProductVariant::deactivate));
+        return transactions.execute(() -> mutateVariant(actor,id,expected,"VARIANT_DEACTIVATED",value -> value.deactivate()));
     }
     /** Retires the Variant while preserving historical references. */
     public CatalogRevision<ProductVariant> archiveVariant(CatalogAdminContext actor, UUID id, long expected) {
         authorizer.require(actor,CatalogAdminPermission.MANAGE);
-        return transactions.execute(() -> mutateVariant(actor,id,expected,"VARIANT_ARCHIVED",ProductVariant::archive));
+        return transactions.execute(() -> mutateVariant(actor,id,expected,"VARIANT_ARCHIVED",value -> value.archive()));
     }
     /** Serializes a Variant transition and its evidence against the expected revision. */
     private CatalogRevision<ProductVariant> mutateVariant(CatalogAdminContext actor, UUID id, long expected,

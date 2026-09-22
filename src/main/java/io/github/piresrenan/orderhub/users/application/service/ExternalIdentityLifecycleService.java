@@ -97,7 +97,7 @@ public final class ExternalIdentityLifecycleService implements ExternalIdentityL
     /** Returns the owner private active-binding projection without exposing provider subjects. */
     @Override public List<ExternalIdentityAccount> accounts(UUID user) {
         Objects.requireNonNull(user);
-        return transaction.execute(() -> repository.accounts(user).stream().filter(ExternalIdentityLifecycleRepository.Account::active)
+        return transaction.execute(() -> repository.accounts(user).stream().filter(value -> value.active())
                 .map(account -> new ExternalIdentityAccount(account.id(), account.issuer())).toList());
     }
 

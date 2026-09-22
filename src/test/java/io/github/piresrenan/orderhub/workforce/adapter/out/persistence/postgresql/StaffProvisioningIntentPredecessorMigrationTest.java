@@ -26,10 +26,13 @@ class StaffProvisioningIntentPredecessorMigrationTest {
 
     @Container
     private static final PostgreSQLContainer POSTGRES =
-            new PostgreSQLContainer(POSTGRES_IMAGE)
-                    .withDatabaseName("orderhub_test")
+            new PostgreSQLContainer(POSTGRES_IMAGE);
+
+    static {
+        POSTGRES.withDatabaseName("orderhub_test")
                     .withUsername("orderhub_test")
                     .withPassword("synthetic-test-password");
+    }
 
     private static final UUID INTENT_ID =
             UUID.fromString("7a6b5c4d-3e2f-4a1b-8c9d-0e1f2a3b4c5d");

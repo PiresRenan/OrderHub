@@ -58,7 +58,8 @@ public class OpenApiConfiguration {
                 .addProperty("field", new StringSchema().description("Rejected field name; never its value."))
                 .addProperty("code", new StringSchema().description("Validation constraint code."))
                 .addProperty("message", new StringSchema().description("Fixed public validation explanation."));
-        var problem = new ObjectSchema()
+        var problem = new ObjectSchema();
+        problem
                 .description("RFC 9457 public error. Codes differ by boundary; fields never contain credentials, rejected values, SQL or stack traces.")
                 .addProperty("type", new StringSchema().format("uri").description("Problem type URI, usually urn:orderhub:problem:<code>."))
                 .addProperty("title", new StringSchema().description("Short public explanation."))

@@ -81,10 +81,10 @@ class PostgreSqlCatalogAdministrationReadTest {
         products.createProduct(foreign,UUID.randomUUID(),new CatalogProductMetadata("Foreign","foreign",null,null));
         products.createVariant(actor,low,low,new CatalogVariantMetadata("LOW",null,null,null,List.of()));
         products.createVariant(actor,low,high,new CatalogVariantMetadata("HIGH",null,null,null,List.of()));
-        assertThat(reads.products(actor,null,1)).extracting(CatalogProductSummary::id).containsExactly(low);
-        assertThat(reads.products(actor,low,1)).extracting(CatalogProductSummary::id).containsExactly(high);
+        assertThat(reads.products(actor,null,1)).extracting(value -> value.id()).containsExactly(low);
+        assertThat(reads.products(actor,low,1)).extracting(value -> value.id()).containsExactly(high);
         assertThat(reads.products(actor,high,1)).isEmpty();
-        assertThat(reads.variants(actor,low,low,1)).extracting(CatalogVariantSummary::id).containsExactly(high);
+        assertThat(reads.variants(actor,low,low,1)).extracting(value -> value.id()).containsExactly(high);
         assertThatThrownBy(()->reads.products(actor,null,101)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(()->reads.variants(actor,low,null,0)).isInstanceOf(IllegalArgumentException.class);
         var denied=new CatalogAdministrationReadService((a,p)->{throw new CatalogAdminDeniedException();},repo,boundary);

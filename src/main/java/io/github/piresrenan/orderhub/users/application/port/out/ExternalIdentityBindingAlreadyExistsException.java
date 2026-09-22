@@ -11,6 +11,8 @@ package io.github.piresrenan.orderhub.users.application.port.out;
  */
 public final class ExternalIdentityBindingAlreadyExistsException
         extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+
 
     private static final String MESSAGE =
             "External identity binding already exists.";

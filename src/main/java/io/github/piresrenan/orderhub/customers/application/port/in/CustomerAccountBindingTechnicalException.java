@@ -15,6 +15,8 @@ import org.springframework.modulith.NamedInterface;
 @NamedInterface("account-binding")
 public final class CustomerAccountBindingTechnicalException
         extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+
 
     public CustomerAccountBindingTechnicalException(
             Throwable cause) {

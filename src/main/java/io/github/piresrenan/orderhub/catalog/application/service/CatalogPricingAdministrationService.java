@@ -25,7 +25,7 @@ public final class CatalogPricingAdministrationService {
         return transactions.execute(()-> {
             repository.variant(actor.tenantId(),variant,false).orElseThrow(CatalogAdminNotFoundException::new);
             var before=repository.price(actor.tenantId(),variant,currency,true);
-            if(before.map(CatalogRevision::revision).orElse(0L)!=expected) throw new CatalogAdminConflictException();
+            if(before.map(value -> value.revision()).orElse(0L)!=expected) throw new CatalogAdminConflictException();
             repository.savePrice(price,expected);
             repository.appendAudit(new CatalogAuditEvidence(UUID.randomUUID(),actor.tenantId(),actor.userId(),variant,
                     "BASE_PRICE_SET",expected,expected+1,actor.correlationId(),clock.instant(),currency,

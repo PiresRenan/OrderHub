@@ -42,10 +42,13 @@ class PostgreSqlWorkforceAuthorityChangeAnalyticsSourceTest {
 
     @Container
     private static final PostgreSQLContainer POSTGRES =
-            new PostgreSQLContainer(POSTGRES_IMAGE)
-                    .withDatabaseName("orderhub_test")
+            new PostgreSQLContainer(POSTGRES_IMAGE);
+
+    static {
+        POSTGRES.withDatabaseName("orderhub_test")
                     .withUsername("orderhub_test")
                     .withPassword("synthetic-test-password");
+    }
 
     private static final UUID TENANT_ID =
             UUID.fromString("00000000-0000-4000-8000-0000000000a1");

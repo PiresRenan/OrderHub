@@ -207,7 +207,9 @@ public final class CommitOrderInventoryService
                 aggregated.merge(
                         demand.variantId(),
                         demand.quantity(),
-                        Math::addExact);
+                        (current, added) -> Math.addExact(
+                                current.longValue(),
+                                added.longValue()));
 
             } catch (ArithmeticException exception) {
 

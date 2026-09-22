@@ -61,10 +61,13 @@ class PostgreSqlCatalogCommercialRepositoriesTest {
 
     @Container
     private static final PostgreSQLContainer POSTGRES =
-            new PostgreSQLContainer(POSTGRES_IMAGE)
-                    .withDatabaseName("orderhub_test")
+            new PostgreSQLContainer(POSTGRES_IMAGE);
+
+    static {
+        POSTGRES.withDatabaseName("orderhub_test")
                     .withUsername("orderhub_test")
                     .withPassword("synthetic-test-password");
+    }
 
     private static JdbcTemplate jdbcTemplate;
     private static TransactionOperations transactionOperations;
@@ -220,12 +223,12 @@ class PostgreSqlCatalogCommercialRepositoriesTest {
 
         assertThat(productRepository.findById(TENANT_A, PRODUCT_ID))
                 .get()
-                .extracting(Product::brand)
+                .extracting(value -> value.brand())
                 .isEqualTo("Brand A");
 
         assertThat(productRepository.findById(TENANT_B, PRODUCT_ID))
                 .get()
-                .extracting(Product::brand)
+                .extracting(value -> value.brand())
                 .isEqualTo("Brand B");
     }
 
@@ -480,12 +483,12 @@ class PostgreSqlCatalogCommercialRepositoriesTest {
 
         assertThat(productVariantRepository.findById(TENANT_A, VARIANT_ID))
                 .get()
-                .extracting(ProductVariant::mpn)
+                .extracting(value -> value.mpn())
                 .isEqualTo("MPN-A");
 
         assertThat(productVariantRepository.findById(TENANT_B, VARIANT_ID))
                 .get()
-                .extracting(ProductVariant::mpn)
+                .extracting(value -> value.mpn())
                 .isEqualTo("MPN-B");
     }
 
@@ -674,7 +677,7 @@ class PostgreSqlCatalogCommercialRepositoriesTest {
                         PRODUCT_ID);
 
         assertThat(media)
-                .extracting(CatalogMedia::id)
+                .extracting(value -> value.id())
                 .containsExactly(
                         firstId,
                         secondId,
@@ -743,21 +746,21 @@ class PostgreSqlCatalogCommercialRepositoriesTest {
                 catalogMediaRepository.findByVariant(
                         TENANT_A,
                         VARIANT_ID))
-                .extracting(CatalogMedia::reference)
+                .extracting(value -> value.reference())
                 .containsExactly("tenant-a-video");
 
         assertThat(
                 catalogMediaRepository.findByProduct(
                         TENANT_A,
                         PRODUCT_ID))
-                .extracting(CatalogMedia::reference)
+                .extracting(value -> value.reference())
                 .containsExactly("tenant-a-product-image");
 
         assertThat(
                 catalogMediaRepository.findByVariant(
                         TENANT_B,
                         VARIANT_ID))
-                .extracting(CatalogMedia::reference)
+                .extracting(value -> value.reference())
                 .containsExactly("tenant-b-video");
     }
 

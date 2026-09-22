@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.OffsetDateTime;
 import java.util.Arrays;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -24,7 +23,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
-import io.github.piresrenan.orderhub.workforce.application.model.ConsumedStaffProvisioningIntent;
 import io.github.piresrenan.orderhub.workforce.application.port.out.StaffProvisioningIntentRepository;
 
 /**
@@ -47,13 +45,16 @@ class PostgreSqlStaffProvisioningIntentConcurrencyTest {
     @Container
     private static final PostgreSQLContainer POSTGRES =
             new PostgreSQLContainer(
-                    POSTGRES_IMAGE)
-                    .withDatabaseName(
+                    POSTGRES_IMAGE);
+
+    static {
+        POSTGRES.withDatabaseName(
                             "orderhub_test")
                     .withUsername(
                             "orderhub_test")
                     .withPassword(
                             "synthetic-test-password");
+    }
 
     private static JdbcTemplate jdbcTemplate;
 

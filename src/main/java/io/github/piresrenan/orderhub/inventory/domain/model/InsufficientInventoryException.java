@@ -11,6 +11,8 @@ package io.github.piresrenan.orderhub.inventory.domain.model;
  */
 public final class InsufficientInventoryException
         extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+
 
     public InsufficientInventoryException() {
         super(

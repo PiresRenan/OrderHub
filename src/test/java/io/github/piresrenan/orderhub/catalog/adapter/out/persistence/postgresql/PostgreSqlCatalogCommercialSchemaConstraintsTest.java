@@ -40,10 +40,13 @@ class PostgreSqlCatalogCommercialSchemaConstraintsTest {
 
     @Container
     private static final PostgreSQLContainer POSTGRES =
-            new PostgreSQLContainer(POSTGRES_IMAGE)
-                    .withDatabaseName("orderhub_test")
+            new PostgreSQLContainer(POSTGRES_IMAGE);
+
+    static {
+        POSTGRES.withDatabaseName("orderhub_test")
                     .withUsername("orderhub_test")
                     .withPassword("synthetic-test-password");
+    }
 
     private static JdbcTemplate jdbcTemplate;
 
@@ -587,11 +590,10 @@ class PostgreSqlCatalogCommercialSchemaConstraintsTest {
             current = current.getCause();
         }
 
-        assertThat(current)
-                .isInstanceOf(PSQLException.class);
-
-        var postgresException =
-                (PSQLException) current;
+        if (!(current instanceof PSQLException postgresException)) {
+            throw new AssertionError(
+                    "Expected a PSQLException in the cause chain", exception);
+        }
 
         assertThat(postgresException.getSQLState())
                 .isEqualTo(expectedSqlState);

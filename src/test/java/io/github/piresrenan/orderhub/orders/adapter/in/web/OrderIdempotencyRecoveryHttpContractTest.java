@@ -34,7 +34,7 @@ class OrderIdempotencyRecoveryHttpContractTest {
 
         assertProblem(
                 response,
-                HttpStatus.UNPROCESSABLE_ENTITY,
+                HttpStatus.UNPROCESSABLE_CONTENT,
                 "urn:orderhub:problem:idempotency-key-reused",
                 "IDEMPOTENCY_KEY_REUSED",
                 "The request idempotency key cannot be reused for different request content.");
@@ -77,7 +77,7 @@ class OrderIdempotencyRecoveryHttpContractTest {
             assertThat(
                     Arrays.stream(
                                     annotation.value())
-                            .map(Class::getName)
+                            .map(value -> value.getName())
                             .toList())
                     .contains(
                             CreateOrderIdempotencyPersistenceException.class
@@ -137,7 +137,7 @@ class OrderIdempotencyRecoveryHttpContractTest {
             assertThat(
                     Arrays.stream(
                                     annotation.value())
-                            .map(Class::getName)
+                            .map(value -> value.getName())
                             .toList())
                     .contains(
                             handledException.getName());

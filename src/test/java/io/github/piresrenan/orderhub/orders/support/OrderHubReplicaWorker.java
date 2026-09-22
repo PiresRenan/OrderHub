@@ -17,7 +17,6 @@ import org.springframework.transaction.PlatformTransactionManager;
 
 import io.github.piresrenan.orderhub.OrderHubApplication;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
-import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderIdempotencyKeyDigest;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
 
 /**

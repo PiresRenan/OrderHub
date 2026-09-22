@@ -6,6 +6,8 @@ package io.github.piresrenan.orderhub.orders.application.port.in;
  */
 public final class CustomerOrderUnavailableException
         extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+
 
     public CustomerOrderUnavailableException() {
 

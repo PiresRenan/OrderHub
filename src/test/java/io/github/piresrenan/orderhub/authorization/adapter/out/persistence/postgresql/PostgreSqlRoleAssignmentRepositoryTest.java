@@ -16,7 +16,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
-import io.github.piresrenan.orderhub.authorization.adapter.out.persistence.postgresql.PostgreSqlRoleAssignmentRepository;
 import io.github.piresrenan.orderhub.authorization.application.port.out.AuthorizationPersistenceException;
 import io.github.piresrenan.orderhub.authorization.application.port.out.RoleAssignmentRepository;
 import io.github.piresrenan.orderhub.authorization.domain.model.AuthorizationPersona;
@@ -34,10 +33,13 @@ class PostgreSqlRoleAssignmentRepositoryTest {
 
     @Container
     private static final PostgreSQLContainer POSTGRES =
-            new PostgreSQLContainer(POSTGRES_IMAGE)
-                    .withDatabaseName("orderhub_test")
+            new PostgreSQLContainer(POSTGRES_IMAGE);
+
+    static {
+        POSTGRES.withDatabaseName("orderhub_test")
                     .withUsername("orderhub_test")
                     .withPassword("synthetic-test-password");
+    }
 
     private static JdbcTemplate jdbcTemplate;
 
@@ -147,7 +149,7 @@ class PostgreSqlRoleAssignmentRepositoryTest {
                         userId,
                         tenantA))
                 .extracting(
-                        RoleAssignment::roleCode)
+                        value -> value.roleCode())
                 .containsExactly(
                         "INVENTORY_OPERATOR");
 
@@ -156,7 +158,7 @@ class PostgreSqlRoleAssignmentRepositoryTest {
                         userId,
                         tenantB))
                 .extracting(
-                        RoleAssignment::roleCode)
+                        value -> value.roleCode())
                 .containsExactly(
                         "ORDER_OPERATOR");
     }

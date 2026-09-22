@@ -31,8 +31,8 @@ public final class LocalDevelopmentApplication {
         if (applicationPort < 0 || applicationPort > 65535 || issuerPort < 0 || issuerPort > 65535) {
             throw new IllegalArgumentException("Invalid development port");
         }
-        var database = new PostgreSQLContainer(DockerImageName.parse(POSTGRES).asCompatibleSubstituteFor("postgres"))
-                .withDatabaseName("orderhub_development")
+        var database = new PostgreSQLContainer(DockerImageName.parse(POSTGRES).asCompatibleSubstituteFor("postgres"));
+        database.withDatabaseName("orderhub_development")
                 .withUsername("orderhub_development")
                 .withPassword("synthetic-disposable-development-password");
         DevelopmentIssuer issuer = null;
