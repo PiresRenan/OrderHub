@@ -36,7 +36,8 @@ public final class DevelopmentIssuer implements AutoCloseable {
 
     static String subject(String persona) { return "synthetic-local-" + persona; }
 
-    void ready(Map<String, Object> selectors) { fixture.set(Map.copyOf(selectors)); }
+    /** Publishes the complete manifest once; insertion order is kept so its structure is deterministic. */
+    void ready(Map<String, Object> selectors) { fixture.set(java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(selectors))); }
 
     private void handle(HttpExchange exchange) throws IOException {
         try (exchange) {

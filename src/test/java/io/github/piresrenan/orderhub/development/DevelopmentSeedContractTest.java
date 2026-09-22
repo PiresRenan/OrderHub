@@ -31,6 +31,9 @@ class DevelopmentSeedContractTest {
     private static final Set<String> PERSONAS = Set.of("platform", "staff", "beta-admin", "multi-tenant-staff",
             "alpha-member-no-role", "alpha-suspended", "alpha-terminated", "org-viewer", "customer",
             "alpha-customer-2", "beta-customer", "outsider", "unbound");
+    /** Documented, ordered top-level manifest fields (docs/development/seed-data.md). */
+    static final List<String> MANIFEST_FIELDS = List.of("schemaVersion", "issuer", "tenantId", "productId", "variantId",
+            "customerId", "personas", "organizations", "tenants", "customers", "catalog", "inventory", "orders", "outstanding");
     private static final Set<String> SECRET_FIELDS = Set.of("credential", "access_token", "token", "password",
             "privateKey", "secret", "d", "p", "q");
     private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
@@ -41,6 +44,7 @@ class DevelopmentSeedContractTest {
         try (var context = LocalDevelopmentApplication.start(0, 0)) {
             var manifest = manifest(context);
             assertThat(manifest.get("schemaVersion").asInt()).isEqualTo(1);
+            assertThat(List.copyOf(manifest.propertyNames())).containsExactlyElementsOf(MANIFEST_FIELDS);
             assertThat(names(manifest.get("personas"), "name")).containsExactlyInAnyOrderElementsOf(PERSONAS);
             assertThat(names(manifest.get("organizations"), "key")).containsExactlyInAnyOrder("north", "south", "dormant");
             assertThat(names(manifest.get("tenants"), "key")).containsExactlyInAnyOrder("alpha", "beta", "gamma", "delta", "epsilon");
