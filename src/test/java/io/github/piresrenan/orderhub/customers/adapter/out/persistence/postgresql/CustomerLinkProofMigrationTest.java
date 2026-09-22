@@ -9,6 +9,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.TestPropertySource;
 import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
 
 /** Customer proof durability is independent of Staff placement and role state. */
@@ -19,6 +20,7 @@ import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
  */
 @SpringBootTest
 @Import(PostgreSqlTestConfiguration.class)
+@TestPropertySource(properties = "orderhub.security.jwt.token-profile=GENERIC")
 class CustomerLinkProofMigrationTest {
     @Autowired private JdbcTemplate jdbc;
 

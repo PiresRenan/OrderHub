@@ -3,12 +3,15 @@ package io.github.piresrenan.orderhub.api;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
+import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.media.JsonSchema;
 import io.swagger.v3.oas.models.media.Schema;
+import io.swagger.v3.oas.models.media.StringSchema;
 
 /** Completes reflected wire projections where Jackson extensions and owner invariants exceed annotation inference. */
 final class HttpSchemaContract {
@@ -19,7 +22,7 @@ final class HttpSchemaContract {
 
     /** Retains generated fields and references, tightening only verified public constraints rather than copying DTO definitions. */
     static void complete(OpenAPI api, int maxOrderItems) {
-        Map<String, Schema> schemas = api.getComponents().getSchemas();
+        Components schemas = api.getComponents();
         normalizedText(property(schemas, "AdministrativeNameRequest", "name"), 120, JAVA_WHITESPACE, false, false);
         for (var name : List.of("CatalogProductCreate", "CatalogProductUpdate", "CatalogCategoryCreate", "CatalogCategoryUpdate")) {
             // The application bounds raw Product/Category names before the domain strips whitespace.
@@ -38,7 +41,7 @@ final class HttpSchemaContract {
         }));
         for (var name : List.of("StaffProvisioningIssuance", "ExternalIdentityLinkIssuance", "CustomerLinkIssuance")) {
             for (var outcome : List.of("Issued", "Replay")) {
-                var schema = schemas.get(name + outcome);
+                Schema<?> schema = component(schemas, name + outcome);
                 requireAll(schema);
                 schema.setAdditionalProperties(false);
             }
@@ -50,15 +53,15 @@ final class HttpSchemaContract {
             property(schemas, name + "Issued", "expiresAt").setDescription("Absolute expiry with offset; proof validity is checked after database lock acquisition.");
         }
         for (var name : List.of("AdministrativeOrganization", "AdministrativeTenant", "OrganizationTenantSummary")) {
-            requireAll(schemas.get(name));
-            property(schemas, name, "status").setEnum(List.of("ACTIVE", "SUSPENDED"));
+            requireAll(component(schemas, name));
+            enumeration(property(schemas, name, "status"), "ACTIVE", "SUSPENDED");
             property(schemas, name, "name").setDescription("Current normalized administrative name.");
         }
         for (var name : List.of("CatalogProductSummary", "CatalogVariantSummary", "ExternalIdentityAccount", "InventoryMovement", "ProductVariantAttribute")) {
-            requireAll(schemas.get(name));
+            requireAll(component(schemas, name));
         }
         var displayName = property(schemas, "CatalogVariantSummary", "displayName");
-        displayName.setTypes(Set.of("string", "null"));
+        displayName.setTypes(new LinkedHashSet<>(List.of("string", "null")));
         for (var name : List.of("CatalogVariantCreate", "CatalogVariantUpdate", "CatalogVariantView", "CatalogVariantSummary")) {
             strictText(property(schemas, name, "sku"), 64);
         }
@@ -84,27 +87,27 @@ final class HttpSchemaContract {
         property(schemas, "InventoryMovement", "reason").setPattern("^[A-Z][A-Z0-9_]{0,63}$");
         property(schemas, "InventoryMovement", "occurredAt").setDescription("UTC occurrence instant, persisted at microsecond precision and retained on replay.");
         property(schemas, "CreateOrderRequest", "items").setMaxItems(maxOrderItems);
-        schemas.values().forEach(schema -> {
-            if (schema.getProperties() != null) schema.getProperties().values().forEach(valueSchema -> {
-                var field = (Schema) valueSchema;
+        for (Schema<?> schema : schemas.getSchemas().values()) {
+            if (schema.getProperties() == null) continue;
+            for (Schema<?> field : schema.getProperties().values()) {
                 var pattern = field.getPattern();
                 // Some regex engines allow $ before a final newline; Java matches() consumes the full value.
                 if (pattern != null && pattern.startsWith("^") && pattern.endsWith("$")) {
                     field.setPattern(pattern.substring(0, pattern.length() - 1) + "(?![\\s\\S])");
                 }
-            });
-        });
+            }
+        }
     }
 
     /** Describes owner normalization with code-point atoms valid in Java and ECMAScript with or without its Unicode flag. */
-    private static void normalizedText(Schema schema, int maximum, String whitespace, boolean rejectControls, boolean rawBound) {
+    private static void normalizedText(Schema<?> schema, int maximum, String whitespace, boolean rejectControls, boolean rawBound) {
         schema.setPattern(textPattern(maximum, whitespace, rejectControls, true));
         schema.setMinLength(1);
         schema.setMaxLength(rawBound ? maximum : null);
     }
 
     /** Keeps non-normalizing commercial identifiers/attribute values nonblank, control-free and unpadded. */
-    private static void strictText(Schema schema, int maximum) {
+    private static void strictText(Schema<?> schema, int maximum) {
         schema.setPattern(textPattern(maximum, CATALOG_WHITESPACE, true, false));
         schema.setMinLength(1);
         schema.setMaxLength(maximum);
@@ -120,12 +123,12 @@ final class HttpSchemaContract {
     }
 
     /** Closes actual request records recursively because the configured JSON parser rejects unknown fields. */
-    private static void closeRequest(Schema<?> schema, Map<String, Schema> schemas, Set<String> visited) {
+    private static void closeRequest(Schema<?> schema, Components schemas, Set<String> visited) {
         if (schema == null) return;
         if (schema.get$ref() != null) {
             var reference = schema.get$ref();
             if (reference.startsWith("#/components/schemas/") && visited.add(reference)) {
-                closeRequest(schemas.get(reference.substring("#/components/schemas/".length())), schemas, visited);
+                closeRequest(component(schemas, reference.substring("#/components/schemas/".length())), schemas, visited);
             }
             return;
         }
@@ -143,11 +146,27 @@ final class HttpSchemaContract {
     }
 
     /** Fails generation on source drift instead of silently manufacturing an absent wire field. */
-    private static Schema property(Map<String, Schema> schemas, String name, String field) {
-        var schema = schemas.get(name);
+    private static Schema<?> property(Components schemas, String name, String field) {
+        Schema<?> schema = component(schemas, name);
         if (schema == null || schema.getProperties() == null || !schema.getProperties().containsKey(field)) {
             throw new IllegalStateException("Expected wire schema property is absent: " + name + "." + field);
         }
-        return (Schema) schema.getProperties().get(field);
+        return schema.getProperties().get(field);
+    }
+
+    /** Reads one generated component; Swagger exposes the component map with an unparameterized value type. */
+    private static Schema<?> component(Components schemas, String name) {
+        return schemas.getSchemas().get(name);
+    }
+
+    /** Sets string enum values on the concrete generated model; any other model is source drift, never an unchecked write. */
+    private static void enumeration(Schema<?> schema, String... values) {
+        if (schema instanceof JsonSchema json) {
+            json.setEnum(List.<Object>of((Object[]) values));
+        } else if (schema instanceof StringSchema string) {
+            string.setEnum(List.of(values));
+        } else {
+            throw new IllegalStateException("Expected string enumeration schema model");
+        }
     }
 }

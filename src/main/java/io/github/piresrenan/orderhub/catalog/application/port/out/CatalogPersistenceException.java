@@ -11,6 +11,8 @@ package io.github.piresrenan.orderhub.catalog.application.port.out;
  * </p>
  */
 public final class CatalogPersistenceException extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+
 
     public CatalogPersistenceException(
             Throwable cause) {

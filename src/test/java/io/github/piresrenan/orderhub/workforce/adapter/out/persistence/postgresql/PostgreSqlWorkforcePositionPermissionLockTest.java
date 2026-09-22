@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.TestPropertySource;
 
 import io.github.piresrenan.orderhub.OrderHubApplication;
 import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
@@ -24,6 +25,7 @@ import io.github.piresrenan.orderhub.workforce.application.port.out.WorkforceTra
             OrderHubApplication.class,
             PostgreSqlTestConfiguration.class
         })
+@TestPropertySource(properties = "orderhub.security.jwt.token-profile=GENERIC")
 class PostgreSqlWorkforcePositionPermissionLockTest {
 
     @Autowired
@@ -80,7 +82,7 @@ class PostgreSqlWorkforcePositionPermissionLockTest {
                                     snapshot.requestedTargetPosition()
                                             .permissionEnvelope()
                                             .permissions())
-                                    .extracting(Enum::name)
+                                    .extracting(value -> value.name())
                                     .containsExactly(
                                             "CATALOG_VIEW");
 

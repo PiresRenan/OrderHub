@@ -31,8 +31,8 @@ public final class LocalDevelopmentApplication {
         if (applicationPort < 0 || applicationPort > 65535 || issuerPort < 0 || issuerPort > 65535) {
             throw new IllegalArgumentException("Invalid development port");
         }
-        var database = new PostgreSQLContainer(DockerImageName.parse(POSTGRES).asCompatibleSubstituteFor("postgres"))
-                .withDatabaseName("orderhub_development")
+        var database = new PostgreSQLContainer(DockerImageName.parse(POSTGRES).asCompatibleSubstituteFor("postgres"));
+        database.withDatabaseName("orderhub_development")
                 .withUsername("orderhub_development")
                 .withPassword("synthetic-disposable-development-password");
         DevelopmentIssuer issuer = null;
@@ -58,6 +58,7 @@ public final class LocalDevelopmentApplication {
                         Map.entry("springdoc.swagger-ui.enabled", true),
                         Map.entry("orderhub.security.jwt.issuer", ownedIssuer.baseUri()),
                         Map.entry("orderhub.security.jwt.audience", DevelopmentIssuer.AUDIENCE),
+                        Map.entry("orderhub.security.jwt.token-profile", "GENERIC"),
                         Map.entry("orderhub.security.jwt.jwk-set-uri", ownedIssuer.baseUri() + "/jwks"))));
                 context.getEnvironment().setActiveProfiles("dev");
                 var beans = (DefaultListableBeanFactory) context.getBeanFactory();

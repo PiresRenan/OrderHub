@@ -185,7 +185,7 @@ public final class ScopedAuthorizationEvaluator {
                                         request.userId(),
                                         request.scope()))
                         .map(
-                                UserPermissionOverride::override)
+                                value -> value.override())
                         .toList();
 
         return permissionEvaluator.evaluate(

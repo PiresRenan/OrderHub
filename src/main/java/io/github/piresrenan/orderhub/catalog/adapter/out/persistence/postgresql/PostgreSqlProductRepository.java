@@ -177,7 +177,7 @@ public final class PostgreSqlProductRepository
 
             var categoryIds =
                     rows.stream()
-                            .map(ProductRow::categoryId)
+                            .map(value -> value.categoryId())
                             .filter(Objects::nonNull)
                             .toList();
 

@@ -79,13 +79,16 @@ class PostgreSqlCategoryConcurrentReparentingAcceptanceTest {
     @Container
     private static final PostgreSQLContainer POSTGRES =
             new PostgreSQLContainer(
-                    POSTGRES_IMAGE)
-                    .withDatabaseName(
+                    POSTGRES_IMAGE);
+
+    static {
+        POSTGRES.withDatabaseName(
                             "orderhub_test")
                     .withUsername(
                             "orderhub_test")
                     .withPassword(
                             "synthetic-test-password");
+    }
 
     private static DriverManagerDataSource dataSource;
     private static JdbcTemplate jdbcTemplate;
@@ -182,7 +185,7 @@ class PostgreSqlCategoryConcurrentReparentingAcceptanceTest {
 
         var failures =
                 attempts.stream()
-                        .map(Attempt::failure)
+                        .map(value -> value.failure())
                         .filter(failure ->
                                 failure != null)
                         .toList();

@@ -11,13 +11,29 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.web.server.context.WebServerApplicationContext;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /** Why: onboarding needs real trust boundaries; Covers: owned fixtures and HTTP flows; Prevents: unsafe or unusable demo shortcuts. */
 class LocalDevelopmentAcceptanceTest {
     private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
     private final ObjectMapper json = new ObjectMapper();
+
+    @Test
+    void ambientProductionTokenProfileCannotReplaceOwnedSyntheticTrust() throws Exception {
+        // Why: the local issuer is generic; Covers: production profile leakage;
+        // Prevents: an operator environment making the disposable launcher unusable.
+        var key = "orderhub.security.jwt.token-profile";
+        var previous = System.getProperty(key);
+        try {
+            System.setProperty(key, "COGNITO");
+            try (var context = LocalDevelopmentApplication.start(0, 0)) {
+                assertThat(context.getBean(io.github.piresrenan.orderhub.security.adapter.in.authentication.jwt.JwtResourceServerProperties.class)
+                        .tokenProfile()).isEqualTo(io.github.piresrenan.orderhub.security.adapter.in.authentication.jwt.JwtTokenProfile.GENERIC);
+            }
+        } finally {
+            if (previous == null) System.clearProperty(key); else System.setProperty(key, previous);
+        }
+    }
 
     @Test
     void ambientHikariConnectionSettingsCannotRedirectFixtureWrites() throws Exception {
@@ -45,14 +61,14 @@ class LocalDevelopmentAcceptanceTest {
             var fixtureResponse = request("GET", issuer + "/fixture", null, null, null);
             assertThat(fixtureResponse.statusCode()).isEqualTo(200);
             var fixture = json.readTree(fixtureResponse.body());
-            var tenant = fixture.get("tenantId").asText();
-            var variant = fixture.get("variantId").asText();
-            var customer = fixture.get("customerId").asText();
+            var tenant = fixture.get("tenantId").asString();
+            var variant = fixture.get("variantId").asString();
+            var customer = fixture.get("customerId").asString();
             var staffToken = token(issuer, "staff");
             var customerToken = token(issuer, "customer");
             var outsiderToken = token(issuer, "outsider");
             assertThat(request("GET", app + "/readyz", null, null, null).statusCode()).isEqualTo(200);
-            assertThat(request("GET", app + "/catalog/products/" + fixture.get("productId").asText(), staffToken, tenant, null).statusCode()).isEqualTo(200);
+            assertThat(request("GET", app + "/catalog/products/" + fixture.get("productId").asString(), staffToken, tenant, null).statusCode()).isEqualTo(200);
             assertThat(request("GET", app + "/inventory/positions/" + variant, customerToken, tenant, null).statusCode()).isEqualTo(403);
             assertThat(request("GET", app + "/inventory/positions/" + variant, outsiderToken, tenant, null).statusCode()).isEqualTo(403);
 
@@ -85,7 +101,7 @@ class LocalDevelopmentAcceptanceTest {
         var response = request("POST", issuer + "/tokens/" + persona, null, null, "");
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.headers().firstValue("Cache-Control")).contains("no-store");
-        return json.readTree(response.body()).get("access_token").asText();
+        return json.readTree(response.body()).get("access_token").asString();
     }
 
     private HttpResponse<String> createOrder(String app, String token, String tenant, String body, String key) throws Exception {

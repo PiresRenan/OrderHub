@@ -19,7 +19,7 @@ import tools.jackson.databind.ObjectMapper;
 /** Ephemeral loopback fixture issuer, deliberately excluded from the application HTTP surface. */
 public final class DevelopmentIssuer implements AutoCloseable {
     static final String AUDIENCE = "orderhub-disposable-development";
-    private static final Set<String> PERSONAS = Set.of("platform", "staff", "customer", "outsider");
+    private static final Set<String> PERSONAS = Set.copyOf(DevelopmentSeedCatalog.PERSONA_NAMES);
     private final RSAKey key = RealJwtTestSupport.generateRsaKey("disposable-development");
     private final ObjectMapper json = new ObjectMapper();
     private final HttpServer server;
@@ -36,7 +36,8 @@ public final class DevelopmentIssuer implements AutoCloseable {
 
     static String subject(String persona) { return "synthetic-local-" + persona; }
 
-    void ready(Map<String, Object> selectors) { fixture.set(Map.copyOf(selectors)); }
+    /** Publishes the complete manifest once; insertion order is kept so its structure is deterministic. */
+    void ready(Map<String, Object> selectors) { fixture.set(java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(selectors))); }
 
     private void handle(HttpExchange exchange) throws IOException {
         try (exchange) {

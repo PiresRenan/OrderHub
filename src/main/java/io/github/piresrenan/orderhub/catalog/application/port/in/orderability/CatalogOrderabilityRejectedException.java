@@ -6,6 +6,8 @@ package io.github.piresrenan.orderhub.catalog.application.port.in.orderability;
  */
 public final class CatalogOrderabilityRejectedException
         extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+
 
     public CatalogOrderabilityRejectedException() {
 

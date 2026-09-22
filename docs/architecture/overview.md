@@ -126,4 +126,5 @@ Design history: [persistence](../adr/ADR-0005-postgresql-persistence-and-transac
 [identity lifecycle](../adr/ADR-0017-tenant-identity-provisioning-and-account-lifecycle.md),
 [retention](../adr/ADR-0018-bounded-operational-data-lifecycle.md).
 Historical qualification checkpoints remain records of their own scope; this
-guide describes the current integrated design plus the OH-021 candidate.
+guide describes the current release candidate. [Client integration](../integration/README.md)
+defines direct browser, optional BFF and explicit POST-v1 M2M/payment/AI boundaries.

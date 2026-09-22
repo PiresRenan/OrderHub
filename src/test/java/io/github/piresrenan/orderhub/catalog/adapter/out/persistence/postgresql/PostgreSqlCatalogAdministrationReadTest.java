@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.test.context.TestPropertySource;
 import io.github.piresrenan.orderhub.catalog.application.port.in.administration.*;
 import io.github.piresrenan.orderhub.catalog.application.service.*;
 import io.github.piresrenan.orderhub.catalog.adapter.out.transaction.postgresql.PostgreSqlCatalogAdminTransactionExecutor;
@@ -21,6 +22,7 @@ import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
  * Prevents: whole-catalog responses and foreign-Tenant enumeration. */
 @SpringBootTest
 @Import(PostgreSqlTestConfiguration.class)
+@TestPropertySource(properties = "orderhub.security.jwt.token-profile=GENERIC")
 class PostgreSqlCatalogAdministrationReadTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager manager;
@@ -79,10 +81,10 @@ class PostgreSqlCatalogAdministrationReadTest {
         products.createProduct(foreign,UUID.randomUUID(),new CatalogProductMetadata("Foreign","foreign",null,null));
         products.createVariant(actor,low,low,new CatalogVariantMetadata("LOW",null,null,null,List.of()));
         products.createVariant(actor,low,high,new CatalogVariantMetadata("HIGH",null,null,null,List.of()));
-        assertThat(reads.products(actor,null,1)).extracting(CatalogProductSummary::id).containsExactly(low);
-        assertThat(reads.products(actor,low,1)).extracting(CatalogProductSummary::id).containsExactly(high);
+        assertThat(reads.products(actor,null,1)).extracting(value -> value.id()).containsExactly(low);
+        assertThat(reads.products(actor,low,1)).extracting(value -> value.id()).containsExactly(high);
         assertThat(reads.products(actor,high,1)).isEmpty();
-        assertThat(reads.variants(actor,low,low,1)).extracting(CatalogVariantSummary::id).containsExactly(high);
+        assertThat(reads.variants(actor,low,low,1)).extracting(value -> value.id()).containsExactly(high);
         assertThatThrownBy(()->reads.products(actor,null,101)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(()->reads.variants(actor,low,null,0)).isInstanceOf(IllegalArgumentException.class);
         var denied=new CatalogAdministrationReadService((a,p)->{throw new CatalogAdminDeniedException();},repo,boundary);

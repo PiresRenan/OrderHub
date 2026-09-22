@@ -32,10 +32,11 @@ public class PostgreSqlTestConfiguration {
     @Bean
     @ServiceConnection
     PostgreSQLContainer postgresContainer() {
-        return new PostgreSQLContainer(POSTGRES_IMAGE)
-                .withDatabaseName("orderhub_test")
+        var container = new PostgreSQLContainer(POSTGRES_IMAGE);
+        container.withDatabaseName("orderhub_test")
                 .withUsername("orderhub_test")
                 .withPassword("synthetic-test-password");
+        return container;
     }
 
     /**

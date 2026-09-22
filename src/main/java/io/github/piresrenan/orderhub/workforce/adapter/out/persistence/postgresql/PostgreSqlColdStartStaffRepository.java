@@ -58,7 +58,7 @@ public final class PostgreSqlColdStartStaffRepository implements ColdStartStaffR
             }
             var actual = jdbc.query("SELECT permission_code FROM workforce.job_position_permissions WHERE tenant_id = ? AND position_id = ? FOR SHARE",
                     (row, index) -> row.getString("permission_code"), tenantId, position);
-            var expected = envelope.permissions().stream().map(Enum::name).collect(java.util.stream.Collectors.toSet());
+            var expected = envelope.permissions().stream().map(value -> value.name()).collect(java.util.stream.Collectors.toSet());
             if (!java.util.Set.copyOf(actual).equals(expected)) { throw new StaffProvisioningUnavailableException(); }
             return new ColdStartStaffPlacement(department, position);
         } catch (DataAccessException exception) {

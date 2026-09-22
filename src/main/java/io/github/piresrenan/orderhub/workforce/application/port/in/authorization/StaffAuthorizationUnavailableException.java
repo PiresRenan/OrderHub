@@ -2,6 +2,8 @@ package io.github.piresrenan.orderhub.workforce.application.port.in.authorizatio
 
 /** Technical uncertainty is distinct from a policy denial and discloses no authority state. */
 public final class StaffAuthorizationUnavailableException extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+
 
     /** Retains the diagnostic cause internally while publishing only a constant message. */
     public StaffAuthorizationUnavailableException(Throwable cause) {

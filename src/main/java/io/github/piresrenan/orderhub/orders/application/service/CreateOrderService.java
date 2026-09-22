@@ -180,7 +180,7 @@ public final class CreateOrderService
                         persistedOrder.items()
                                 .stream()
                                 .map(
-                                        OrderItem::variantId)
+                                        value -> value.variantId())
                                 .toList()));
 
         var inventoryOutcome =

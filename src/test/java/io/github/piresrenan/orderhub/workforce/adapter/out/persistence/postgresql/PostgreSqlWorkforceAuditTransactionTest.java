@@ -3,7 +3,6 @@ package io.github.piresrenan.orderhub.workforce.adapter.out.persistence.postgres
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.sql.SQLException;
-import java.util.List;
 import java.util.UUID;
 
 import javax.sql.DataSource;
@@ -33,10 +32,13 @@ class PostgreSqlWorkforceAuditTransactionTest {
 
     @Container
     private static final PostgreSQLContainer POSTGRES =
-            new PostgreSQLContainer(POSTGRES_IMAGE)
-                    .withDatabaseName("orderhub_test")
+            new PostgreSQLContainer(POSTGRES_IMAGE);
+
+    static {
+        POSTGRES.withDatabaseName("orderhub_test")
                     .withUsername("orderhub_test")
                     .withPassword("synthetic-test-password");
+    }
 
     private static JdbcTemplate jdbcTemplate;
 

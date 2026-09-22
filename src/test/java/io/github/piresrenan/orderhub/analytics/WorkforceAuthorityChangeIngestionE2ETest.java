@@ -26,6 +26,7 @@ import org.springframework.modulith.events.ResubmissionOptions;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.test.context.TestPropertySource;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -78,6 +79,7 @@ import io.github.piresrenan.orderhub.workforce.domain.model.WorkforceMutationDec
             WorkforceAuthorityChangeIngestionE2ETest
                     .FailableAnalyticalFactPersistenceConfiguration.class
         })
+@TestPropertySource(properties = "orderhub.security.jwt.token-profile=GENERIC")
 class WorkforceAuthorityChangeIngestionE2ETest {
 
     private static final Duration SETTLE_TIMEOUT =
@@ -567,7 +569,7 @@ class WorkforceAuthorityChangeIngestionE2ETest {
 
             assertThat(
                     tags.stream()
-                            .map(io.micrometer.core.instrument.Tag::getKey)
+                            .map(value -> value.getKey())
                             .toList())
                     .as("The projection metric must carry exactly one bounded"
                             + " dimension")

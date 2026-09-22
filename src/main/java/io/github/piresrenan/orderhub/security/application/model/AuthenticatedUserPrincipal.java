@@ -15,7 +15,7 @@ import java.util.UUID;
  * @param userId authenticated internal OrderHub User identifier
  */
 public record AuthenticatedUserPrincipal(
-        UUID userId) {
+        UUID userId) implements java.io.Serializable {
 
     /**
      * Validates the minimum invariant required to represent an authenticated

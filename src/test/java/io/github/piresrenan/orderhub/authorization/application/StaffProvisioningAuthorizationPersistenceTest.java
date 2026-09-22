@@ -24,7 +24,6 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 import io.github.piresrenan.orderhub.authorization.adapter.out.persistence.postgresql.*;
 import io.github.piresrenan.orderhub.authorization.application.port.in.provisioning.*;
-import io.github.piresrenan.orderhub.authorization.application.port.out.StaffProvisioningAuthorizationRepository;
 import io.github.piresrenan.orderhub.authorization.application.service.StaffProvisioningAuthorizationService;
 import io.github.piresrenan.orderhub.authorization.domain.model.*;
 

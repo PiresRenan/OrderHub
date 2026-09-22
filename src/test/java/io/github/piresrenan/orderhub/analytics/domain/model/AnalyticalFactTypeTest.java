@@ -3,7 +3,6 @@ package io.github.piresrenan.orderhub.analytics.domain.model;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
-import java.lang.reflect.Method;
 import java.util.Arrays;
 
 import org.junit.jupiter.api.Test;
@@ -45,7 +44,7 @@ class AnalyticalFactTypeTest {
                             Arrays.stream(
                                             classificationType
                                                     .getEnumConstants())
-                                    .map(Object::toString))
+                                    .map(value -> value.toString()))
                             .as("Only the classification required by a current"
                                     + " analytical fact may be declared")
                             .containsExactly(
@@ -56,7 +55,7 @@ class AnalyticalFactTypeTest {
                         Arrays.stream(
                                         AnalyticalFactType.class
                                                 .getDeclaredMethods())
-                                .map(Method::getName))
+                                .map(value -> value.getName()))
                         .as("Fact type must expose bounded classification"
                                 + " metadata")
                         .contains(

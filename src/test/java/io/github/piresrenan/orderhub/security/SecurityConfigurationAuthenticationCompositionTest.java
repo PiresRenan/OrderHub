@@ -154,6 +154,7 @@ class SecurityConfigurationAuthenticationCompositionTest {
                                     "Authentication composition must not resolve tenant membership");
                         })
                 .withPropertyValues(
+                        "orderhub.security.jwt.token-profile=GENERIC",
                         "orderhub.security.jwt.issuer="
                                 + ISSUER,
                         "orderhub.security.jwt.audience="

@@ -381,15 +381,16 @@ class TrustedTenantContextArgumentResolverTest {
         }
     }
 
-    private static final class TestEndpoint {
+    /** Package-private so the reflectively resolved handler methods are not local-only. */
+    static final class TestEndpoint {
 
-        @SuppressWarnings("unused")
-        void trustedTenantEndpoint(
+        // Resolved reflectively by the argument-resolver tests below.
+        public void trustedTenantEndpoint(
                 TrustedTenantContext context) {
         }
 
-        @SuppressWarnings("unused")
-        void unrelatedEndpoint(
+        // Resolved reflectively by the argument-resolver tests below.
+        public void unrelatedEndpoint(
                 String value) {
         }
     }

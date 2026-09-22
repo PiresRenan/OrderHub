@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.TestPropertySource;
 import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityQuery;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveOrCreateExternalUserUseCase;
@@ -30,6 +31,7 @@ import io.github.piresrenan.orderhub.customers.application.port.in.linking.Custo
  */
 @SpringBootTest
 @Import(PostgreSqlTestConfiguration.class)
+@TestPropertySource(properties = "orderhub.security.jwt.token-profile=GENERIC")
 class TenantMembershipAdministrationProductionTest {
     @Autowired private io.github.piresrenan.orderhub.workforce.application.port.in.ManageTenantMembershipUseCase administration;
     @Autowired private io.github.piresrenan.orderhub.workforce.application.port.in.ManageStaffProvisioningUseCase staffIssuance;

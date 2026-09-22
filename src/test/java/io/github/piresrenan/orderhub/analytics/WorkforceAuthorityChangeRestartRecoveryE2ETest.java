@@ -6,7 +6,6 @@ import static org.awaitility.Awaitility.await;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -77,8 +76,8 @@ class WorkforceAuthorityChangeRestartRecoveryE2ETest {
     static void startSharedDatabase() {
 
         postgres =
-                new PostgreSQLContainer(POSTGRES_IMAGE)
-                        .withDatabaseName("orderhub_test")
+                new PostgreSQLContainer(POSTGRES_IMAGE);
+        postgres.withDatabaseName("orderhub_test")
                         .withUsername("orderhub_test")
                         .withPassword("synthetic-test-password");
 
@@ -341,6 +340,7 @@ class WorkforceAuthorityChangeRestartRecoveryE2ETest {
                                 + postgres.getUsername(),
                         "spring.datasource.password="
                                 + postgres.getPassword(),
+                        "orderhub.security.jwt.token-profile=GENERIC",
                         "orderhub.security.jwt.issuer="
                                 + "https://issuer.orderhub.test",
                         "orderhub.security.jwt.audience=orderhub-api-test",

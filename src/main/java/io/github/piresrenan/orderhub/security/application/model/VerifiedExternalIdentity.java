@@ -1,7 +1,7 @@
 package io.github.piresrenan.orderhub.security.application.model;
 
 /** Verified authentication fact only: no internal User, Tenant, role or permission. */
-public record VerifiedExternalIdentity(String issuer, String subject) {
+public record VerifiedExternalIdentity(String issuer, String subject) implements java.io.Serializable {
     /** Rejects missing verified identity facts while preserving their exact case and whitespace. */
     public VerifiedExternalIdentity {
         if (issuer == null || issuer.isBlank() || subject == null || subject.isBlank()) {

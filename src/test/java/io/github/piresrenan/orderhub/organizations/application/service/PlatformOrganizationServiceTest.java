@@ -24,7 +24,6 @@ import io.github.piresrenan.orderhub.organizations.application.port.out.Organiza
 import io.github.piresrenan.orderhub.organizations.application.port.out.OrganizationTransactionExecutor;
 import io.github.piresrenan.orderhub.organizations.application.port.in.administration.PlatformAdministrationAccessDeniedException;
 import io.github.piresrenan.orderhub.organizations.application.port.in.administration.OrganizationNotFoundException;
-import io.github.piresrenan.orderhub.organizations.domain.model.Organization;
 import io.github.piresrenan.orderhub.organizations.application.model.OrganizationAdministrativeAuditEvidence;
 import io.github.piresrenan.orderhub.organizations.application.model.OrganizationAdministrativeAuditOutcome;
 

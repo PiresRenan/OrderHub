@@ -61,10 +61,13 @@ class PostgreSqlInventoryPositionRepositoryTest {
 
     @Container
     private static final PostgreSQLContainer POSTGRES =
-            new PostgreSQLContainer(POSTGRES_IMAGE)
-                    .withDatabaseName("orderhub_test")
+            new PostgreSQLContainer(POSTGRES_IMAGE);
+
+    static {
+        POSTGRES.withDatabaseName("orderhub_test")
                     .withUsername("orderhub_test")
                     .withPassword("synthetic-test-password");
+    }
 
     private static JdbcTemplate jdbcTemplate;
 
@@ -571,7 +574,7 @@ class PostgreSqlInventoryPositionRepositoryTest {
 
         assertThat(
                 attempts.stream()
-                        .filter(CommitAttempt::succeeded)
+                        .filter(value -> value.succeeded())
                         .toList())
                 .hasSize(1);
 
@@ -585,8 +588,8 @@ class PostgreSqlInventoryPositionRepositoryTest {
 
         var successfulAllocation =
                 attempts.stream()
-                        .filter(CommitAttempt::succeeded)
-                        .map(CommitAttempt::allocation)
+                        .filter(value -> value.succeeded())
+                        .map(value -> value.allocation())
                         .findFirst()
                         .orElseThrow();
 
@@ -644,16 +647,16 @@ class PostgreSqlInventoryPositionRepositoryTest {
 
         var totalAllocated =
                 attempts.stream()
-                        .map(CommitAttempt::allocation)
+                        .map(value -> value.allocation())
                         .mapToLong(
-                                InventoryAllocation::allocatedQuantity)
+                                value -> value.allocatedQuantity())
                         .sum();
 
         var totalBackordered =
                 attempts.stream()
-                        .map(CommitAttempt::allocation)
+                        .map(value -> value.allocation())
                         .mapToLong(
-                                InventoryAllocation::backorderedQuantity)
+                                value -> value.backorderedQuantity())
                         .sum();
 
         assertThat(totalAllocated)

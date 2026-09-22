@@ -115,7 +115,7 @@ class CreateOrderIdempotencyPersistencePortContractTest {
         assertThat(
                 Arrays.stream(
                                 acquisition.getPermittedSubclasses())
-                        .map(Class::getSimpleName)
+                        .map(value -> value.getSimpleName())
                         .toList())
                 .containsExactlyInAnyOrder(
                         "Acquired",

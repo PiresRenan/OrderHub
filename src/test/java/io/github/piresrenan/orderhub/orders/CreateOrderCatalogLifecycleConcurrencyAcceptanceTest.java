@@ -22,9 +22,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.TestPropertySource;
 
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
-import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderIdempotencyKeyDigest;
 import io.github.piresrenan.orderhub.orders.support.TestCreateOrderIdempotencyKeyDigests;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
 import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
@@ -40,6 +40,7 @@ import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
         properties =
                 "orderhub.orders.transaction.timeout=5s")
 @Import(PostgreSqlTestConfiguration.class)
+@TestPropertySource(properties = "orderhub.security.jwt.token-profile=GENERIC")
 class CreateOrderCatalogLifecycleConcurrencyAcceptanceTest {
 
     private static final UUID TENANT_ID =

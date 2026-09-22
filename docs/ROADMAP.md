@@ -1,8 +1,32 @@
 # OrderHub Engineering Roadmap
 
-This roadmap records the current engineering direction for OrderHub after OH-012.
+This roadmap records the admitted v1 engineering scope and its delivery history.
 It is an architectural planning baseline, not a promise to introduce a technology
 before a concrete business or operational problem justifies it.
+
+## OH-022 — release qualification in progress
+
+The post-OH-021 authority is `d3aa23a42e949cd2299342f414476d2028ef69a0`.
+Qualification closes demonstrated CORS and JWT validity/purpose gaps, executes
+continuous journeys and measures runtime contention/recovery. It additionally
+admits Cognito App Clients through an explicit allowlist, requires an explicit
+token profile, classifies identity failures at their owning boundary, makes the
+generated OpenAPI byte-reproducible, expands the disposable development seed
+into a documented multi-tenant catalog, covers all 60 public business
+operations with real-socket end-to-end suites and a coverage contract, adds
+verified usage and integration guides, and gates the production artifact
+against development fixtures. It adds no new business domain or migration. The 1.0.0 candidate is not a completed stable
+release until the governed main commit, immutable tag and publication exist.
+See [ADR-0020](adr/ADR-0020-v1-release-qualification.md) and
+[client integration](integration/README.md).
+
+## POST-v1 / FUTURE EVOLUTION
+
+Independent machine principals, general Customer registration/CRUD, a complete
+Workforce HTTP backoffice, payment/webhook providers, AI/ML, warehouses,
+fulfillment, advanced pricing and new infrastructure are explicitly excluded
+from OH-022 absent a demonstrated release-blocking defect. The future direction
+sections below are not unfinished release features.
 
 ## Decision standard
 

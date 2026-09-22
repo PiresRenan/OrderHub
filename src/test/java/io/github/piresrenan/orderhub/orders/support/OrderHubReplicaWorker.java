@@ -17,7 +17,6 @@ import org.springframework.transaction.PlatformTransactionManager;
 
 import io.github.piresrenan.orderhub.OrderHubApplication;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
-import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderIdempotencyKeyDigest;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
 
 /**
@@ -103,6 +102,7 @@ public final class OrderHubReplicaWorker {
                                 "logging.level.root=WARN",
                                 "orderhub.orders.transaction.timeout=10s",
                                 "orderhub.orders.idempotency.acquisition-timeout=5s",
+                                "orderhub.security.jwt.token-profile=GENERIC",
                                 "orderhub.security.jwt.issuer="
                                         + "https://issuer.orderhub.test",
                                 "orderhub.security.jwt.audience="

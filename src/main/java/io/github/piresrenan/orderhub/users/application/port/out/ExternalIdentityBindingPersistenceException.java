@@ -12,6 +12,8 @@ package io.github.piresrenan.orderhub.users.application.port.out;
  */
 public final class ExternalIdentityBindingPersistenceException
         extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+
 
     private static final String MESSAGE =
             "External identity binding persistence operation failed.";

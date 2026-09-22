@@ -1,5 +1,6 @@
 package io.github.piresrenan.orderhub.security.adapter.in.authentication.jwt;
 
+import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -13,12 +14,21 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param issuer exact trusted JWT issuer
  * @param audience exact audience required for OrderHub access tokens
  * @param jwkSetUri trusted JWK Set endpoint used for signature verification
+ * @param tokenProfile deliberately selected provider policy; never defaulted by binding
+ * @param allowedClientIds admitted Cognito App Client IDs; required for COGNITO, rejected for GENERIC
  */
 @ConfigurationProperties(prefix = "orderhub.security.jwt")
 public record JwtResourceServerProperties(
         String issuer,
         String audience,
-        String jwkSetUri) {
+        String jwkSetUri,
+        JwtTokenProfile tokenProfile,
+        List<String> allowedClientIds) {
+
+    /** Preserves explicit generic-provider construction used by provider-neutral consumers. */
+    public JwtResourceServerProperties(String issuer, String audience, String jwkSetUri) {
+        this(issuer, audience, jwkSetUri, JwtTokenProfile.GENERIC, List.of());
+    }
 
     /**
      * Ensures that the complete production JWT trust boundary is configured.
@@ -29,6 +39,7 @@ public record JwtResourceServerProperties(
      * @throws IllegalArgumentException when issuer, audience or JWK Set location
      *                                  is missing or blank
      */
+    @org.springframework.boot.context.properties.bind.ConstructorBinding
     public JwtResourceServerProperties {
         if (issuer == null || issuer.isBlank()) {
             throw new IllegalArgumentException(
@@ -44,5 +55,11 @@ public record JwtResourceServerProperties(
             throw new IllegalArgumentException(
                     "JWT JWK Set URI is required");
         }
+        if (tokenProfile == null) {
+            throw new IllegalArgumentException(
+                    "JWT token profile is required");
+        }
+        tokenProfile.validateAudience(audience);
+        allowedClientIds = tokenProfile.validateAllowedClientIds(allowedClientIds);
     }
 }

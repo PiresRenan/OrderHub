@@ -15,7 +15,6 @@ import io.github.piresrenan.orderhub.inventory.application.port.in.CommitOrderIn
 import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryAllocationOutcome;
 import io.github.piresrenan.orderhub.inventory.application.port.out.InventoryCommitmentIdGenerator;
 import io.github.piresrenan.orderhub.inventory.application.port.out.InventoryCommitmentRepository;
-import io.github.piresrenan.orderhub.inventory.application.port.out.InventoryPolicyRepository;
 import io.github.piresrenan.orderhub.inventory.application.port.out.InventoryPositionRepository;
 import io.github.piresrenan.orderhub.inventory.application.port.out.InventoryTimeProvider;
 import io.github.piresrenan.orderhub.inventory.domain.model.InventoryAllocation;

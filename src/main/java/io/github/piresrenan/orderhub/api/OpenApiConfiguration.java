@@ -58,7 +58,8 @@ public class OpenApiConfiguration {
                 .addProperty("field", new StringSchema().description("Rejected field name; never its value."))
                 .addProperty("code", new StringSchema().description("Validation constraint code."))
                 .addProperty("message", new StringSchema().description("Fixed public validation explanation."));
-        var problem = new ObjectSchema()
+        var problem = new ObjectSchema();
+        problem
                 .description("RFC 9457 public error. Codes differ by boundary; fields never contain credentials, rejected values, SQL or stack traces.")
                 .addProperty("type", new StringSchema().format("uri").description("Problem type URI, usually urn:orderhub:problem:<code>."))
                 .addProperty("title", new StringSchema().description("Short public explanation."))
@@ -69,7 +70,7 @@ public class OpenApiConfiguration {
                 .addProperty("errors", new ArraySchema().items(validation).description("Present only for supported Bean Validation failures."));
         problem.setRequired(List.of("type", "title", "status"));
         return new OpenAPI()
-                .info(new Info().title("OrderHub API").version("0.1.0")
+                .info(new Info().title("OrderHub API").version("1.0.0")
                         .description("Admitted v1 business surface; existing paths have no /v1 prefix. Stateless bearer authentication, owner-controlled authorization and PostgreSQL transactions. See the repository API and security guides for integration and retry contracts."))
                 .servers(List.of(new Server().url("/").description("Current deployment; no client-supplied host is embedded.")))
                 .addSecurityItem(new SecurityRequirement().addList("bearerAuth"))
@@ -91,6 +92,10 @@ public class OpenApiConfiguration {
             responses.putIfAbsent("405", problemResponse("HTTP method is not supported. The Allow header identifies supported methods."));
             responses.putIfAbsent("406", problemResponse("Requested response media type is not supported."));
             responses.putIfAbsent("500", problemResponse("Technical uncertainty; sanitized failure without implementation details."));
+            if (!handler.getBeanType().getSimpleName().equals("IdentityBootstrapController")) {
+                responses.putIfAbsent("503", problemResponse("Identity verification is temporarily unavailable; retry with bounded backoff."));
+                responses.get("503").addHeaderObject("Retry-After", new Header().schema(new StringSchema()._const("1")));
+            }
             for (var parameter : handler.getMethodParameters()) {
                 if (parameter.hasParameterAnnotation(RequestBody.class)) {
                     responses.putIfAbsent("415", problemResponse("Request representation is not supported."));

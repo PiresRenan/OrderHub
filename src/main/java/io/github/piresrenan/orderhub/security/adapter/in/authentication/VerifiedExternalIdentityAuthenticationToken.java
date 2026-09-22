@@ -7,6 +7,8 @@ import io.github.piresrenan.orderhub.security.application.model.VerifiedExternal
 
 /** Discards bearer credentials and exposes zero granted authorities after normal JWT verification. */
 public final class VerifiedExternalIdentityAuthenticationToken extends AbstractAuthenticationToken {
+    private static final long serialVersionUID = 1L;
+
     private final VerifiedExternalIdentity principal;
     /** Requires the supplied owner contracts; construction performs no lifecycle mutation or independent commit. */
     public VerifiedExternalIdentityAuthenticationToken(VerifiedExternalIdentity principal) {

@@ -15,10 +15,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.TestPropertySource;
 
 import io.github.piresrenan.orderhub.inventory.application.port.in.InventoryCommitmentRejectedException;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderCommand;
-import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderIdempotencyKeyDigest;
 import io.github.piresrenan.orderhub.orders.support.TestCreateOrderIdempotencyKeyDigests;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderAllocationOutcome;
 import io.github.piresrenan.orderhub.orders.application.port.in.CreateOrderUseCase;
@@ -27,6 +27,7 @@ import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
 
 @SpringBootTest
 @Import(PostgreSqlTestConfiguration.class)
+@TestPropertySource(properties = "orderhub.security.jwt.token-profile=GENERIC")
 class CreateOrderInventoryTransactionIntegrationTest {
 
     private static final UUID TENANT_ID =
@@ -471,7 +472,7 @@ class CreateOrderInventoryTransactionIntegrationTest {
 
             assertThat(outcomes)
                     .filteredOn(
-                            Outcome::success)
+                            value -> value.success())
                     .hasSize(1);
 
             assertThat(outcomes)

@@ -162,7 +162,7 @@ class OrderHttpResourceLimitsTest {
                                 .header("X-Tenant-Id", UUID.randomUUID())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(body))
-                                .andExpect(status().isPayloadTooLarge())
+                                .andExpect(status().isContentTooLarge())
                                 .andExpect(content().contentTypeCompatibleWith(
                                                 MediaType.APPLICATION_PROBLEM_JSON))
                                 .andExpect(jsonPath("$.code").value("REQUEST_TOO_LARGE"))

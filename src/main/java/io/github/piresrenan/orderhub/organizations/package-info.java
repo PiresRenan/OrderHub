@@ -2,9 +2,9 @@
  * Owns Organization identity, lifecycle and Organization/Tenant placement.
  *
  * <p>
- * The current domain-only checkpoint intentionally permits no dependency on
- * another OrderHub application module. Future edges require a concrete
- * application contract and an explicit update to this declaration.
+ * Administration consumes only the explicitly named Authorization, Tenants
+ * and Users application contracts below. Persistence remains owner-local;
+ * future edges require an explicit update to this declaration.
  * </p>
  */
 @org.springframework.modulith.ApplicationModule(

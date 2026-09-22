@@ -19,6 +19,7 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
@@ -34,6 +35,7 @@ import io.github.piresrenan.orderhub.support.PostgreSqlTestConfiguration;
 @Import(PostgreSqlTestConfiguration.class)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @ExtendWith(OutputCaptureExtension.class)
+@TestPropertySource(properties = "orderhub.security.jwt.token-profile=GENERIC")
 class PlatformDatabaseReadinessTest {
 
     @Autowired

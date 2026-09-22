@@ -15,6 +15,8 @@ import io.github.piresrenan.orderhub.security.application.model.AuthenticatedUse
  */
 public final class AuthenticatedUserAuthenticationToken
         extends AbstractAuthenticationToken {
+    private static final long serialVersionUID = 1L;
+
 
     private final AuthenticatedUserPrincipal principal;
 

@@ -26,7 +26,9 @@ import io.github.piresrenan.orderhub.users.application.port.out.ExternalIdentity
  * Prevents: Identity reassignment, orphan Users and history loss across retries or upgrades.
  */
 @SpringBootTest(properties = {
+        "orderhub.security.jwt.token-profile=GENERIC",
         "orderhub.security.jwt.issuer=https://synthetic-identity-lifecycle.test",
+        "orderhub.security.jwt.additional-issuers[0].token-profile=GENERIC",
         "orderhub.security.jwt.additional-issuers[0].issuer=https://synthetic-next-provider.test",
         "orderhub.security.jwt.additional-issuers[0].jwk-set-uri=http://127.0.0.1:1/unused-lifecycle-test-jwks"
 })

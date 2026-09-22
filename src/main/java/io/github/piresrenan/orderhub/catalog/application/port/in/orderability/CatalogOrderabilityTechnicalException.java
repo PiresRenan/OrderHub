@@ -13,6 +13,8 @@ package io.github.piresrenan.orderhub.catalog.application.port.in.orderability;
  */
 public final class CatalogOrderabilityTechnicalException
         extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+
 
     public CatalogOrderabilityTechnicalException(
             Throwable cause) {

@@ -15,6 +15,8 @@ import io.github.piresrenan.orderhub.security.application.port.in.ResolveAuthent
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityQuery;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolvedUserIdentity;
+import io.github.piresrenan.orderhub.users.application.port.in.ExternalIdentityResolutionUnavailableException;
+import io.github.piresrenan.orderhub.security.application.port.in.AuthenticatedUserResolutionUnavailableException;
 
 class ResolveAuthenticatedUserServiceTest {
 
@@ -91,6 +93,18 @@ class ResolveAuthenticatedUserServiceTest {
 
         assertThat(result)
                 .isEmpty();
+    }
+
+    @Test
+    void translatesUsersResolutionUnavailabilityToSecurityUnavailability() {
+        // Why: Security adapters must know only Security contracts; Covers: Users
+        // unavailability; Prevents: adapters importing Users failure types.
+        var failure = new ExternalIdentityResolutionUnavailableException(new IllegalStateException("synthetic"));
+        ResolveAuthenticatedUserUseCase useCase = new ResolveAuthenticatedUserService(query -> { throw failure; });
+
+        assertThatThrownBy(() -> useCase.resolve(new ResolveAuthenticatedUserQuery("https://issuer.example.test", "synthetic-subject")))
+                .isInstanceOf(AuthenticatedUserResolutionUnavailableException.class)
+                .hasCause(failure);
     }
 
     @Test
