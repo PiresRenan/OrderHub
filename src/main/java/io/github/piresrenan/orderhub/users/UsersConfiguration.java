@@ -14,6 +14,9 @@ import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.Po
 import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.SpringExternalIdentityLifecycleTransaction;
 
 import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.PostgreSqlTenantMembershipRepository;
+import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.PostgreSqlTenantMembershipScanRepository;
+import io.github.piresrenan.orderhub.users.application.port.in.ScanOperationallyActiveMembershipTenantsUseCase;
+import io.github.piresrenan.orderhub.users.application.service.ScanOperationallyActiveMembershipTenantsService;
 import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.PostgreSqlUserRepository;
 import io.github.piresrenan.orderhub.users.application.port.in.CreateUserUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.EstablishTenantMembershipUseCase;
@@ -194,6 +197,22 @@ public class UsersConfiguration {
 
                 return new IsTenantMembershipOperationallyActiveService(
                                 tenantMembershipRepository);
+        }
+
+        /**
+         * Exposes bounded scans of one User's ACTIVE memberships for self-scoped
+         * Tenant discovery (ADR-0021).
+         *
+         * @param jdbcTemplate JDBC boundary for the Users-owned scan read
+         * @return bounded membership scan use case
+         */
+        @Bean
+        ScanOperationallyActiveMembershipTenantsUseCase scanOperationallyActiveMembershipTenantsUseCase(
+                        JdbcTemplate jdbcTemplate) {
+
+                return new ScanOperationallyActiveMembershipTenantsService(
+                                new PostgreSqlTenantMembershipScanRepository(
+                                                jdbcTemplate));
         }
 
         /**

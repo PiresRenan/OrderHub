@@ -6,6 +6,20 @@ The project follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Tenant discovery (OH-023, v1 scope amendment)
+
+- `GET /tenants` lets the authenticated internal User discover the Tenants in
+  which it currently holds an ACTIVE membership and whose Tenant is ACTIVE, as
+  `{id, name}` with `Cache-Control: no-store`. Discovery never grants authority,
+  and every Tenant-scoped request still establishes trusted Tenant context.
+- Bounded scan pagination: `limit` 1–100 (default 50), exclusive `afterId`, and
+  `nextAfterId` set to the last scanned membership. Pages may be short or empty
+  while more remain, and only a null `nextAfterId` ends the scan.
+- V45 adds an additive `(user_id, status, tenant_id)` index on
+  `users.tenant_memberships`.
+- Admitted to v1.0.0 by an explicit scope amendment (ADR-0020, ADR-0021). The
+  final contract has 61 operations.
+
 ### Release qualification
 
 - OH-022 adds explicit browser-origin admission without a mandatory BFF,

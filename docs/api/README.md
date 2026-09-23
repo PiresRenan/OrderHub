@@ -1,6 +1,9 @@
 # Using the HTTP API
 
-The admitted contract has 60 explicit operations in six controllers. Paths are
+The admitted v1.0.0 contract has 61 explicit operations in seven controllers,
+including OH-023 self-scoped Tenant discovery
+([ADR-0021](../adr/ADR-0021-self-scoped-tenant-discovery.md)), admitted to v1 by an
+explicit scope amendment (see [ADR-0020](../adr/ADR-0020-v1-release-qualification.md)). Paths are
 the existing `/orders`, `/catalog`, `/inventory`, `/platform`, `/organizations`,
 `/identity`, `/administration` and `/tenants` routes; there is no `/v1` URI
 prefix. Framework health endpoints are separate from the business API.
@@ -53,6 +56,7 @@ Swagger and Actuator exposure are separately configured.
 | Inventory | 8 | Current Staff INVENTORY_VIEW/RECEIVE/ADJUST/POLICY_MANAGE; same focused guide |
 | Platform/Organization | 13 | Explicit administrative grants; no implicit Tenant business access |
 | Identity/Tenant lifecycle | 14 | Internal account ownership or current authorized management; [focused contract](../oh019-http-contract.md) |
+| Tenant discovery | 1 | Bearer-bound internal User only; bounded scan pages; never authority ([ADR-0021](../adr/ADR-0021-self-scoped-tenant-discovery.md)) |
 | Unbound identity bootstrap | 2 | Verified external identity and a valid owner-issued one-time proof |
 
 Requests and successful bodies use JSON. Body-less 204 responses have no JSON
