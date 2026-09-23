@@ -1,6 +1,10 @@
 # ADR-0021 — Authenticated self-scoped Tenant discovery
 
-Status: DESIGNED — implementation and exact-candidate qualification pending.
+Status: TESTED. The integration candidate for PR #54 was qualified on its exact
+HEAD: 1,647 tests with 0 failures, 0 errors and 0 skips, plus Branch Policy, CI and
+Platform CI. The generated contract has 61 operations; its canonical LF OpenAPI
+sha256 is `ba175bc784ddd2d519b54cf9cbc7a8a28a51065bacb5d1210f4f7d4df7c1dc8a`.
+V45 is qualified on both the historical and the fresh-install paths.
 
 
 Task: OH-023, [Issue #52](https://github.com/PiresRenan/OrderHub/issues/52).
