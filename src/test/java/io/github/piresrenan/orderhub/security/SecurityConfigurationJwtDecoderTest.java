@@ -235,6 +235,19 @@ class SecurityConfigurationJwtDecoderTest {
                 });
     }
 
+    @Test
+    void genericProfileAcceptsRfc9068AccessTokenType() {
+        // Why: OpenIddict and other RFC 9068 issuers mark access tokens with typ=at+jwt.
+        // Covers: the production GENERIC decoder with real JWK retrieval and RS256 signature.
+        // Prevents: rejecting standards-compliant access tokens from the GENERIC trust boundary.
+        contextRunner().run(context -> {
+            var jwt = context.getBean(JwtDecoder.class)
+                    .decode(signedToken(trustedKeyPair, ISSUER, AUDIENCE, "at+jwt"));
+            assertThat(jwt.getHeaders()).containsEntry("typ", "at+jwt");
+            assertThat(jwt.getSubject()).isEqualTo(SUBJECT);
+        });
+    }
+
     /**
      * Creates a production-style Spring context using only explicit external JWT
      * trust configuration.
@@ -335,7 +348,11 @@ class SecurityConfigurationJwtDecoderTest {
             KeyPair keyPair,
             String issuer,
             String audience) {
+        return signedToken(keyPair, issuer, audience, null);
+    }
 
+    /** Signs one synthetic access token carrying an explicit JOSE typ header, or none when null. */
+    private String signedToken(KeyPair keyPair, String issuer, String audience, String joseType) {
         try {
             var now =
                     Instant.now();
@@ -368,6 +385,7 @@ class SecurityConfigurationJwtDecoderTest {
                                     JWSAlgorithm.RS256)
                                     .keyID(
                                             KEY_ID)
+                                    .type(joseType == null ? null : new com.nimbusds.jose.JOSEObjectType(joseType))
                                     .build(),
                             claims);
 

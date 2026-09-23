@@ -298,6 +298,88 @@ class ReleaseSecurityBoundaryTest {
                 .run(context -> assertThat(context).hasFailed());
     }
 
+    @Test void genericProfileAdmitsCompatibleJwtAtJwtAndEmptyTypeFormsUnderTheUnchangedContract() {
+        runner().run(context -> {
+            var decoder = context.getBean(JwtDecoder.class);
+            var expiry = Instant.now().plusSeconds(300);
+            // typ is a case-insensitive media type (RFC 7515 4.1.9); Spring's default already matched "jwt".
+            for (var type : new String[]{"at+jwt", "AT+JWT", "JWT", "jwt", null}) {
+                assertThat(decoder.decode(typed(type, ISSUER, AUDIENCE, expiry, key, java.util.Map.of())).getSubject()).isEqualTo("synthetic-user");
+            }
+            // Preserved Spring compatibility, not a recommended form: blank typ is treated as absent, as jwt() did.
+            for (var type : new String[]{"", " ", "\t"}) {
+                var token = typed(type, ISSUER, AUDIENCE, expiry, key, java.util.Map.of());
+                assertThat(com.nimbusds.jwt.SignedJWT.parse(token).getHeader().getType()).hasToString(type);
+                assertThat(decoder.decode(token).getHeaders()).containsEntry("typ", type);
+            }
+            // OpenIddict ID tokens carry typ=JWT, so their exclusion rests on the audience contract, not typ.
+            for (var type : new String[]{"secevent+jwt", "logout+jwt", "id_token+jwt", "application/at+jwt", "application/jwt", "at+jwt ", "*"}) {
+                assertThatThrownBy(() -> decoder.decode(typed(type, ISSUER, AUDIENCE, expiry, key, java.util.Map.of())))
+                        .isInstanceOf(JwtException.class).hasMessageContaining("typ");
+            }
+            var other = new RSAKeyGenerator(2048).keyID(key.getKeyID()).generate();
+            for (var token : new String[]{typed("at+jwt", OTHER, AUDIENCE, expiry, key, java.util.Map.of()),
+                    typed("at+jwt", ISSUER, "https://other-api.example.test", expiry, key, java.util.Map.of()),
+                    typed("at+jwt", ISSUER, AUDIENCE, null, key, java.util.Map.of()),
+                    typed("at+jwt", ISSUER, AUDIENCE, Instant.now().minusSeconds(300), key, java.util.Map.of()),
+                    typed("at+jwt", ISSUER, AUDIENCE, expiry, other, java.util.Map.of())}) {
+                assertThatThrownBy(() -> decoder.decode(token)).isInstanceOf(JwtException.class);
+            }
+        });
+    }
+
+    @Test void cognitoTypeAndClaimSemanticsRemainUnchanged() {
+        runner().withPropertyValues("orderhub.security.jwt.token-profile=COGNITO", "orderhub.security.jwt.allowed-client-ids[0]=spa-client").run(context -> {
+            var decoder = context.getBean(JwtDecoder.class);
+            var expiry = Instant.now().plusSeconds(300);
+            var access = java.util.Map.<String, Object>of("token_use", "access", "client_id", "spa-client");
+            for (var type : new String[]{"JWT", null, "", " "}) {
+                assertThat(decoder.decode(typed(type, ISSUER, AUDIENCE, expiry, key, access)).getSubject()).isEqualTo("synthetic-user");
+            }
+            // Pre-existing Spring default for COGNITO: only JWT or absent typ.
+            assertThatThrownBy(() -> decoder.decode(typed("at+jwt", ISSUER, AUDIENCE, expiry, key, access))).isInstanceOf(JwtException.class);
+            for (var claims : java.util.List.<java.util.Map<String, Object>>of(java.util.Map.of("token_use", "id", "client_id", "spa-client"),
+                    java.util.Map.of("token_use", "access"), java.util.Map.of("token_use", "access", "client_id", 42),
+                    java.util.Map.of("token_use", "access", "client_id", "foreign-client"))) {
+                assertThatThrownBy(() -> decoder.decode(typed("JWT", ISSUER, AUDIENCE, expiry, key, claims))).isInstanceOf(JwtException.class);
+            }
+            var other = new RSAKeyGenerator(2048).keyID(key.getKeyID()).generate();
+            for (var token : new String[]{typed("JWT", OTHER, AUDIENCE, expiry, key, access), typed("JWT", ISSUER, "spa-client", expiry, key, access),
+                    typed("JWT", ISSUER, AUDIENCE, Instant.now().minusSeconds(300), key, access), typed("JWT", ISSUER, AUDIENCE, expiry, other, access)}) {
+                assertThatThrownBy(() -> decoder.decode(token)).isInstanceOf(JwtException.class);
+            }
+        });
+    }
+
+    @Test void additionalGenericIssuerAdmitsAtJwtUnderItsOwnTrustAndUnconfiguredIssuerFetchesNoKeys() {
+        runner().withPropertyValues("orderhub.security.jwt.additional-issuers[0].issuer=" + OTHER,
+                "orderhub.security.jwt.additional-issuers[0].jwk-set-uri=" + jwks,
+                "orderhub.security.jwt.additional-issuers[0].token-profile=GENERIC").run(context -> {
+            var decoder = context.getBean(JwtDecoder.class);
+            var expiry = Instant.now().plusSeconds(300);
+            assertThat(decoder.decode(typed("at+jwt", OTHER, AUDIENCE, expiry, key, java.util.Map.of())).getIssuer()).hasToString(OTHER);
+            assertThatThrownBy(() -> decoder.decode(typed("at+jwt", OTHER, "https://other-api.example.test", expiry, key, java.util.Map.of())))
+                    .isInstanceOf(JwtException.class);
+            var requests = keyRequests.get();
+            assertThatThrownBy(() -> decoder.decode(typed("at+jwt", "https://unconfigured.example.test", AUDIENCE, expiry, key, java.util.Map.of())))
+                    .isInstanceOf(JwtException.class);
+            assertThat(keyRequests).hasValue(requests);
+        });
+    }
+
+    @Test void atJwtTypeAndAuthorityShapedClaimsConferNoTenantStaffCustomerRoleOrPermission() {
+        runner().run(context -> {
+            var claims = java.util.Map.<String, Object>of("tenant_id", "00000000-0000-0000-0000-00000000aaaa",
+                    "staff_id", "synthetic-staff", "customer_id", "synthetic-customer", "role", "OWNER",
+                    "roles", java.util.List.of("ADMIN", "OWNER"), "permissions", java.util.List.of("orders:write"),
+                    "scope", "orderhub.admin", "authorities", java.util.List.of("ROLE_ADMIN"));
+            var body = mvc(context.getSourceApplicationContext()).perform(get("/whoami")
+                    .header("Authorization", "Bearer " + typed("at+jwt", ISSUER, AUDIENCE, Instant.now().plusSeconds(300), key, claims)))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+            assertThat(body).isEqualTo("AuthenticatedUserAuthenticationToken|" + USER + "|[]");
+        });
+    }
+
     private WebApplicationContextRunner runner() {
         return baseRunner().withPropertyValues("orderhub.security.jwt.token-profile=GENERIC");
     }
@@ -331,6 +413,17 @@ class ReleaseSecurityBoundaryTest {
         signed.sign(new RSASSASigner(key));
         return signed.serialize();
     }
+    private String typed(String type, String issuer, String audience, Instant expiry, RSAKey signer, java.util.Map<String, Object> extra) throws Exception {
+        var claims = new JWTClaimsSet.Builder().issuer(issuer).subject("synthetic-user").audience(audience)
+                .issueTime(Date.from(Instant.now().minusSeconds(5)));
+        if (expiry != null) { claims.expirationTime(Date.from(expiry)); }
+        extra.forEach(claims::claim);
+        var header = new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(signer.getKeyID());
+        if (type != null) { header.type(new com.nimbusds.jose.JOSEObjectType(type)); }
+        var signed = new SignedJWT(header.build(), claims.build());
+        signed.sign(new RSASSASigner(signer));
+        return signed.serialize();
+    }
     @Configuration(proxyBeanMethods = false)
     @EnableWebSecurity @EnableWebMvc
     static class WebConfiguration {
@@ -340,6 +433,10 @@ class ReleaseSecurityBoundaryTest {
         @PostMapping({"/orders", "/identity/bootstrap/staff", "/identity/bootstrap/external-links"})
         ResponseEntity<Void> create() { return ResponseEntity.created(URI.create("/orders/synthetic")).build(); }
         @GetMapping("/orders") String read() { return "synthetic"; }
+        @GetMapping("/whoami") String whoami(org.springframework.security.core.Authentication authentication) {
+            var principal = (io.github.piresrenan.orderhub.security.application.model.AuthenticatedUserPrincipal) authentication.getPrincipal();
+            return authentication.getClass().getSimpleName() + "|" + principal.userId() + "|" + authentication.getAuthorities();
+        }
         @GetMapping("/orders/denied") String denied() { throw new org.springframework.security.access.AccessDeniedException("Synthetic denial"); }
     }
 }
