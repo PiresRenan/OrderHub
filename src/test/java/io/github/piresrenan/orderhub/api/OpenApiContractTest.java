@@ -61,7 +61,8 @@ class OpenApiContractTest {
             assertThat(operation.path("tags").isEmpty()).isFalse();
             assertThat(operation.path("responses").has("401")).isTrue();
         }));
-        assertThat(actual).hasSize(60);
+        // 60 frozen v1.0.0 operations (ADR-0020) plus OH-023 self-scoped Tenant discovery (ADR-0021, post-v1).
+        assertThat(actual).hasSize(61);
         assertThat(documented).containsExactlyElementsOf(actual);
         assertThat(document.path("openapi").asString()).startsWith("3.1.");
         assertThat(document.at("/info/version").asString()).isEqualTo("1.0.0");
@@ -237,6 +238,31 @@ class OpenApiContractTest {
                 && value.codePointCount(0, value.length()) <= schema.path("maxLength").asInt(Integer.MAX_VALUE)
                 && java.util.regex.Pattern.compile(schema.path("pattern").asString()).matcher(value).matches();
         assertThat(described).as("Catalog owner/string contract parity").isEqualTo(admitted);
+    }
+
+    @Test
+    void tenantDiscoveryContractDocumentsBoundedScanAndMinimalProjection() throws Exception {
+        // Why: clients follow the published contract; ADR-0021 semantics must be explicit there.
+        // Covers: GET /tenants parameters, responses, page schema and cache header.
+        // Prevents: clients inferring end-of-list from short pages or expecting authority fields.
+        var document = document();
+        var operation = document.at("/paths/~1tenants/get");
+        assertThat(operation.path("operationId").asString()).isEqualTo("tenantsDiscoverSelectable");
+        assertThat(operation.path("responses").propertyNames()).contains("200", "400", "401", "500").doesNotContain("404");
+        assertThat(operation.at("/responses/200/headers/Cache-Control").isMissingNode()).isFalse();
+        assertThat(operation.path("description").asString()).contains("nextAfterId", "not authorization", "no-store");
+        var parameters = new java.util.TreeMap<String, JsonNode>();
+        operation.path("parameters").forEach(parameter -> parameters.put(parameter.path("name").asString(), parameter));
+        assertThat(parameters.keySet()).containsExactly("afterId", "limit");
+        assertThat(parameters.get("afterId").at("/schema/format").asString()).isEqualTo("uuid");
+        assertThat(parameters.get("limit").at("/schema/minimum").asInt()).isEqualTo(1);
+        assertThat(parameters.get("limit").at("/schema/maximum").asInt()).isEqualTo(100);
+        assertThat(parameters.get("limit").at("/schema/default").asInt()).isEqualTo(50);
+        var page = document.at("/components/schemas/SelectableTenantPage");
+        assertThat(page.path("properties").propertyNames()).containsExactlyInAnyOrder("items", "nextAfterId");
+        assertThat(page.path("required").toString()).contains("items", "nextAfterId");
+        assertThat(page.at("/properties/nextAfterId/type").toString()).contains("null");
+        assertThat(document.at("/components/schemas/SelectableTenant/properties").propertyNames()).containsExactlyInAnyOrder("id", "name");
     }
 
     @Test

@@ -78,8 +78,9 @@ quantities never silently accept fractional truncation.
 
 ## HTTP contract
 
-There are 60 explicit operations across Orders, Catalog, Inventory,
-Platform/Organization administration and identity/Tenant lifecycle. Existing
+There are 61 explicit operations across Orders, Catalog, Inventory,
+Platform/Organization administration, identity/Tenant lifecycle and
+self-scoped Tenant discovery (60 frozen v1.0.0 operations plus post-v1 OH-023). Existing
 paths do not have a `/v1` prefix. OpenAPI is generated from these real handlers
 and their metadata; CI checks coverage and critical representations. The JSON
 contract is available at `/v3/api-docs` when deliberately enabled.

@@ -9,12 +9,14 @@ import org.springframework.transaction.PlatformTransactionManager;
 
 import io.github.piresrenan.orderhub.authorization.application.port.in.administration.AuthorizeAdministrativeActionUseCase;
 import io.github.piresrenan.orderhub.tenants.adapter.out.persistence.postgresql.PostgreSqlTenantAdministrativeAuditRepository;
+import io.github.piresrenan.orderhub.tenants.adapter.out.persistence.postgresql.PostgreSqlTenantBatchRepository;
 import io.github.piresrenan.orderhub.tenants.adapter.out.persistence.postgresql.PostgreSqlTenantLifecycleRepository;
 import io.github.piresrenan.orderhub.tenants.adapter.out.persistence.postgresql.PostgreSqlTenantRepository;
 import io.github.piresrenan.orderhub.tenants.adapter.out.transaction.spring.SpringTenantTransactionExecutor;
 import io.github.piresrenan.orderhub.tenants.application.port.in.CreateTenantUseCase;
 import io.github.piresrenan.orderhub.tenants.application.port.in.administration.PlatformTenantUseCase;
 import io.github.piresrenan.orderhub.tenants.application.port.in.administration.FindTenantAdministrativeMetadataUseCase;
+import io.github.piresrenan.orderhub.tenants.application.port.in.operational.FindActiveTenantSummariesUseCase;
 import io.github.piresrenan.orderhub.tenants.application.port.in.operational.FindTenantOperationalStateUseCase;
 import io.github.piresrenan.orderhub.tenants.application.port.out.TenantIdGenerator;
 import io.github.piresrenan.orderhub.tenants.application.port.out.TenantAdministrativeAuditRepository;
@@ -22,6 +24,7 @@ import io.github.piresrenan.orderhub.tenants.application.port.out.TenantLifecycl
 import io.github.piresrenan.orderhub.tenants.application.port.out.TenantRepository;
 import io.github.piresrenan.orderhub.tenants.application.port.out.TenantTransactionExecutor;
 import io.github.piresrenan.orderhub.tenants.application.service.CreateTenantService;
+import io.github.piresrenan.orderhub.tenants.application.service.FindActiveTenantSummariesService;
 import io.github.piresrenan.orderhub.tenants.application.service.FindTenantOperationalStateService;
 import io.github.piresrenan.orderhub.tenants.application.service.FindTenantAdministrativeMetadataService;
 import io.github.piresrenan.orderhub.tenants.application.service.TenantAdministrationService;
@@ -97,6 +100,22 @@ public class TenantsConfiguration {
 
         return new FindTenantOperationalStateService(
                 tenantRepository);
+    }
+
+    /**
+     * Exposes one bounded batch read of ACTIVE Tenant summaries for self-scoped
+     * discovery (ADR-0021).
+     *
+     * @param jdbcTemplate JDBC boundary for the Tenants-owned batch read
+     * @return ACTIVE Tenant summaries boundary
+     */
+    @Bean
+    FindActiveTenantSummariesUseCase findActiveTenantSummariesUseCase(
+            JdbcTemplate jdbcTemplate) {
+
+        return new FindActiveTenantSummariesService(
+                new PostgreSqlTenantBatchRepository(
+                        jdbcTemplate));
     }
 
     @Bean

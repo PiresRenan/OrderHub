@@ -36,7 +36,11 @@ Do not edit, delete, rename, or renumber accepted V scripts. Do not change B44 a
 acceptance. `V1-V44.sha256` records the accepted source bytes; `.gitattributes` keeps SQL
 line endings at LF across platforms. Tests verify all 42 hashes.
 
-Future schema or canonical-data changes belong in V45 and later. Both installation paths
+Future schema or canonical-data changes belong in V45 and later. The post-v1 OH-023
+candidate adds `V45__index_tenant_memberships_by_user_status.sql`, an additive index for
+self-scoped Tenant discovery ([ADR-0021](../adr/ADR-0021-self-scoped-tenant-discovery.md)).
+It builds with a plain `CREATE INDEX` inside the Flyway transaction, which blocks writes to
+`users.tenant_memberships` for the duration of the build. Both installation paths
 then apply those same migrations after reaching version 44. B44 is not regenerated for
 each change. Historical migration tests continue to use `classpath:db/migration` alone;
 the dedicated baseline tests use both locations. Moving B44 into `db/migration` would

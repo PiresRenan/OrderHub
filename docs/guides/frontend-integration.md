@@ -62,6 +62,13 @@ Orders, Catalog and Inventory require `X-Tenant-Id: <uuid>`. The header selects;
 the User, membership, Tenant state and permission or ownership on every request. Administrative routes that carry
 `{tenantId}` in the path do not need the header.
 
+To offer a Tenant picker, call `GET /tenants?limit=50` with the bearer only. It returns
+`{"items":[{"id","name"}],"nextAfterId"}` for Tenants in which the current User holds an ACTIVE membership and
+the Tenant is ACTIVE. A page may be short or empty while `nextAfterId` is non-null: keep requesting with
+`afterId=<nextAfterId>` until `nextAfterId` is null, and never infer the end from `items.length`. The response is
+`Cache-Control: no-store` and is presentation context only. A listed Tenant can be suspended at any time, and the next
+Tenant-scoped request is then denied, so do not treat the list as permission (post-v1 OH-023, ADR-0021).
+
 ## Base client
 
 ```typescript
