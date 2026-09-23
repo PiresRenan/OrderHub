@@ -1,8 +1,9 @@
 # Using the HTTP API
 
-The admitted contract has 61 explicit operations in seven controllers: the 60
-frozen v1.0.0 operations plus post-v1 OH-023 self-scoped Tenant discovery
-([ADR-0021](../adr/ADR-0021-self-scoped-tenant-discovery.md)). Paths are
+The admitted v1.0.0 contract has 61 explicit operations in seven controllers,
+including OH-023 self-scoped Tenant discovery
+([ADR-0021](../adr/ADR-0021-self-scoped-tenant-discovery.md)), admitted to v1 by an
+explicit scope amendment (see [ADR-0020](../adr/ADR-0020-v1-release-qualification.md)). Paths are
 the existing `/orders`, `/catalog`, `/inventory`, `/platform`, `/organizations`,
 `/identity`, `/administration` and `/tenants` routes; there is no `/v1` URI
 prefix. Framework health endpoints are separate from the business API.

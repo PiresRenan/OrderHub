@@ -118,7 +118,10 @@ retrying the same key/body within bounded backoff, not by minting another key.
 failure; refreshing indefinitely will not create permission. Other conflict,
 validation, pagination and Problem Details contracts are in the [API guide](../api/README.md).
 Administrative paths often use path selectors instead of X-Tenant-Id; follow
-generated OpenAPI rather than sending an invented universal selector.
+generated OpenAPI rather than sending an invented universal selector. Obtain
+selectable Tenant IDs from `GET /tenants`, following `nextAfterId` until it is
+null ([frontend guide](../guides/frontend-integration.md#tenant-selection)). Never
+derive them from token claims.
 
 ## Onboarding preconditions and local equivalent
 

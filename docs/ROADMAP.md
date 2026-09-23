@@ -20,6 +20,15 @@ release until the governed main commit, immutable tag and publication exist.
 See [ADR-0020](adr/ADR-0020-v1-release-qualification.md) and
 [client integration](integration/README.md).
 
+**Scope amendment accepted 2026-09-23.** The v1 closure program originally
+covered OH-019 through OH-022 with 60 public operations. The owner explicitly
+admitted OH-023, authenticated self-scoped Tenant discovery
+([ADR-0021](adr/ADR-0021-self-scoped-tenant-discovery.md), #52), so that secure
+first-party/BFF clients can discover their current Tenant contexts from OrderHub
+state. The v1 sequence becomes OH-019, OH-020, OH-021, OH-023, then OH-022 final
+qualification and promotion on the resulting 61-operation, V1–V45 tree. No other
+deferred capability is admitted by this precedent.
+
 ## POST-v1 / FUTURE EVOLUTION
 
 Independent machine principals, general Customer registration/CRUD, a complete

@@ -18,6 +18,34 @@ origin admission. Signed-token/filter regressions also demonstrated acceptance
 of absent expiry and, under matching issuer/audience, ID-token purpose. These
 are bounded transport/authentication corrections, not a new product phase.
 
+## Scope amendment — OH-023 admitted to v1.0.0 (2026-09-23)
+
+The evidence above is the historical qualification baseline. It covered
+**60 operations** and migrations V1–V44, and it remains accurate for that
+candidate.
+
+On 2026-09-23 the owner admitted OH-023, authenticated self-scoped Tenant
+discovery ([ADR-0021](ADR-0021-self-scoped-tenant-discovery.md), #52), into v1.0.0
+as a single, explicit scope amendment. This is not a correction of a defect in
+the original 60 operations. Orders, Catalog and Inventory require a Tenant
+selector, and without an OrderHub-owned discovery capability a secure
+first-party or BFF client would have to derive Tenant authority outside OrderHub.
+
+Consequences for OH-022:
+
+- the final v1.0.0 contract has **61 operations**, and the accepted migrations
+  are **V1–V45** (V45 is the additive discovery index);
+- the final OpenAPI artifact, checksum and release evidence are regenerated
+  from the post-OH-023 `pre-release` tree;
+- qualification of the earlier 60-operation candidate is historical evidence
+  only and is not qualification of the final tree;
+- the OH-022 final GO waits for full qualification of the integrated OH-023
+  tree, including any index-maintenance impact of V45 on write paths;
+- OH-022 still owns final qualification, promotion to `main`, the exact release
+  tree, the `v1.0.0` tag and the release notes;
+- the amendment admits only OH-023 and sets no precedent for other deferred
+  capabilities.
+
 ## Decision
 
 Use Spring CORS processing on the existing business and bootstrap chains with an

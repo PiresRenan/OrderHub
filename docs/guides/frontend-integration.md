@@ -67,7 +67,7 @@ To offer a Tenant picker, call `GET /tenants?limit=50` with the bearer only. It 
 the Tenant is ACTIVE. A page may be short or empty while `nextAfterId` is non-null: keep requesting with
 `afterId=<nextAfterId>` until `nextAfterId` is null, and never infer the end from `items.length`. The response is
 `Cache-Control: no-store` and is presentation context only. A listed Tenant can be suspended at any time, and the next
-Tenant-scoped request is then denied, so do not treat the list as permission (post-v1 OH-023, ADR-0021).
+Tenant-scoped request is then denied, so do not treat the list as permission (OH-023, ADR-0021).
 
 ## Base client
 

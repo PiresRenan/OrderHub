@@ -61,7 +61,8 @@ class OpenApiContractTest {
             assertThat(operation.path("tags").isEmpty()).isFalse();
             assertThat(operation.path("responses").has("401")).isTrue();
         }));
-        // 60 frozen v1.0.0 operations (ADR-0020) plus OH-023 self-scoped Tenant discovery (ADR-0021, post-v1).
+        // v1.0.0 contract: the originally qualified 60 operations plus OH-023 Tenant discovery, admitted by the
+        // 2026-09-23 v1 scope amendment (ADR-0020, ADR-0021).
         assertThat(actual).hasSize(61);
         assertThat(documented).containsExactlyElementsOf(actual);
         assertThat(document.path("openapi").asString()).startsWith("3.1.");

@@ -93,7 +93,7 @@ class V1HttpE2ECoverageTest {
         map.put("identityCancelExternalLinkProof", SXE + "externalIdentityLinkLifecycleKeepsOneInternalUser");
         map.put("identityBootstrapExternalLink", SXE + "externalIdentityLinkLifecycleKeepsOneInternalUser");
         map.put("identityUnlinkExternalAccount", SXE + "externalIdentityLinkLifecycleKeepsOneInternalUser");
-        // OH-023 (ADR-0021), post-v1: self-scoped Tenant discovery.
+        // OH-023 (ADR-0021): self-scoped Tenant discovery, admitted to v1.0.0 by scope amendment.
         map.put("tenantsDiscoverSelectable", "SeededTenantDiscoveryE2ETest#everyPersonaDiscoversExactlyItsSelectableTenants");
         return java.util.Collections.unmodifiableMap(map);
     }

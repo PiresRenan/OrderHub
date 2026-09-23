@@ -2,19 +2,16 @@
 
 Status: DESIGNED — implementation and exact-candidate qualification pending.
 
-Numbering note: ADR-0021 and migration V45 are provisional on the isolated OH-023
-branch. Before post-v1 integration, the next available ADR and migration numbers
-are re-derived from the released baseline. If OH-022 has used either number, this
-work is renumbered. Integrated authority is never overwritten, and out-of-order
-migration is never enabled.
 
 Task: OH-023, [Issue #52](https://github.com/PiresRenan/OrderHub/issues/52).
 
-Classification: **POST-v1**. This capability is not part of the OH-022 / v1.0.0
-scope. The frozen v1 contract (60 operations, ADR-0020) is unchanged. OH-023 is
-integrated into `pre-release` only after v1.0.0 is promoted, tagged and published,
-and only after the candidate is synchronized with the post-v1 baseline and fully
-requalified.
+Classification: **v1.0.0 release scope**, admitted by an explicit scope
+amendment accepted on 2026-09-23 (#52, #41, #42; see ADR-0020). This decision
+originally classified the capability as post-v1; the owner superseded that
+classification because a secure first-party/BFF client needs an OrderHub-owned
+way to discover its current Tenant contexts without deriving authority outside
+OrderHub. The final v1.0.0 contract therefore has 61 operations and accepted
+migrations V1–V45.
 
 ## Problem
 
@@ -201,7 +198,7 @@ consciously on large retained datasets.
 
 The operation is generated from the MVC handler, with authentication, query
 parameters, page schema, 200/400/401/5xx semantics and the `Cache-Control`
-header. The generated artifact on the OH-023 branch is a post-v1 candidate only.
+header. It is part of the final v1.0.0 generated contract.
 
 ## Alternatives rejected
 
