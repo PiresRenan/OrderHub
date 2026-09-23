@@ -21,7 +21,11 @@ and required audience using Spring Security/Nimbus. Expiry is mandatory for
 every trusted provider. The per-issuer `COGNITO` token profile also requires
 `token_use=access`, an HTTPS resource audience and a string `client_id` in that
 issuer's explicit `allowed-client-ids`; `GENERIC` retains other explicitly
-configured providers and does not require `client_id`. The profile itself must
+configured providers and does not require `client_id`. The JOSE `typ` header
+(case-insensitive) must be absent, `JWT` or, for `GENERIC` only, the RFC 9068
+`at+jwt` access-token type (as issued by OpenIddict); any other `typ` is rejected.
+`typ` is not a purpose check: ID tokens are excluded by the audience contract,
+and `COGNITO` keeps `token_use`. The profile itself must
 be configured explicitly for every issuer. `aud` binds the target Resource
 Server, `client_id` the admitted App Client and `token_use` the token purpose;
 none of them confers Tenant, Staff or Customer authority. See [client integration](../integration/README.md)

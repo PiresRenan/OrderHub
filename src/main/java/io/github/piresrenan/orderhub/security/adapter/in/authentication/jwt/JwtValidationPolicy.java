@@ -9,6 +9,7 @@ import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.JwtTimestampValidator;
 import org.springframework.security.oauth2.jwt.JwtIssuerValidator;
 import org.springframework.security.oauth2.jwt.JwtClaimValidator;
+import org.springframework.security.oauth2.jwt.JwtTypeValidator;
 
 /**
  * Defines the validation policy applied to externally issued JWT access tokens.
@@ -51,9 +52,17 @@ public final class JwtValidationPolicy
         var clients = java.util.Set.copyOf(profile.validateAllowedClientIds(allowedClientIds));
         var timestamps = new JwtTimestampValidator();
         timestamps.setAllowEmptyExpiryClaim(false);
+        var defaults = new java.util.ArrayList<OAuth2TokenValidator<Jwt>>(
+                java.util.List.of(timestamps, new JwtIssuerValidator(expectedIssuer)));
+        if (profile == JwtTokenProfile.GENERIC) {
+            // Why: Spring adds JwtTypeValidator.jwt() only when no type validator is supplied, so this
+            // replaces it; RFC 9068 issuers (OpenIddict) emit typ=at+jwt, legacy issuers JWT or none.
+            var types = new JwtTypeValidator("JWT", "at+jwt");
+            types.setAllowEmpty(true);
+            defaults.add(types);
+        }
         var validators = new java.util.ArrayList<OAuth2TokenValidator<Jwt>>();
-        validators.add(JwtValidators.createDefaultWithValidators(
-                new java.util.ArrayList<>(java.util.List.of(timestamps, new JwtIssuerValidator(expectedIssuer)))));
+        validators.add(JwtValidators.createDefaultWithValidators(defaults));
         validators.add(new JwtAudienceValidator(expectedAudience));
         if (profile == JwtTokenProfile.COGNITO) {
             validators.add(new JwtClaimValidator<Object>("token_use", value -> "access".equals(value)));
