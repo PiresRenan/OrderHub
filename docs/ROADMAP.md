@@ -604,8 +604,18 @@ operational workflows without bypassing those primitives.
 one-shot command establishes the first retained Platform operator from an exact trusted
 issuer + subject. It creates one User, one binding and only `PLATFORM_TENANTS_MANAGE`, plus
 append-only ceremony evidence, in one PostgreSQL transaction arbitrated by a forward-only
-singleton (V46). It adds no public operation (61 remain). Recovery and break-glass stay
-out of scope. Admitted to v1.0.0 by the 2026-09-24 security/operability amendment.
+singleton (V46). It adds no public operation (61 remain). Admitted to v1.0.0 by the
+2026-09-24 security/operability amendment.
+
+OH-026 ([#58](https://github.com/PiresRenan/OrderHub/issues/58)) fixes the recovery
+contract as an ADR-0022 amendment: no OrderHub recovery mutator, break-glass account or
+reopen. Each exceptional state R1–R10 maps to normal retry, read-only verification,
+normal administration, Identity-side recovery, whole-database restore, or fail-closed
+security escalation. No migration, no public operation.
+Known v1 limitation for release governance (OH-022): there is no Platform-administrator
+succession and no public path to add a second Platform administrator. Credential loss by
+the same principal is Identity-owned recovery. Permanent loss of the final authorized
+principal is an unsupported security-escalation state.
 
 ## Durable internal publication — implemented; external delivery deferred
 

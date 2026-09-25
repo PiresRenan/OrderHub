@@ -69,6 +69,22 @@ class BootstrapModuleContractTest {
     }
 
     @Test
+    void noRecoveryReopenOrForceModeExists() throws Exception {
+        // OH-026: v1 has no OrderHub recovery mutator. The only command mode is the forward-only normal ceremony.
+        var entry = java.nio.file.Files.readString(java.nio.file.Path.of("src/main/java/io/github/piresrenan/orderhub/OrderHubApplication.java"));
+        assertThat(java.util.regex.Pattern.compile("args\\[0]").matcher(entry).results().count()).isEqualTo(1);
+        var forbidden = java.util.regex.Pattern.compile("(?i)(break-?glass|bootstrap[._-]?(reset|force|reopen|recover)"
+                + "|first-operator[._-]?(reset|force|reopen|recover))");
+        for (var root : java.util.List.of("src/main/java", "src/main/resources")) {
+            try (var files = java.nio.file.Files.walk(java.nio.file.Path.of(root))) {
+                for (var file : files.filter(java.nio.file.Files::isRegularFile).toList()) {
+                    assertThat(java.nio.file.Files.readString(file)).as(file.toString()).doesNotContainPattern(forbidden);
+                }
+            }
+        }
+    }
+
+    @Test
     void everyCurrentBackgroundMutatorIsDisabledInCommandMode() throws Exception {
         // Inventory of production startup and background mechanisms. A new entry must be reviewed for command mode.
         var base = java.nio.file.Path.of("src/main/java");

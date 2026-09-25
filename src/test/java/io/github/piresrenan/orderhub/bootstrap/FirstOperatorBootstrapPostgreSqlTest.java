@@ -468,6 +468,26 @@ class FirstOperatorBootstrapPostgreSqlTest {
     }
 
     @Test
+    void normalBootstrapCannotBeUsedForSuccessionOrReopenedAfterAccessLoss() {
+        // OH-026 R8B/R9/R10: a retired issuer or a replacement identity is never a bootstrap input.
+        // This proves the normal ceremony cannot be used for succession; it does not make succession supported.
+        var operation = UUID.randomUUID();
+        assertThat(graph().bootstrap(request(operation))).isEqualTo(FirstOperatorBootstrapOutcome.COMPLETED);
+        var before = snapshot();
+        var retired = new FirstOperatorBootstrapService(issuer -> false, new SpringFirstOperatorBootstrapTransaction(manager), ceremony(),
+                resolver(), usersGraph(), authority(), UUID::randomUUID);
+
+        assertThat(retired.bootstrap(new FirstOperatorBootstrapRequest(TRUSTED, "replacement-subject", UUID.randomUUID())))
+                .isEqualTo(FirstOperatorBootstrapOutcome.ALREADY_COMPLETED);
+        assertThat(retired.bootstrap(new FirstOperatorBootstrapRequest("https://replacement.bootstrap.test", "replacement-subject",
+                UUID.randomUUID()))).isEqualTo(FirstOperatorBootstrapOutcome.ALREADY_COMPLETED);
+        assertThat(retired.bootstrap(request(operation))).isEqualTo(FirstOperatorBootstrapOutcome.ALREADY_COMPLETED_SAME_OPERATION);
+
+        assertThat(snapshot()).isEqualTo(before);
+        assertThat(state()).isEqualTo("COMPLETED");
+    }
+
+    @Test
     void ownerWritesRefuseToRunOutsideTheCallerTransaction() {
         assertThatThrownBy(() -> ceremony().lock()).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> ceremony().appendCompletedEvidence(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()))

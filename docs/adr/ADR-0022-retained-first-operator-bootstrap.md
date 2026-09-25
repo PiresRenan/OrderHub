@@ -280,7 +280,234 @@ unchanged.
 
 ### Recovery
 
-Recovery and break-glass are **outside** OH-024. Nothing reopens the ceremony.
+Recovery and break-glass are **outside** OH-024. Nothing reopens the ceremony. OH-026 fixes
+the recovery contract below.
+
+## Amendment — recovery disposition contract (OH-026)
+
+Task: OH-026, [Issue #58](https://github.com/PiresRenan/OrderHub/issues/58). Parent: #53.
+Paired: OrderHub-Web-BFF #44 (BFF-023).
+
+### Decision
+
+**No new OrderHub recovery mutator.** v1 has no recovery command, recovery endpoint,
+break-glass account, emergency token, startup seed, or reset/force/reopen option. Every
+exceptional state maps to exactly one existing disposition. Where OrderHub cannot
+determine the correct security state from its own data, it fails closed. The disposition
+is then restore, Identity-side recovery or security escalation, never application repair.
+
+Two events are deliberately kept apart:
+
+- **Account recovery:** the **same** authorized principal regains the use of their own
+  subscriber account. This is Identity-owned, and it preserves the subject.
+- **Principal succession:** a different human takes over Platform authority. This is not
+  account recovery. v1 does not support it.
+
+A provider subject that represents person A must never come to represent person B just
+to keep Platform authority. Otherwise OrderHub bindings, grants and ceremony evidence
+would attribute B's actions to A.
+
+Why this is safer than a new mutator:
+
+- Any OrderHub mutator that grants Platform authority to an identity without an
+  already-authorized actor is a second bootstrap. Its assurance would be at most equal to
+  the deployment operator's access to the database and configuration, and it would add a
+  standing code path for the most privileged transition.
+- Credential and authenticator loss by the same principal (R8A) is an Identity problem.
+  Identity resolves it without any OrderHub change.
+- OrderHub stores no raw subject in ceremony evidence, and it has no trustworthy way to
+  decide which person should hold Platform authority after the final principal is gone.
+  That is an organizational security decision, not something OrderHub can infer.
+
+### Recovery state matrix
+
+| State | Meaning | Primary disposition | Owner | Allowed action | Forbidden action | Mutation |
+| --- | --- | --- | --- | --- | --- | --- |
+| R1 | Ceremony `OPEN`, no Platform grant, exact pair unbound (including after `PERSISTENCE_FAILURE`, `INVALID_INPUT`, `UNTRUSTED_ISSUER`) | NORMAL RETRY | Deployment | Fix input or trust configuration, then rerun `bootstrap-first-operator` with the same operation id | Manual rows; editing the singleton | Normal ceremony only |
+| R2 | `COMPLETED`, operator can authenticate | NORMAL EXISTING ADMIN FLOW | OrderHub admin APIs | Normal Tenant, Staff and link lifecycle | Any bootstrap rerun expecting new effects | None from recovery |
+| R3 | `COMPLETED`; stdout, operation id or receipt copy lost | READ-ONLY VERIFICATION | Deployment | See "R3: closure vs. provenance" below | Reversing or brute-forcing the fingerprint; fabricating identity evidence; storing reversible identity data; any new privileged mutation | None |
+| R4 | Identity created the account and completed its bootstrap but emitted no receipt | IDENTITY-SIDE RECOVERY | Identity/BFF | Identity recovers or re-emits the exact issuer + subject through its own governed procedure. OrderHub stays `OPEN`, then R1. | OrderHub guessing or deriving the subject; OrderHub reading the Identity database | None in OrderHub |
+| R5 | `INCOMPATIBLE_EXISTING_STATE`: exact pair already bound | UNSUPPORTED / FAIL CLOSED | Security | Obtain a **fresh**, unbound Identity account for the first operator and run R1. If the binding is unexpected: SECURITY ESCALATION. | Adopting or elevating the bound (Customer, Staff or other) User; unlinking the binding by SQL | None |
+| R6 | `INCOMPATIBLE_EXISTING_STATE`: a Platform grant exists while `OPEN` (upgrade or legacy) | NORMAL EXISTING ADMIN FLOW | Existing Platform holder | While a legitimate holder is still accessible, that holder continues supported Platform operations; the bootstrap is unnecessary. This does **not** create a successor: the public API cannot establish another Platform administrator. If the holder's credentials are lost: R8A. If the holder is gone: R10. If the grant is unexplained: SECURITY ESCALATION, then R7. | Creating a second operator; deleting the grant to "unblock" the ceremony | None |
+| R7 | Inconsistent or corrupted security state (evidence vs. singleton mismatch, missing singleton, bypassed trigger, disagreeing User/binding/grant rows) | RESTORE FROM AUTHORITATIVE BACKUP | Deployment + security | Stop mutating deployments; restore the whole OrderHub database to a reviewed point; verify (see "Restore contract (R7)") | Repair SQL; disabling triggers; "picking the most likely truth"; selective repair to avoid rollback | None by OrderHub |
+| R8A | `COMPLETED`; the **same** authorized principal lost their password or authenticator | IDENTITY-SIDE RECOVERY | Identity/BFF | Identity recovers account access for that same principal under its recovery policy, preserving the subject, and binds new authenticators | Reopening the bootstrap; binding a new identity by SQL | None in OrderHub |
+| R8B | `COMPLETED`; the principal left, was terminated, or is otherwise permanently no longer authorized | NORMAL EXISTING ADMIN FLOW if another legitimate Platform holder is accessible, otherwise R10 | Organization/security | Remove the departed principal's access at Identity according to organizational policy. Continue with any remaining legitimate holder, within current capabilities. | Reactivating a terminated person to regain OrderHub access; handing the departed person's Identity account to a replacement; keeping the subject while changing the human; rewriting OrderHub identity history | None in OrderHub |
+| R9 | Signing/encryption key or client-secret rotation; issuer migration | NORMAL EXISTING ADMIN FLOW | Identity (keys); OrderHub link lifecycle (migration) | Key and secret rotation: no OrderHub action, because issuer + subject are unchanged. Issuer migration for the **same** principal: add the new issuer to trust, and the operator adds the new identity through `POST /identity/external-link-proofs` + `POST /identity/bootstrap/external-links`, verifies it, then unlinks the old one (add-then-remove, last-path protected) | Rewriting ceremony evidence; rebinding by SQL; bootstrap rerun; linking another person's identity | Normal link lifecycle only |
+| R10 | Total loss of legitimate human Platform access | SECURITY ESCALATION — NO AUTOMATED REPAIR IN v1 (unsupported) | Security, with Identity/BFF for the bounded pre-checks | First exhaust the bounded options (see "R10") | Standing emergency account; root token; hidden endpoint; reopen; account reassignment presented as recovery; Identity restore used as succession | None in v1 |
+
+### R3: closure vs. provenance
+
+1. **Original receipt and operation id retained:** an exact replay returns
+   `ALREADY_COMPLETED_SAME_OPERATION`. This confirms the original request.
+2. **Records lost, but the legitimate operator can authenticate:** confirm through normal
+   authenticated reads (`GET /identity/external-accounts` and a Platform operation).
+3. **Closure check:** a different, syntactically valid request returning
+   `ALREADY_COMPLETED` (exit 3) proves only that the ceremony is closed and that this run
+   mutated nothing. It does **not** prove which identity completed the ceremony. Do not
+   use it to reconstruct provenance, and do not reverse or guess the stored fingerprint.
+
+### R10: bounded options before escalation
+
+Only the following apply, and only under their conditions:
+
+- **Identity account recovery.** Valid only if the same, still-authorized principal
+  exists, and the problem is loss or corruption of that principal's credentials,
+  authenticators or account state (this is R8A).
+- **Identity restore from its own authoritative backup.** Valid only if the legitimate
+  Identity system or account was lost to infrastructure or data loss, and the restored
+  account still belongs to the same authorized principal. Identity restore is **not** a
+  succession mechanism.
+
+If the final authorized Platform principal is permanently unavailable, and no other
+Platform administrator exists, v1 has no supported OrderHub recovery. The disposition is
+SECURITY ESCALATION — NO AUTOMATED REPAIR IN v1. Any of the following needs a separate
+product and security decision:
+
+- a Platform-administrator succession capability;
+- a way to add Platform administrators;
+- a separately authorized break-glass ceremony.
+
+### Security grounding
+
+These sources were verified against the official NIST publications (nvlpubs.nist.gov /
+csrc.nist.gov) and the OWASP Cheat Sheet Series. They shaped the decision. This is not a
+compliance claim.
+
+- **NIST SP 800-63B-4 (Final, July 2025), §4.2 Account Recovery.**
+  - What it says: account recovery is when a subscriber recovers from losing control of
+    the authenticators needed for a desired AAL. After recovery, the subscriber binds new
+    authenticators to **their** subscriber account.
+  - §4.2.1: CSPs SHALL support at least one of four method classes (saved or issued
+    recovery codes, recovery contacts, repeated identity proofing).
+  - §4.2.1.4: repeated identity proofing SHALL confirm that the claimant's identity is
+    consistent with the previously established account.
+  - §4.2.2: requirements vary by IAL and maximum AAL.
+  - §4.2.3: recovery SHALL cause a notification to the subscriber or their designee.
+  - Applied:
+    - Recovery is CSP-owned (Identity) and restores the **same** subscriber account
+      (R4, R8A).
+    - It is not a mechanism for transferring an account to a different person (R8B, R10).
+    - OrderHub is not a CSP, receives no recovery secrets and implements no recovery
+      method.
+- **NIST SP 800-53 Rev. 5 AC-2.**
+  - What it says: account management, including notification when users are terminated
+    or transferred (AC-2h).
+  - Applied: R8B treats departure as an account-management event, not a recovery event.
+- **NIST SP 800-53 Rev. 5 AC-2(2).**
+  - What it says: temporary and emergency accounts are removed or disabled automatically
+    after an organization-defined period.
+  - This is guidance for how we reason, not a control that applies directly: v1 creates
+    no emergency account, so there is nothing to expire.
+- **NIST SP 800-53 Rev. 5 AC-6(5).**
+  - What it says: privileged accounts are restricted to organization-defined personnel
+    or roles.
+  - Applied: Platform authority stays the single minimal grant `PLATFORM_TENANTS_MANAGE`,
+    bound to one named principal.
+- **NIST SP 800-53 Rev. 5 AU-2 and AU-10.**
+  - What they say: AU-2 covers event logging; AU-10 covers evidence that an individual
+    performed an action.
+  - Guidance only: they explain why a subject must not change human (attribution
+    integrity). OrderHub adds no new logged event.
+- **NIST SP 800-53 Rev. 5 CP-9 and CP-10.**
+  - What they say: CP-9 covers backups; CP-10 covers recovery and reconstitution to a
+    known state.
+  - Applied: R7 restores the coherent database instead of repairing selected rows. The
+    backup tooling belongs to the deployment.
+- **OWASP Forgot Password Cheat Sheet.**
+  - What it says: single-use tokens, no account change before a valid token, no
+    enumeration, and throttling.
+  - Supporting guidance for the Identity side only. It does not authorize principal
+    succession, and it does not apply to OrderHub, which has no password.
+
+### Restore contract (R7)
+
+- **Why not repair:** OrderHub cannot tell which of disagreeing security rows is true.
+  Selective SQL would create authority without an authorized actor or evidence.
+- **Impact:** a whole-database restore may roll **business** state back to the selected
+  restore point. This makes it an exceptional security or disaster-recovery action.
+  Do not create selective repair to avoid this consequence.
+- **Authoritative backup:** a point-in-time copy of the **whole** OrderHub database. It
+  was taken by the deployment's governed backup process, and its provenance and integrity
+  are known and verified. OrderHub specifies the property, not the tooling.
+- **Preconditions:**
+  - Stop OrderHub servers and all command jobs.
+  - Choose a reviewed restore point from before the suspected corruption.
+  - Get deployment and security approval (external change reference; dual control where
+    the organization has it).
+  - Complete the organization's normal data-loss assessment.
+- **Restore rules:** restore the whole database as one unit, with the Flyway history of
+  the same artifact. Do not patch business or security rows before or after.
+- **Post-restore verification:**
+  - `flyway validate` passes for V1–V46.
+  - A `bootstrap-first-operator` run with a new operation id returns `ALREADY_COMPLETED`
+    (for a restored `COMPLETED` ceremony) or follows R1 (for a restored `OPEN` ceremony).
+  - The legitimate operator authenticates and performs a Platform read.
+  - The Identity owner reviews any Identity changes made after the restore point.
+
+### Authorization, evidence and privacy
+
+- Recovery actions are deployment/security operations authorized **outside** OrderHub.
+  They need an external change reference, plus dual control where the organization has
+  it. OrderHub implements no approval workflow.
+- The deployment record may hold:
+  - the change reference;
+  - the operation id;
+  - the command outcome line and exit code;
+  - timestamps;
+  - internal User IDs.
+- The deployment record must never hold passwords, tokens, client secrets, private keys,
+  receipt contents or raw subjects.
+- OrderHub writes no new evidence, because no new mutation exists. Normal lifecycle flows
+  (R9) keep their existing audit.
+
+### Invariants preserved
+
+- The ceremony moves only `OPEN -> COMPLETED`.
+- V46 is unchanged, and no new migration was added: history stays V1–V46.
+- There is no reset, force, reopen or recovery property or mode.
+- The public OpenAPI stays at 61 operations.
+
+Executable proof:
+
+- `FirstOperatorBootstrapPostgreSqlTest.normalBootstrapCannotBeUsedForSuccessionOrReopenedAfterAccessLoss`
+  - Checks: with a retired issuer, a replacement subject, or a replacement issuer, the
+    ceremony answers `ALREADY_COMPLETED` and nothing changes.
+  - Proves: the normal bootstrap cannot be used for succession (R8B/R10), or for
+    re-bootstrap after identity lifecycle changes (R9).
+  - Does **not** prove: that succession is supported.
+- `BootstrapModuleContractTest.noRecoveryReopenOrForceModeExists`: there is a single
+  command mode and no recovery, reopen or force switch.
+- Existing tests prove R1, the R3 replay and closure, R5, R6, the R7 cases E and F, and
+  trigger-level non-reopen.
+
+### Known limitation (release visibility)
+
+v1 has no supported Platform-administrator succession capability, and no normal public
+path to establish a second Platform administrator: grants through the public API are
+Organization-scoped only.
+
+- Loss of credentials by the same principal is Identity-owned recovery (R8A).
+- Permanent loss or departure of the final authorized principal is an unsupported v1
+  security-escalation state (R8B → R10).
+
+This is an operational and security risk. OH-026 deliberately does not solve it. It is
+recorded here so that OH-022 and release governance can weigh it when evaluating final
+production readiness. OH-026 does not classify it as release-blocking.
+
+### Rejected alternatives (OH-026)
+
+- **Offline "recover-first-operator" command:** a second bootstrap with no stronger
+  assurance than restore.
+- **Adopting a bound identity:** privilege escalation (R5).
+- **Reassigning or reactivating a departed principal's Identity account:** collapses
+  identity continuity into principal succession and falsifies attribution (R8B).
+- **Using Identity restore as succession:** a restore returns the same principal's
+  account; it does not replace the principal.
+- **Standing break-glass account or token:** out of scope for #58, and the reasoning in
+  AC-2(2) argues against standing emergency access.
+- **Read-only verifier command:** R3 is already answered by exact replay, by
+  authenticated reads, and by the bounded closure check.
+- **Reopen flag:** defeats the one-shot guarantee.
 
 ## Rejected alternatives
 
