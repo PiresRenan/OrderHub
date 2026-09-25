@@ -468,8 +468,9 @@ class FirstOperatorBootstrapPostgreSqlTest {
     }
 
     @Test
-    void postBootstrapAccessLossNeverReopensOrMintsAnotherOperator() {
-        // OH-026 R8/R9/R10: a lost operator, a retired issuer or a replacement identity is never a bootstrap input.
+    void normalBootstrapCannotBeUsedForSuccessionOrReopenedAfterAccessLoss() {
+        // OH-026 R8B/R9/R10: a retired issuer or a replacement identity is never a bootstrap input.
+        // This proves the normal ceremony cannot be used for succession; it does not make succession supported.
         var operation = UUID.randomUUID();
         assertThat(graph().bootstrap(request(operation))).isEqualTo(FirstOperatorBootstrapOutcome.COMPLETED);
         var before = snapshot();

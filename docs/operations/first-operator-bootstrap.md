@@ -97,16 +97,21 @@ available, before any R5–R10 action.
 | --- | --- | --- | --- |
 | Exit 1, 2 or 4 | R1 retryable | Fix the cause and rerun with the same operation id | `COMPLETED` |
 | Operator signs in normally | R2 | Use normal administration | — |
-| Output, operation id or receipt lost | R3 | Rerun with the original receipt and operation id if held. Otherwise use a new operation id and expect `ALREADY_COMPLETED` (exit 3); nothing changes. | Operator sign-in + Platform read |
+| Output, operation id or receipt lost | R3 | 1. If the original receipt and operation id are held, run an exact replay and expect `ALREADY_COMPLETED_SAME_OPERATION`. 2. Otherwise the legitimate operator signs in and verifies with authenticated reads. 3. A different valid request that returns `ALREADY_COMPLETED` (exit 3) proves **only** that the ceremony is closed and that nothing changed, not which identity completed it. Never reverse the fingerprint or fabricate identity evidence. | Replay, or operator sign-in + Platform read |
 | No receipt from Identity | R4 | Identity owner recovers the receipt. OrderHub stays `OPEN`, then R1. | `COMPLETED` |
 | Exit 5, identity already bound | R5 | Do **not** adopt it. Use a fresh Identity account. If the binding is unexpected, escalate to security. | `COMPLETED` for the fresh identity |
-| Exit 5, Platform grant exists | R6 | The existing holder uses normal administration. If the grant is unexplained, escalate to security, then R7. | Holder sign-in |
-| Exit 1 persisting on a healthy database, or security rows disagree | R7 | **Restore the whole OrderHub database** from an authoritative backup. Do not repair rows. | `flyway validate`; exit 3 or R1; operator sign-in |
-| Operator lost password, authenticator or left | R8 | Identity recovers the **same** account | Operator sign-in |
+| Exit 5, Platform grant exists | R6 | While a legitimate holder is accessible, that holder continues supported Platform operations. This does **not** create a successor: the public API cannot add a Platform administrator. If the grant is unexplained, escalate to security, then R7. | Holder sign-in |
+| Exit 1 persisting on a healthy database, or security rows disagree | R7 | **Restore the whole OrderHub database** from an authoritative backup with known provenance and integrity. Choose a reviewed restore point, get deployment/security approval and complete a data-loss assessment: business state rolls back to the restore point. Do not repair rows. | `flyway validate`; exit 3 or R1; operator sign-in |
+| The **same** authorized operator lost their password or authenticator | R8A | Identity recovers that principal's own account (same subject) | Operator sign-in |
+| Operator left, was terminated, or is no longer authorized | R8B | This is **not** account recovery. Remove their access at Identity. If another legitimate Platform holder is accessible, continue with normal administration; otherwise R10. Never reactivate the person, and never hand their Identity account to a replacement. | Remaining holder sign-in |
 | Key or secret rotation | R9 | No OrderHub action | Operator sign-in |
 | Issuer migration | R9 | Trust the new issuer, then link-proof add-then-remove through the normal API | `GET /identity/external-accounts` |
-| No human can reach Platform access | R10 | Identity recovery, then Identity restore. Otherwise **security escalation. There is no automated repair, and v1 does not support this.** | Operator sign-in |
+| No legitimate human can reach Platform access | R10 | **Security escalation. There is no automated repair in v1.** First exhaust two options, and only where they apply: Identity recovery (if the same still-authorized principal only lost credentials), and Identity restore (if data loss hit that same principal's account). Neither of these is a succession mechanism. | Operator sign-in, or an escalation record |
 
 Keep in deployment records only the change reference, operation id, outcome line, exit
 code, timestamps and internal User IDs. Never keep passwords, tokens, secrets, keys,
 receipt contents or raw subjects.
+
+Known v1 limitation: there is no Platform-administrator succession, and no public path to
+add a second Platform administrator. Permanent loss of the final authorized principal is
+an unsupported security-escalation state (ADR-0022, OH-026 amendment).

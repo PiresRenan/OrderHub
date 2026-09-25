@@ -612,6 +612,10 @@ contract as an ADR-0022 amendment: no OrderHub recovery mutator, break-glass acc
 reopen. Each exceptional state R1–R10 maps to normal retry, read-only verification,
 normal administration, Identity-side recovery, whole-database restore, or fail-closed
 security escalation. No migration, no public operation.
+Known v1 limitation for release governance (OH-022): there is no Platform-administrator
+succession and no public path to add a second Platform administrator. Credential loss by
+the same principal is Identity-owned recovery. Permanent loss of the final authorized
+principal is an unsupported security-escalation state.
 
 ## Durable internal publication — implemented; external delivery deferred
 
