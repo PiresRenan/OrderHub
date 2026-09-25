@@ -16,12 +16,15 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
+import org.flywaydb.core.Flyway;
 import org.springframework.boot.logging.LogLevel;
+import org.springframework.boot.logging.LoggingInitializationContext;
 import org.springframework.boot.logging.LoggingSystem;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.web.server.context.WebServerApplicationContext;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.core.env.StandardEnvironment;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
@@ -51,15 +54,24 @@ class FirstOperatorBootstrapCommandModeTest {
 
     @AfterEach
     void restoreSharedTestJvmLogging() {
-        // The command switches logging off for its own process; this test JVM hosts other suites.
-        LoggingSystem.get(getClass().getClassLoader()).setLogLevel(LoggingSystem.ROOT_LOGGER_NAME, LogLevel.INFO);
+        // The command installs its discarding logging configuration for its own process; this in-process test
+        // shares the JVM with other suites, so logging is reinitialized with the framework defaults.
+        var logging = LoggingSystem.get(getClass().getClassLoader());
+        logging.cleanUp();
+        logging.beforeInitialize();
+        logging.initialize(new LoggingInitializationContext(new StandardEnvironment()), null, null);
+        logging.setLogLevel(LoggingSystem.ROOT_LOGGER_NAME, LogLevel.INFO);
     }
 
     @Test
     void commandModeIsANonWebOneShotContextThatIsClosedBeforeReturning(CapturedOutput output) throws Exception {
+        // Deployment owns migration; the command itself never migrates.
+        Flyway.configure().dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
+                .locations("classpath:db/migration", "classpath:db/baseline").load().migrate();
         var receipt = directory.resolve("receipt.json");
         Files.writeString(receipt, "{\"issuer\":\"https://identity.mode.test\",\"subject\":\"mode-subject\"}", StandardCharsets.UTF_8);
         var observed = new AtomicReference<ConfigurableApplicationContext>();
+        var outputBeforeCommand = output.getAll().length();
         var buffer = new ByteArrayOutputStream();
 
         var result = FirstOperatorBootstrapCommand.run(OrderHubApplication.class, new String[] {
@@ -82,7 +94,7 @@ class FirstOperatorBootstrapCommandModeTest {
         assertThat(observed.get()).isNotNull();
         assertThat(observed.get().isActive()).isFalse();
         assertThat(buffer.toString(StandardCharsets.UTF_8)).isEqualTo("FIRST_OPERATOR_BOOTSTRAP: COMPLETED" + System.lineSeparator());
-        assertThat(output.getAll()).isEmpty();
+        assertThat(output.getAll().substring(outputBeforeCommand)).isEmpty();
     }
 
     @Test

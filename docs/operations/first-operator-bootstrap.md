@@ -9,8 +9,10 @@ All values below are placeholders.
 
 ## Preconditions
 
-- The database has been migrated through V46 by the same OrderHub artifact. The command
-  also migrates on startup, exactly like the server.
+- **Before** running `bootstrap-first-operator`, the deployment migration step must have
+  applied and validated migrations through **V46** from the exact same OrderHub artifact.
+  The command never migrates. Against an older schema it returns `PERSISTENCE_FAILURE`
+  and changes nothing, including Flyway history.
 - The retained issuer is configured as trusted (`orderhub.security.jwt.issuer` or an
   additional trusted issuer). The ceremony trusts nothing else.
 - The deployment holds a receipt produced by the Identity bootstrap:
@@ -45,16 +47,20 @@ FIRST_OPERATOR_BOOTSTRAP: COMPLETED
 | --- | --- | --- |
 | `COMPLETED` | 0 | Done. Proceed to the normal journey below. |
 | `ALREADY_COMPLETED_SAME_OPERATION` | 0 | An earlier run with this operation id and identity already succeeded. Nothing changed. |
-| `PERSISTENCE_FAILURE` | 1 | Nothing was committed. Fix connectivity or configuration and rerun with the **same** operation id. |
+| `PERSISTENCE_FAILURE` | 1 | Nothing was committed. Check connectivity, configuration and that V46 has been applied, then rerun with the **same** operation id. |
 | `INVALID_INPUT` | 2 | Fix the receipt or operation id. No business state was changed. |
 | `ALREADY_COMPLETED` | 3 | The ceremony is closed for a different operation or identity. It cannot be reopened. |
 | `UNTRUSTED_ISSUER` | 4 | The receipt issuer is not configured as trusted. Nothing changed. |
 | `INCOMPATIBLE_EXISTING_STATE` | 5 | Platform authority already exists, or the identity is already bound. Use the separate recovery process. |
 
 If output is lost, rerun with the **same** receipt and operation id. A completed ceremony
-answers `ALREADY_COMPLETED_SAME_OPERATION` and never repeats privileged effects.
+recognizes that exact request from its stored evidence and answers
+`ALREADY_COMPLETED_SAME_OPERATION` without repeating privileged effects. This holds even
+if the original binding has since been unlinked or migrated, or the issuer is no longer
+trusted.
 
-That line is the command's only output. Framework logging is off in command mode, so no
+That line is the command's only output. Command mode discards every log event, whatever
+logger levels are configured, so no
 stack trace, connection detail, SQL, receipt path or contents, issuer, subject or
 configuration value is printed. To diagnose `PERSISTENCE_FAILURE`, start the normal server
 with the same database configuration.

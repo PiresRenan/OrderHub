@@ -2,24 +2,19 @@ package io.github.piresrenan.orderhub.bootstrap;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.junit.jupiter.api.AfterEach;
+import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
-import org.springframework.boot.logging.LogLevel;
-import org.springframework.boot.logging.LoggingSystem;
-import org.springframework.boot.test.system.CapturedOutput;
-import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.testcontainers.junit.jupiter.Container;
@@ -29,146 +24,147 @@ import org.testcontainers.utility.DockerImageName;
 
 import io.github.piresrenan.orderhub.OrderHubApplication;
 import io.github.piresrenan.orderhub.bootstrap.adapter.in.command.FirstOperatorBootstrapCommand;
-import io.github.piresrenan.orderhub.bootstrap.adapter.in.command.FirstOperatorBootstrapCommand.Result;
 
 /**
- * Why: the only inbound surface of ADR-0022 is an offline, one-shot process.
- * Scenario: the real application class is launched in command mode, without a web server, against a fresh
- * PostgreSQL database that the command itself installs through the production Flyway locations (B44 + V45 + V46).
- * Covers: exit results, separate-process restart and replay, strict receipt/operation validation, untrusted
- * issuer, unavailable database and the absence of identity or configuration values in all captured output.
- * Prevents: bootstrap inputs on the command line, value echoing and process-local one-shot state.
+ * Why: the only inbound surface of ADR-0022 is an offline, one-shot operating-system process.
+ * Scenario: every attempt is a separate JVM launched through {@code OrderHubApplication.main} with the
+ * {@code bootstrap-first-operator} argument and hostile, explicitly verbose logger levels. Deployment migrates
+ * the databases beforehand, except where a test proves that the command never migrates.
+ * Covers: real exit statuses, process restart and replay, bounded input rejection, untrusted issuer, an
+ * unavailable database, the exact process-visible output, and command-mode migration isolation (MIG-CMD-1..3).
+ * Prevents: logging or stack-trace leakage through explicitly configured loggers, schema mutation by the
+ * privileged ceremony, and process-local one-shot state.
  */
 @Testcontainers
-@ExtendWith(OutputCaptureExtension.class)
 class FirstOperatorBootstrapCommandTest {
 
     private static final String TRUSTED = "https://identity.command.test";
     private static final String SUBJECT = "c0mmand-subject-7d1e";
     private static final String PASSWORD = "synthetic-command-password";
+    private static final String USERNAME = "command_owner";
     private static final AtomicInteger DATABASES = new AtomicInteger();
+
+    /** Explicit package-level verbosity that a hostile or careless environment might carry. */
+    private static final List<String> HOSTILE_LOGGING = List.of(
+            "--logging.level.root=TRACE",
+            "--logging.level.org.springframework=TRACE",
+            "--logging.level.org.springframework.boot=TRACE",
+            "--logging.level.com.zaxxer.hikari=TRACE",
+            "--logging.level.org.flywaydb=DEBUG",
+            "--logging.level.org.postgresql=TRACE",
+            "--logging.level.io.github.piresrenan.orderhub=TRACE",
+            "--logging.config=classpath:does-not-exist.xml",
+            "--debug=true",
+            "--trace=true",
+            "--spring.main.banner-mode=console");
 
     @Container
     private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(
             DockerImageName.parse("postgres:18.6-trixie@sha256:"
                     + "4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280")
                     .asCompatibleSubstituteFor("postgres"))
+            .withUsername(USERNAME)
             .withPassword(PASSWORD);
 
     @TempDir
     Path directory;
 
-    @AfterEach
-    void restoreSharedTestJvmLogging() {
-        // The command switches logging off for its own process; this test JVM hosts other suites.
-        LoggingSystem.get(getClass().getClassLoader()).setLogLevel(LoggingSystem.ROOT_LOGGER_NAME, LogLevel.INFO);
-    }
-
     @Test
-    void completesOnceAndSeparateProcessesReplayOrRejectWithoutMutation(CapturedOutput output) throws Exception {
-        var database = freshDatabase();
+    void completesOnceAndSeparateProcessesReplayOrRejectWithoutMutation() throws Exception {
+        // MIG-CMD-3: an already migrated V46 database runs the normal ceremony.
+        var database = migratedDatabase(null);
         var receipt = receipt("{\"issuer\":\"" + TRUSTED + "\",\"subject\":\"" + SUBJECT + "\"}");
         var operation = UUID.randomUUID().toString();
 
-        assertThat(run(database, receipt, operation)).isEqualTo(Result.COMPLETED);
+        assertOutcome(run(database, receipt, operation), 0, "COMPLETED");
         var jdbc = jdbc(database);
         var before = snapshot(jdbc);
-        assertThat(before.toString()).contains("COMPLETED");
 
-        // Each run is a new application context and connection pool: nothing survives in memory.
-        assertThat(run(database, receipt, operation)).isEqualTo(Result.ALREADY_COMPLETED_SAME_OPERATION);
-        assertThat(run(database, receipt, UUID.randomUUID().toString())).isEqualTo(Result.ALREADY_COMPLETED);
-        assertThat(run(database, receipt("{\"issuer\":\"" + TRUSTED + "\",\"subject\":\"other\"}"), operation))
-                .isEqualTo(Result.ALREADY_COMPLETED);
+        assertOutcome(run(database, receipt, operation), 0, "ALREADY_COMPLETED_SAME_OPERATION");
+        assertOutcome(run(database, receipt, UUID.randomUUID().toString()), 3, "ALREADY_COMPLETED");
+        assertOutcome(run(database, receipt("{\"issuer\":\"" + TRUSTED + "\",\"subject\":\"other\"}"), operation), 3, "ALREADY_COMPLETED");
         assertThat(snapshot(jdbc)).isEqualTo(before);
 
         assertThat(jdbc.queryForObject("SELECT count(*) FROM users.users", Long.class)).isEqualTo(1);
         assertThat(jdbc.queryForList("SELECT permission_code FROM access_control.administrative_grants", String.class))
                 .containsExactly("PLATFORM_TENANTS_MANAGE");
-        assertThat(jdbc.queryForList("SELECT version FROM public.flyway_schema_history ORDER BY installed_rank", String.class))
-                .containsExactly("44", "45", "46");
-        assertNoSensitiveOutput(output, receipt);
-        assertThat(outcomeLines).containsExactly(
-                "FIRST_OPERATOR_BOOTSTRAP: COMPLETED",
-                "FIRST_OPERATOR_BOOTSTRAP: ALREADY_COMPLETED_SAME_OPERATION",
-                "FIRST_OPERATOR_BOOTSTRAP: ALREADY_COMPLETED",
-                "FIRST_OPERATOR_BOOTSTRAP: ALREADY_COMPLETED");
-        assertThat(Result.COMPLETED.exitCode()).isZero();
-        assertThat(Result.ALREADY_COMPLETED.exitCode()).isEqualTo(3);
+        assertThat(history(jdbc)).containsExactly("44", "45", "46");
     }
 
     @Test
-    void rejectsUnusableInputAndUntrustedIssuerWithoutMutation(CapturedOutput output) throws Exception {
-        var database = freshDatabase();
+    void rejectsUnusableInputAndUntrustedIssuerWithoutMutation() throws Exception {
+        var database = migratedDatabase(null);
         var operation = UUID.randomUUID().toString();
-        var invalid = List.of(
-                "", "[]", "null", "{\"issuer\":\"" + TRUSTED + "\"}",
-                "{\"issuer\":\"" + TRUSTED + "\",\"subject\":\"" + SUBJECT + "\",\"password\":\"x\"}",
-                "{\"issuer\":\"" + TRUSTED + "\",\"subject\":\"a\",\"subject\":\"" + SUBJECT + "\"}",
-                "{\"issuer\":\"" + TRUSTED + "\",\"subject\":42}",
-                "{\"issuer\":\"" + TRUSTED + "\",\"subject\":null}",
-                "{\"issuer\":\"" + TRUSTED + "\",\"subject\":\" " + SUBJECT + "\"}",
-                "{\"issuer\":\"" + TRUSTED + " \",\"subject\":\"" + SUBJECT + "\"}",
-                "{\"issuer\":\"" + TRUSTED + "\",\"subject\":\"a\\u0000b\"}",
-                "{\"issuer\":\"" + TRUSTED + "\",\"subject\":\"" + "s".repeat(1025) + "\"}");
-        for (var content : invalid) {
-            assertThat(run(database, receipt(content), operation)).as(content).isEqualTo(Result.INVALID_INPUT);
-        }
-        var malformedUtf8 = directory.resolve("malformed.json");
-        Files.write(malformedUtf8, new byte[] {'{', '"', (byte) 0xC3, '"', '}'});
-        assertThat(run(database, malformedUtf8, operation)).isEqualTo(Result.INVALID_INPUT);
-        var oversized = receipt("{\"issuer\":\"" + TRUSTED + "\",\"subject\":\"" + SUBJECT + "\"}" + " ".repeat(20_000));
-        assertThat(run(database, oversized, operation)).isEqualTo(Result.INVALID_INPUT);
-
         var valid = receipt("{\"issuer\":\"" + TRUSTED + "\",\"subject\":\"" + SUBJECT + "\"}");
-        assertThat(run(database, directory.resolve("missing.json"), operation)).isEqualTo(Result.INVALID_INPUT);
-        assertThat(run(database, valid, "not-a-uuid")).isEqualTo(Result.INVALID_INPUT);
-        assertThat(run(database, valid, operation.toUpperCase())).isEqualTo(Result.INVALID_INPUT);
-        assertThat(run(database, valid, null)).isEqualTo(Result.INVALID_INPUT);
-        assertThat(run(database, receipt("{\"issuer\":\"https://attacker.example.test\",\"subject\":\"" + SUBJECT + "\"}"), operation))
-                .isEqualTo(Result.UNTRUSTED_ISSUER);
+
+        assertOutcome(run(database, receipt("{\"issuer\":\"" + TRUSTED + "\",\"subject\":\"" + SUBJECT + "\",\"password\":\"x\"}"),
+                operation), 2, "INVALID_INPUT");
+        assertOutcome(run(database, directory.resolve("missing.json"), operation), 2, "INVALID_INPUT");
+        assertOutcome(run(database, valid, operation.toUpperCase()), 2, "INVALID_INPUT");
+        assertOutcome(run(database, valid, null), 2, "INVALID_INPUT");
+        assertOutcome(run(database, receipt("{\"issuer\":\"https://attacker.example.test\",\"subject\":\"" + SUBJECT + "\"}"),
+                operation), 4, "UNTRUSTED_ISSUER");
 
         var jdbc = jdbc(database);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM users.users", Long.class)).isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM access_control.administrative_grants", Long.class)).isZero();
         assertThat(jdbc.queryForObject("SELECT state FROM bootstrap.first_operator_ceremony", String.class)).isEqualTo("OPEN");
-        assertNoSensitiveOutput(output, valid);
     }
 
     @Test
-    void unavailableDatabaseIsABoundedFailure(CapturedOutput output) throws Exception {
+    void unavailableDatabaseUnderHostileLoggingPrintsOnlyTheOutcome() throws Exception {
         var receipt = receipt("{\"issuer\":\"" + TRUSTED + "\",\"subject\":\"" + SUBJECT + "\"}");
-        var args = arguments("jdbc:postgresql://127.0.0.1:1/unreachable", receipt, UUID.randomUUID().toString());
-        args.add("--spring.datasource.hikari.initialization-fail-timeout=1");
+        var args = arguments("jdbc:postgresql://127.0.0.1:1/unreachable_bootstrap_db", receipt, UUID.randomUUID().toString());
         args.add("--spring.datasource.hikari.connection-timeout=250");
 
-        assertThat(invoke(args)).isEqualTo(Result.PERSISTENCE_FAILURE);
-        // The command boundary is value-free: no stack trace, driver, pool, migration or connection detail.
-        assertThat(output.getAll()).doesNotContain(SUBJECT, PASSWORD, TRUSTED, receipt.toString(), POSTGRES.getUsername(),
-                "127.0.0.1", "unreachable", "jdbc:", "5432", "Connection", "Exception", "	at ", "Hikari", "Flyway",
-                "PSQL", "APPLICATION FAILED", "SELECT", "INSERT");
-        assertThat(output.getAll().strip()).isEmpty();
-        assertThat(outcomeLines).containsExactly("FIRST_OPERATOR_BOOTSTRAP: PERSISTENCE_FAILURE");
+        var result = launch(args);
+
+        assertOutcome(result, 1, "PERSISTENCE_FAILURE");
+        assertThat(result.output()).doesNotContain(SUBJECT, PASSWORD, USERNAME, TRUSTED, receipt.toString(), "127.0.0.1",
+                "unreachable", "jdbc:", "Exception", "\tat ", "Hikari", "Flyway", "PSQL", "APPLICATION FAILED", "SELECT", "DEBUG",
+                "TRACE", "ERROR", "WARN");
     }
 
-    private final List<String> outcomeLines = new ArrayList<>();
+    @Test
+    void commandNeverMigratesAV45DatabaseAndFailsBoundedWithoutMutation() throws Exception {
+        // MIG-CMD-1: valid input against a database the deployment has not migrated to V46.
+        var database = migratedDatabase("45");
+        var receipt = receipt("{\"issuer\":\"" + TRUSTED + "\",\"subject\":\"" + SUBJECT + "\"}");
 
-    private Result run(String database, Path receipt, String operation) {
-        return invoke(arguments(url(database), receipt, operation));
+        assertOutcome(run(database, receipt, UUID.randomUUID().toString()), 1, "PERSISTENCE_FAILURE");
+
+        // MIG-CMD-2: structurally invalid input is classified without touching the schema either.
+        assertOutcome(run(database, receipt("{\"issuer\":1}"), UUID.randomUUID().toString()), 2, "INVALID_INPUT");
+
+        var jdbc = jdbc(database);
+        assertThat(history(jdbc)).containsExactly("44", "45");
+        assertThat(jdbc.queryForObject("SELECT to_regnamespace('bootstrap')::text", String.class)).isNull();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM users.users", Long.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM users.external_identity_bindings", Long.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM access_control.administrative_grants", Long.class)).isZero();
     }
 
-    private Result invoke(List<String> args) {
-        var buffer = new ByteArrayOutputStream();
-        var result = FirstOperatorBootstrapCommand.run(OrderHubApplication.class, args.toArray(String[]::new),
-                new PrintStream(buffer, true, StandardCharsets.UTF_8));
-        outcomeLines.add(buffer.toString(StandardCharsets.UTF_8).strip());
-        return result;
+    private ProcessResult run(String database, Path receipt, String operation) throws Exception {
+        return launch(arguments(url(database), receipt, operation));
+    }
+
+    /** Launches the real entry point in a separate JVM and captures everything the process writes. */
+    private ProcessResult launch(List<String> args) throws IOException, InterruptedException {
+        var command = new ArrayList<String>(List.of(
+                Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+                "-cp", System.getProperty("java.class.path"),
+                OrderHubApplication.class.getName(), FirstOperatorBootstrapCommand.NAME));
+        command.addAll(args);
+        var process = new ProcessBuilder(command).redirectErrorStream(true).start();
+        var output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertThat(process.waitFor(120, TimeUnit.SECONDS)).as("command process terminated").isTrue();
+        return new ProcessResult(process.exitValue(), output);
     }
 
     private static List<String> arguments(String url, Path receipt, String operation) {
         var args = new ArrayList<>(List.of(
                 "--spring.datasource.url=" + url,
-                "--spring.datasource.username=" + POSTGRES.getUsername(),
+                "--spring.datasource.username=" + USERNAME,
                 "--spring.datasource.password=" + PASSWORD,
                 "--orderhub.security.jwt.token-profile=GENERIC",
                 "--orderhub.security.jwt.issuer=" + TRUSTED,
@@ -178,15 +174,17 @@ class FirstOperatorBootstrapCommandTest {
         if (operation != null) {
             args.add("--" + FirstOperatorBootstrapCommand.OPERATION_ID + "=" + operation);
         }
+        args.addAll(HOSTILE_LOGGING);
         return args;
     }
 
-    private void assertNoSensitiveOutput(CapturedOutput output, Path receipt) {
-        assertThat(output.getAll()).isEmpty();
-        assertThat(String.join("\n", outcomeLines)).doesNotContain(SUBJECT, TRUSTED, receipt.toString());
+    /** The complete process-visible output is exactly one outcome line. */
+    private static void assertOutcome(ProcessResult result, int exitCode, String outcome) {
+        assertThat(result.output().strip()).as("process output").isEqualTo("FIRST_OPERATOR_BOOTSTRAP: " + outcome);
+        assertThat(result.exitCode()).as(outcome).isEqualTo(exitCode);
     }
 
-    private Path receipt(String content) throws Exception {
+    private Path receipt(String content) throws IOException {
         var file = Files.createTempFile(directory, "receipt", ".json");
         Files.writeString(file, content, StandardCharsets.UTF_8);
         return file;
@@ -201,18 +199,30 @@ class FirstOperatorBootstrapCommandTest {
                 jdbc.queryForList("SELECT * FROM bootstrap.first_operator_ceremony_events"));
     }
 
-    private static String freshDatabase() {
+    private static List<String> history(JdbcTemplate jdbc) {
+        return jdbc.queryForList("SELECT version FROM public.flyway_schema_history ORDER BY installed_rank", String.class);
+    }
+
+    /** Plays the deployment migration step: fresh installation through the production locations. */
+    private static String migratedDatabase(String target) {
         var name = "command_case_" + DATABASES.incrementAndGet();
-        new JdbcTemplate(new DriverManagerDataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), PASSWORD))
-                .execute("CREATE DATABASE " + name);
+        new JdbcTemplate(new DriverManagerDataSource(POSTGRES.getJdbcUrl(), USERNAME, PASSWORD)).execute("CREATE DATABASE " + name);
+        var flyway = Flyway.configure().dataSource(url(name), USERNAME, PASSWORD).locations("classpath:db/migration", "classpath:db/baseline");
+        if (target != null) {
+            flyway.target(target);
+        }
+        flyway.load().migrate();
         return name;
     }
 
     private static JdbcTemplate jdbc(String database) {
-        return new JdbcTemplate(new DriverManagerDataSource(url(database), POSTGRES.getUsername(), PASSWORD));
+        return new JdbcTemplate(new DriverManagerDataSource(url(database), USERNAME, PASSWORD));
     }
 
     private static String url(String database) {
         return "jdbc:postgresql://" + POSTGRES.getHost() + ":" + POSTGRES.getMappedPort(5432) + "/" + database;
+    }
+
+    private record ProcessResult(int exitCode, String output) {
     }
 }

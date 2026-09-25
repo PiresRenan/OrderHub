@@ -4,6 +4,11 @@
 -- attempt on every process: attempts lock it FOR UPDATE and may move it only
 -- from OPEN to COMPLETED. No issuer, subject, credential or User is seeded;
 -- the OPEN row carries no identity at all.
+--
+-- request_fingerprint is the immutable replay identity of the completing
+-- request: lowercase hex SHA-256 over a versioned domain, the operation id and
+-- the length-prefixed exact issuer and subject. It is neither a credential nor
+-- an authority, and raw issuer/subject are never stored here.
 
 CREATE SCHEMA bootstrap;
 
@@ -12,6 +17,7 @@ CREATE TABLE bootstrap.first_operator_ceremony (
     state TEXT NOT NULL,
     operation_id UUID,
     operator_user_id UUID,
+    request_fingerprint TEXT,
     completed_at TIMESTAMPTZ,
 
     CONSTRAINT pk_bootstrap_first_operator_ceremony
@@ -29,6 +35,7 @@ CREATE TABLE bootstrap.first_operator_ceremony (
                 state = 'OPEN'
                 AND operation_id IS NULL
                 AND operator_user_id IS NULL
+                AND request_fingerprint IS NULL
                 AND completed_at IS NULL
             )
             OR
@@ -36,9 +43,13 @@ CREATE TABLE bootstrap.first_operator_ceremony (
                 state = 'COMPLETED'
                 AND operation_id IS NOT NULL
                 AND operator_user_id IS NOT NULL
+                AND request_fingerprint IS NOT NULL
                 AND completed_at IS NOT NULL
             )
-        )
+        ),
+
+    CONSTRAINT ck_bootstrap_first_operator_ceremony_fingerprint
+        CHECK (request_fingerprint ~ '^[0-9a-f]{64}$')
 );
 
 INSERT INTO bootstrap.first_operator_ceremony (ceremony, state)

@@ -1,5 +1,7 @@
 package io.github.piresrenan.orderhub.bootstrap.application.service;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -20,10 +22,13 @@ import io.github.piresrenan.orderhub.users.application.port.out.TrustedExternalI
 /**
  * Coordinates the ADR-0022 retained first-operator ceremony.
  *
- * <p>Issuer trust is decided first, from the same configured issuer set that
- * JWT verification uses. Everything else happens in one transaction that
- * first locks the singleton ceremony row, so every competing process, replica
- * or rerun is arbitrated by PostgreSQL. Within it the Users, Authorization and
+ * <p>Everything happens in one transaction that first locks the singleton
+ * ceremony row, so every competing process, replica or rerun is arbitrated by
+ * PostgreSQL. A COMPLETED ceremony is answered only from its immutable evidence
+ * (operation id and request fingerprint), never from current external identity
+ * bindings or current issuer trust. An OPEN ceremony requires the issuer to be
+ * in the same configured trust set that JWT verification uses before any
+ * authoritative write. Within the transaction the Users, Authorization and
  * bootstrap-owned writes all join the same physical transaction; any failure
  * rolls all of them back and nothing is compensated afterwards.</p>
  */
@@ -50,13 +55,10 @@ public final class FirstOperatorBootstrapService implements BootstrapFirstOperat
         this.eventIds = Objects.requireNonNull(eventIds, "eventIds");
     }
 
-    /** Rejects untrusted issuers before any transaction, then arbitrates the one-shot transition. */
+    /** Arbitrates the one-shot transition under the singleton lock. */
     @Override
     public FirstOperatorBootstrapOutcome bootstrap(FirstOperatorBootstrapRequest request) {
         Objects.requireNonNull(request, "request");
-        if (!trust.isTrusted(request.issuer())) {
-            return FirstOperatorBootstrapOutcome.UNTRUSTED_ISSUER;
-        }
         var identity = new ResolveExternalIdentityQuery(request.issuer(), request.subject());
         try {
             return transaction.execute(() -> arbitrate(request, identity));
@@ -66,11 +68,19 @@ public final class FirstOperatorBootstrapService implements BootstrapFirstOperat
         }
     }
 
-    /** Runs under the singleton lock: replay when closed, fail closed on existing authority, else transition. */
+    /**
+     * Runs under the singleton lock: replay from evidence when closed; otherwise require trust, fail closed on
+     * existing authority or binding, and transition.
+     */
     private FirstOperatorBootstrapOutcome arbitrate(FirstOperatorBootstrapRequest request, ResolveExternalIdentityQuery identity) {
+        var fingerprint = FirstOperatorRequestFingerprint.of(request);
         var state = ceremony.lock();
         if (state.completed()) {
-            return replay(state, request, identity);
+            return replay(state, request, fingerprint);
+        }
+        // Checked before any authoritative write; the lock itself mutates nothing.
+        if (!trust.isTrusted(request.issuer())) {
+            return FirstOperatorBootstrapOutcome.UNTRUSTED_ISSUER;
         }
         if (authority.platformAuthorityExists() || resolver.resolve(identity).isPresent()) {
             return FirstOperatorBootstrapOutcome.INCOMPATIBLE_EXISTING_STATE;
@@ -78,15 +88,19 @@ public final class FirstOperatorBootstrapService implements BootstrapFirstOperat
         var operator = users.establishNew(identity).userId();
         authority.establishFirstOperatorAuthority(operator);
         ceremony.appendCompletedEvidence(Objects.requireNonNull(eventIds.get(), "eventId"), request.operationId(), operator);
-        ceremony.complete(request.operationId(), operator);
+        ceremony.complete(request.operationId(), operator, fingerprint);
         return FirstOperatorBootstrapOutcome.COMPLETED;
     }
 
-    /** A rerun is recognized only when both the operation and the exact identity match the completed transition. */
-    private FirstOperatorBootstrapOutcome replay(FirstOperatorCeremonyState state, FirstOperatorBootstrapRequest request,
-            ResolveExternalIdentityQuery identity) {
+    /**
+     * Recognizes a rerun only from immutable ceremony evidence: the same operation id and the same exact request
+     * fingerprint. Current bindings and current issuer trust are deliberately not consulted.
+     */
+    private static FirstOperatorBootstrapOutcome replay(FirstOperatorCeremonyState state, FirstOperatorBootstrapRequest request,
+            String fingerprint) {
         var sameOperation = state.operationId().equals(request.operationId())
-                && resolver.resolve(identity).map(user -> user.userId().equals(state.operatorUserId())).orElse(false);
+                && MessageDigest.isEqual(state.requestFingerprint().getBytes(StandardCharsets.US_ASCII),
+                        fingerprint.getBytes(StandardCharsets.US_ASCII));
         return sameOperation
                 ? FirstOperatorBootstrapOutcome.ALREADY_COMPLETED_SAME_OPERATION
                 : FirstOperatorBootstrapOutcome.ALREADY_COMPLETED;

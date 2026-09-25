@@ -1,15 +1,17 @@
 # ADR-0022 — Retained first-operator bootstrap
 
-Status: TESTED. The OH-024 implementation candidate `1545663` (tree `589bb4d`) passed a
-foreground Maven Wrapper clean verify: 1,683 tests across 324 reports, with 0 failures,
-0 errors and 0 skips. It also passed javac `-Xlint:all` (0 warnings), ECJ 3.43 (0
-problems), Spring Modulith verification and the Node artifact/OpenAPI gates. V46 is
-qualified on both the fresh-install and V45-upgrade paths, and its sha256 is
-`d56aad852a237e1460ff479a4e8b7c20854fd302d6e67313ca2c973b96140684`. The generated
-contract still has 61 operations, and its canonical LF OpenAPI sha256 is unchanged:
-`ba175bc784ddd2d519b54cf9cbc7a8a28a51065bacb5d1210f4f7d4df7c1dc8a`. Nine mutations (M1–M9)
-of the guards were each detected by a failing test. This is OrderHub-isolated evidence
-with synthetic issuers; the cross-project Identity journey is not yet executed.
+Status: DESIGNED. Material review corrections are pending exact-candidate requalification.
+
+Review history: candidate `109e497` (tree `ecff8f2`) was promoted to TESTED. That
+qualification is **superseded**. An independent coordinator review of PR #56 found three
+problems:
+
+1. Replay identity depended on the current external binding and on current issuer trust.
+2. A root-level logging override did not stop explicitly configured loggers.
+3. The command could apply schema migrations.
+
+The corrections below replace those mechanics. ADR-0022 returns to TESTED only with
+evidence from the corrected exact candidate.
 
 Task: OH-024, [Issue #55](https://github.com/PiresRenan/OrderHub/issues/55). Parent
 security program: [Issue #53](https://github.com/PiresRenan/OrderHub/issues/53).
@@ -81,12 +83,23 @@ java -jar orderhub.jar bootstrap-first-operator \
   server), performs one attempt, closes, and prints exactly one line
   `FIRST_OPERATOR_BOOTSTRAP: <RESULT>`. Only then does the entry point call `System.exit`
   with the mapped status. The command code itself never terminates the JVM.
-- In command mode, framework logging (Spring, Hikari, Flyway, JDBC driver) is switched
-  off before the logging system initializes. Failures are classified, and their causes
-  are never rendered: no stack trace, JDBC URL, host, port, username, SQL, receipt path,
-  issuer or subject reaches the output. Diagnose persistence failures with the normal
-  server startup under the existing logging policy.
+- Command-mode logging: before the logging system initializes, the command installs, at
+  the highest property precedence, a command-only Logback configuration
+  (`first-operator-bootstrap-logback.xml`). Its only appender discards every event, and
+  its status listener is silent. Explicitly configured `logging.level.*` values, `debug`,
+  `trace` or a different `logging.config` therefore cannot make any logger reach output.
+  Failures are classified, and their causes are never rendered: no stack trace, JDBC URL,
+  host, port, username, SQL, receipt path, issuer or subject. Diagnose persistence
+  failures with the normal server startup under the existing logging policy. Normal
+  server logging is unchanged.
+- The command **never migrates**: `spring.flyway.enabled=false` in command mode. Applying
+  and validating V1–V46 is the deployment migration step's job. On an older schema the
+  ceremony fails with `PERSISTENCE_FAILURE` and changes nothing, including Flyway
+  history.
 - In command mode, outstanding-event republication and analytics housekeeping are off.
+  These are the only current background mutators: the one `@Scheduled` trigger and the
+  one module listener, which runs only for publications. A contract test inventories
+  them.
 - Normal server startup never reads the receipt or operation id and never invokes the
   ceremony. There is no controller, route, runner or startup seed.
 - Database, JWT trust and every other setting use the normal application configuration.
@@ -94,8 +107,8 @@ java -jar orderhub.jar bootstrap-first-operator \
 | Result | Exit | Meaning |
 | --- | --- | --- |
 | `COMPLETED` | 0 | This run performed the one privileged transition |
-| `ALREADY_COMPLETED_SAME_OPERATION` | 0 | Same operation id and exact identity already completed; nothing mutated |
-| `PERSISTENCE_FAILURE` | 1 | Startup, lock-timeout or database failure; the transaction committed nothing |
+| `ALREADY_COMPLETED_SAME_OPERATION` | 0 | Same operation id and exact original issuer + subject already completed (from evidence); nothing mutated |
+| `PERSISTENCE_FAILURE` | 1 | Startup, lock-timeout, database or missing-V46-schema failure; nothing committed |
 | `INVALID_INPUT` | 2 | Receipt or operation id unusable |
 | `ALREADY_COMPLETED` | 3 | Closed by another operation or identity; nothing mutated |
 | `UNTRUSTED_ISSUER` | 4 | Issuer not configured as trusted; nothing mutated |
@@ -123,7 +136,11 @@ containing exactly one JSON object with exactly two string members:
 
 ### Issuer trust
 
-Before any transaction, the issuer must be a member of `TrustedExternalIdentityProviders`.
+While the ceremony is `OPEN`, the issuer must be a member of
+`TrustedExternalIdentityProviders` before any authoritative write. The check runs right
+after the singleton lock, which itself mutates nothing. An already `COMPLETED` ceremony
+is reconciled from its evidence and does not depend on current trust, so retiring an
+issuer later does not change the replay answer.
 That is the same server-owned set (`orderhub.security.jwt.issuer` plus configured
 additional issuers) that JWT verification uses. This is exact string membership. There
 is no second parser, no discovery and no network lookup.
@@ -140,15 +157,17 @@ single `PlatformTransactionManager`/`DataSource`:
 
 1. `SELECT ... FOR UPDATE` on the singleton row, which arbitrates across processes and
    replicas;
-2. if `COMPLETED`, return the replay result;
-3. fail closed if any Platform-scope grant exists or the exact identity is already bound;
+2. if `COMPLETED`, return the replay result from immutable evidence;
+3. require a trusted issuer, then fail closed if any Platform-scope grant exists or the
+   exact identity is already bound;
 4. `EstablishNewExternalUserUseCase.establishNew`: the existing Users serialized scope
    (pg_advisory_xact_lock on the exact pair, REQUIRED) creates one User and binds the
    exact pair, and refuses an already-bound pair;
 5. `FirstOperatorPlatformAuthorityUseCase.establishFirstOperatorAuthority`: exactly
    `PLATFORM_TENANTS_MANAGE` at Platform scope, which must be newly applied;
 6. append the single success evidence row;
-7. conditional `UPDATE ... WHERE state = 'OPEN'` to `COMPLETED`.
+7. conditional `UPDATE ... WHERE state = 'OPEN'` to `COMPLETED`, which stores
+   `operation_id`, `operator_user_id`, `request_fingerprint` and `completed_at`.
 
 Owner adapters refuse to run without an actual transaction, so none of them can commit
 alone. `FirstOperatorBootstrapPostgreSqlTest` asserts that the lock, User creation,
@@ -163,13 +182,34 @@ and then observes `COMPLETED`.
 
 ### Replay
 
-- Same `operationId` and the same exact identity after `COMPLETED`:
-  `ALREADY_COMPLETED_SAME_OPERATION`, with no mutation. This makes a rerun after lost
-  output deterministic.
-- Any other operation or identity after `COMPLETED`: `ALREADY_COMPLETED`, with no
-  mutation.
-- There is no idempotency framework. The singleton row itself stores the completing
-  operation and User.
+A `COMPLETED` ceremony recognizes the exact `operationId` plus the exact original issuer
+and subject request **from immutable ceremony evidence**: the stored `operation_id` and
+`request_fingerprint`.
+
+- **Fingerprint:** lowercase hex SHA-256 over:
+  - the length-prefixed domain `orderhub:first-operator-bootstrap:v1`;
+  - the operation id's 16 bytes;
+  - the exact issuer and exact subject, each as a 4-byte UTF-8 length followed by its
+    bytes.
+
+  The encoding is unambiguous. Including the operation id keeps the value specific to one
+  ceremony request rather than a reusable pseudonym for the identity. It needs no key, is
+  not a credential or authority, is never logged or exposed over HTTP, and is compared in
+  constant time. V46 requires exactly 64 lowercase hex characters when `COMPLETED` and
+  NULL when `OPEN`.
+- **Outcomes:**
+  - same operation id and same exact issuer and subject:
+    `ALREADY_COMPLETED_SAME_OPERATION`;
+  - a different issuer or subject with the same operation id: `ALREADY_COMPLETED`;
+  - the same issuer and subject with a different operation id: `ALREADY_COMPLETED`.
+
+  None of these mutates anything.
+- **Replay never consults mutable state.** It does not use external identity resolution
+  or current issuer trust. Unlinking or migrating the original binding, linking another
+  identity to the same User, Tenant or Staff changes, and retiring the issuer all leave
+  the classification unchanged. Later provider migration does not rewrite ceremony
+  history.
+- There is no idempotency framework.
 
 ### Minimum authority
 

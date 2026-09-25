@@ -26,9 +26,11 @@ import io.github.piresrenan.orderhub.bootstrap.application.port.in.FirstOperator
  * <p>The command starts the application context without a web server, performs
  * exactly one ceremony attempt, closes the context and returns a stable result.
  * Its only output is one line {@code FIRST_OPERATOR_BOOTSTRAP: <RESULT>}.
- * Framework, pool, driver and migration logging is switched off before the
- * logging system initializes, so no stack trace, connection detail, SQL or
- * identity value can reach the operator output. It is reachable only through
+ * Before the logging system initializes, the command installs a logging
+ * configuration whose only appender discards every event. No stack trace,
+ * connection detail, SQL or identity value can reach the operator output, even
+ * when logger levels are configured explicitly. The command never migrates
+ * the schema. It is reachable only through
  * the explicit {@link #NAME} launch argument; a normal server start never
  * reads its configuration or invokes the ceremony.</p>
  *
@@ -49,11 +51,26 @@ public final class FirstOperatorBootstrapCommand {
     /** Output prefix of the single outcome line. */
     static final String OUTPUT_PREFIX = "FIRST_OPERATOR_BOOTSTRAP: ";
 
-    /** Command-mode settings that take precedence over every other configuration source. */
+    /** Command-only Logback configuration whose single appender discards every event. */
+    static final String LOGGING_CONFIG = "classpath:io/github/piresrenan/orderhub/bootstrap/first-operator-bootstrap-logback.xml";
+
+    /**
+     * Command-mode settings that take precedence over every other configuration source.
+     *
+     * <ul>
+     * <li>Logging uses the discarding configuration, so explicitly configured logger levels have no output.</li>
+     * <li>Flyway is disabled: schema migration belongs to the deployment migration step, and V46 must already
+     * exist. On an older schema the ceremony fails without mutating anything.</li>
+     * <li>The only current background mutators (outstanding-event republication and analytics housekeeping)
+     * are disabled.</li>
+     * </ul>
+     */
     private static final Map<String, Object> COMMAND_OVERRIDES = Map.of(
+            "logging.config", LOGGING_CONFIG,
+            "logging.level.root", "OFF",
             "spring.main.banner-mode", "off",
             "spring.main.log-startup-info", "false",
-            "logging.level.root", "OFF",
+            "spring.flyway.enabled", "false",
             "spring.modulith.events.republish-outstanding-events-on-restart", "false",
             "orderhub.analytics.housekeeping.enabled", "false");
 

@@ -78,7 +78,7 @@ class FirstOperatorBootstrapMigrationTest {
     private static void assertOpenAndEmpty(JdbcTemplate jdbc) {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM bootstrap.first_operator_ceremony", Long.class)).isEqualTo(1);
         assertThat(jdbc.queryForList("SELECT ceremony, state FROM bootstrap.first_operator_ceremony "
-                + "WHERE operation_id IS NULL AND operator_user_id IS NULL AND completed_at IS NULL")).containsExactly(Map.of(
+                + "WHERE operation_id IS NULL AND operator_user_id IS NULL AND request_fingerprint IS NULL AND completed_at IS NULL")).containsExactly(Map.of(
                 "ceremony", "RETAINED_FIRST_OPERATOR_BOOTSTRAP", "state", "OPEN"));
         assertThat(jdbc.queryForObject("SELECT count(*) FROM bootstrap.first_operator_ceremony_events", Long.class)).isZero();
     }

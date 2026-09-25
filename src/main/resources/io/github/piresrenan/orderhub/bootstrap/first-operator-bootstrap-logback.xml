@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ADR-0022 command-mode logging: selected only by the offline
+  bootstrap-first-operator command, never by the normal server. The only
+  appender discards every event, so no logger level (including explicitly
+  configured logging.level.* values) can make an event reach any output.
+  The status listener keeps Logback's own status messages silent as well.
+-->
+<configuration>
+    <statusListener class="ch.qos.logback.core.status.NopStatusListener"/>
+    <appender name="DISCARD" class="ch.qos.logback.core.helpers.NOPAppender"/>
+    <root level="OFF">
+        <appender-ref ref="DISCARD"/>
+    </root>
+</configuration>

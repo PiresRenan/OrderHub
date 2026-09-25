@@ -32,10 +32,11 @@ public final class PostgreSqlFirstOperatorCeremonyRepository implements FirstOpe
     public FirstOperatorCeremonyState lock() {
         requireTransaction();
         return jdbc.queryForObject("""
-                SELECT state, operation_id, operator_user_id FROM bootstrap.first_operator_ceremony
+                SELECT state, operation_id, operator_user_id, request_fingerprint FROM bootstrap.first_operator_ceremony
                 WHERE ceremony = ? FOR UPDATE
                 """, (row, index) -> new FirstOperatorCeremonyState("COMPLETED".equals(row.getString("state")),
-                row.getObject("operation_id", UUID.class), row.getObject("operator_user_id", UUID.class)), CEREMONY);
+                row.getObject("operation_id", UUID.class), row.getObject("operator_user_id", UUID.class),
+                row.getString("request_fingerprint")), CEREMONY);
     }
 
     /** Appends the single success evidence row; a second one violates the unique constraint. */
@@ -51,13 +52,14 @@ public final class PostgreSqlFirstOperatorCeremonyRepository implements FirstOpe
 
     /** Closes the ceremony; the conditional update must change exactly the open singleton row. */
     @Override
-    public void complete(UUID operationId, UUID operatorUserId) {
+    public void complete(UUID operationId, UUID operatorUserId, String requestFingerprint) {
         requireTransaction();
         var changed = jdbc.update("""
                 UPDATE bootstrap.first_operator_ceremony
-                SET state = 'COMPLETED', operation_id = ?, operator_user_id = ?, completed_at = CURRENT_TIMESTAMP
+                SET state = 'COMPLETED', operation_id = ?, operator_user_id = ?, request_fingerprint = ?,
+                    completed_at = CURRENT_TIMESTAMP
                 WHERE ceremony = ? AND state = 'OPEN'
-                """, operationId, operatorUserId, CEREMONY);
+                """, operationId, operatorUserId, requestFingerprint, CEREMONY);
         if (changed != 1) {
             throw new IllegalStateException("First-operator ceremony was not open");
         }

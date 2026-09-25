@@ -24,8 +24,9 @@ public interface FirstOperatorCeremonyRepository {
     /**
      * Moves the singleton from OPEN to COMPLETED.
      *
-     * @param operationId    ceremony operation identifier
-     * @param operatorUserId internal User that received the initial grant
+     * @param operationId        ceremony operation identifier
+     * @param operatorUserId     internal User that received the initial grant
+     * @param requestFingerprint immutable fingerprint of the completing request
      */
-    void complete(UUID operationId, UUID operatorUserId);
+    void complete(UUID operationId, UUID operatorUserId, String requestFingerprint);
 }

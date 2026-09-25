@@ -41,6 +41,7 @@ import io.github.piresrenan.orderhub.bootstrap.application.port.out.FirstOperato
 import io.github.piresrenan.orderhub.bootstrap.application.port.out.FirstOperatorCeremonyState;
 import io.github.piresrenan.orderhub.bootstrap.application.service.FirstOperatorBootstrapService;
 import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.PostgreSqlExternalIdentityBindingRepository;
+import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.PostgreSqlExternalIdentityLifecycleRepository;
 import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.PostgreSqlExternalIdentitySerializationCoordinator;
 import io.github.piresrenan.orderhub.users.adapter.out.persistence.postgresql.PostgreSqlUserRepository;
 import io.github.piresrenan.orderhub.users.application.port.in.BindExternalIdentityUseCase;
@@ -118,10 +119,75 @@ class FirstOperatorBootstrapPostgreSqlTest {
         assertThat(jdbc.queryForList("SELECT outcome, operator_user_id, granted_permission FROM bootstrap.first_operator_ceremony_events"))
                 .containsExactly(row("outcome", "COMPLETED", "operator_user_id", userId, "granted_permission", "PLATFORM_TENANTS_MANAGE"));
         assertThat(bootstrapText()).doesNotContain(SUBJECT, TRUSTED);
+        assertThat(jdbc.queryForObject("SELECT request_fingerprint FROM bootstrap.first_operator_ceremony", String.class))
+                .matches("[0-9a-f]{64}");
     }
 
     @Test
-    void untrustedIssuerIsRejectedBeforeAnyMutation() {
+    void r1ReplayOfTheOriginalRequestSurvivesUnlinkingTheOriginalBinding() {
+        var operation = UUID.randomUUID();
+        assertThat(graph().bootstrap(request(operation))).isEqualTo(FirstOperatorBootstrapOutcome.COMPLETED);
+        var operator = operatorUserId();
+        var lifecycle = new PostgreSqlExternalIdentityLifecycleRepository(jdbc);
+        inTransaction(() -> {
+            var binding = lifecycle.accounts(operator).get(0).id();
+            assertThat(lifecycle.unlink(operator, binding)).isTrue();
+        });
+        assertThat(resolver().resolve(identity())).isEmpty();
+        var before = snapshot();
+
+        assertThat(graph().bootstrap(request(operation))).isEqualTo(FirstOperatorBootstrapOutcome.ALREADY_COMPLETED_SAME_OPERATION);
+
+        assertThat(snapshot()).isEqualTo(before);
+    }
+
+    @Test
+    void r2AnotherIdentityLaterLinkedToTheOperatorIsNotTheSameRequest() {
+        var operation = UUID.randomUUID();
+        assertThat(graph().bootstrap(request(operation))).isEqualTo(FirstOperatorBootstrapOutcome.COMPLETED);
+        var operator = operatorUserId();
+        inTransaction(() -> new PostgreSqlExternalIdentityLifecycleRepository(jdbc).link(operator, TRUSTED, "linked-later"));
+        var alternate = new ResolveExternalIdentityQuery(TRUSTED, "linked-later");
+        assertThat(resolver().resolve(alternate).orElseThrow().userId()).isEqualTo(operator);
+        var before = snapshot();
+
+        assertThat(graph().bootstrap(new FirstOperatorBootstrapRequest(TRUSTED, "linked-later", operation)))
+                .isEqualTo(FirstOperatorBootstrapOutcome.ALREADY_COMPLETED);
+        assertThat(graph().bootstrap(request(UUID.randomUUID()))).isEqualTo(FirstOperatorBootstrapOutcome.ALREADY_COMPLETED);
+
+        assertThat(snapshot()).isEqualTo(before);
+    }
+
+    @Test
+    void r3ReplayOfTheOriginalRequestSurvivesRetiringTheIssuerFromTrust() {
+        var operation = UUID.randomUUID();
+        assertThat(graph().bootstrap(request(operation))).isEqualTo(FirstOperatorBootstrapOutcome.COMPLETED);
+        var before = snapshot();
+        var retired = new FirstOperatorBootstrapService(issuer -> false, new SpringFirstOperatorBootstrapTransaction(manager), ceremony(),
+                resolver(), usersGraph(), authority(), UUID::randomUUID);
+
+        assertThat(retired.bootstrap(request(operation))).isEqualTo(FirstOperatorBootstrapOutcome.ALREADY_COMPLETED_SAME_OPERATION);
+        assertThat(retired.bootstrap(request(UUID.randomUUID()))).isEqualTo(FirstOperatorBootstrapOutcome.ALREADY_COMPLETED);
+
+        assertThat(snapshot()).isEqualTo(before);
+    }
+
+    @Test
+    void r5CompletedStateRequiresAWellFormedFingerprint() {
+        for (var malformed : new String[] {null, "", "A".repeat(64), "0".repeat(63), "0".repeat(65), "g".repeat(64), " " + "0".repeat(63)}) {
+            assertThatThrownBy(() -> jdbc.update("""
+                    UPDATE bootstrap.first_operator_ceremony
+                    SET state = 'COMPLETED', operation_id = ?, operator_user_id = ?, request_fingerprint = ?, completed_at = now()
+                    """, UUID.randomUUID(), UUID.randomUUID(), malformed)).as(String.valueOf(malformed)).isInstanceOf(DataAccessException.class);
+        }
+        assertThatThrownBy(() -> jdbc.update("UPDATE bootstrap.first_operator_ceremony SET request_fingerprint = ?", "0".repeat(64)))
+                .isInstanceOf(DataAccessException.class);
+        assertThat(state()).isEqualTo("OPEN");
+        assertThat(jdbc.queryForObject("SELECT request_fingerprint FROM bootstrap.first_operator_ceremony", String.class)).isNull();
+    }
+
+    @Test
+    void r4UntrustedIssuerIsRejectedBeforeAnyMutation() {
         var outcome = graph().bootstrap(new FirstOperatorBootstrapRequest("https://attacker.example.test", SUBJECT, UUID.randomUUID()));
 
         assertThat(outcome).isEqualTo(FirstOperatorBootstrapOutcome.UNTRUSTED_ISSUER);
@@ -305,8 +371,8 @@ class FirstOperatorBootstrapPostgreSqlTest {
     void f5FailingFinalStateTransitionRollsEverythingBack() {
         var real = ceremony();
         var failing = new DelegatingCeremony(real) {
-            @Override public void complete(UUID operationId, UUID operatorUserId) {
-                real.complete(operationId, operatorUserId);
+            @Override public void complete(UUID operationId, UUID operatorUserId, String requestFingerprint) {
+                real.complete(operationId, operatorUserId, requestFingerprint);
                 throw new InjectedFault();
             }
         };
@@ -346,8 +412,8 @@ class FirstOperatorBootstrapPostgreSqlTest {
                 real.appendCompletedEvidence(eventId, operationId, operatorUserId);
                 record.accept("bootstrap.evidence");
             }
-            @Override public void complete(UUID operationId, UUID operatorUserId) {
-                real.complete(operationId, operatorUserId);
+            @Override public void complete(UUID operationId, UUID operatorUserId, String requestFingerprint) {
+                real.complete(operationId, operatorUserId, requestFingerprint);
                 record.accept("bootstrap.complete");
             }
         };
@@ -394,7 +460,7 @@ class FirstOperatorBootstrapPostgreSqlTest {
         var before = snapshot();
 
         assertThatThrownBy(() -> new SpringFirstOperatorBootstrapTransaction(manager).execute(() -> {
-            ceremony().complete(UUID.randomUUID(), UUID.randomUUID());
+            ceremony().complete(UUID.randomUUID(), UUID.randomUUID(), "0".repeat(64));
             return null;
         })).isInstanceOf(IllegalStateException.class);
 
@@ -406,7 +472,7 @@ class FirstOperatorBootstrapPostgreSqlTest {
         assertThatThrownBy(() -> ceremony().lock()).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> ceremony().appendCompletedEvidence(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()))
                 .isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> ceremony().complete(UUID.randomUUID(), UUID.randomUUID())).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> ceremony().complete(UUID.randomUUID(), UUID.randomUUID(), "0".repeat(64))).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> authority().platformAuthorityExists()).isInstanceOf(IllegalStateException.class);
         assertNothingEstablished();
     }
@@ -565,6 +631,14 @@ class FirstOperatorBootstrapPostgreSqlTest {
         return new ResolveExternalIdentityQuery(TRUSTED, SUBJECT);
     }
 
+    private UUID operatorUserId() {
+        return jdbc.queryForObject("SELECT operator_user_id FROM bootstrap.first_operator_ceremony", UUID.class);
+    }
+
+    private void inTransaction(Runnable work) {
+        new org.springframework.transaction.support.TransactionTemplate(manager).executeWithoutResult(status -> work.run());
+    }
+
     private String state() {
         return jdbc.queryForObject("SELECT state FROM bootstrap.first_operator_ceremony", String.class);
     }
@@ -627,6 +701,8 @@ class FirstOperatorBootstrapPostgreSqlTest {
             delegate.appendCompletedEvidence(eventId, operationId, operatorUserId);
         }
 
-        @Override public void complete(UUID operationId, UUID operatorUserId) { delegate.complete(operationId, operatorUserId); }
+        @Override public void complete(UUID operationId, UUID operatorUserId, String requestFingerprint) {
+            delegate.complete(operationId, operatorUserId, requestFingerprint);
+        }
     }
 }

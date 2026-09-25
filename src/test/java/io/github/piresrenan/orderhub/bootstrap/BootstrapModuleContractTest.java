@@ -69,6 +69,36 @@ class BootstrapModuleContractTest {
     }
 
     @Test
+    void everyCurrentBackgroundMutatorIsDisabledInCommandMode() throws Exception {
+        // Inventory of production startup and background mechanisms. A new entry must be reviewed for command mode.
+        var base = java.nio.file.Path.of("src/main/java");
+        var found = new java.util.TreeMap<String, java.util.TreeSet<String>>();
+        var markers = java.util.List.of("@Scheduled", "@ApplicationModuleListener", "@EventListener", "@TransactionalEventListener",
+                "ApplicationRunner", "CommandLineRunner", "ApplicationReadyEvent", "ApplicationStartedEvent", "ContextRefreshedEvent",
+                "SmartLifecycle", "@PostConstruct", "@Async", "TaskScheduler");
+        try (var sources = java.nio.file.Files.walk(base)) {
+            for (var file : sources.filter(p -> p.toString().endsWith(".java")).toList()) {
+                var text = java.nio.file.Files.readString(file);
+                for (var marker : markers) {
+                    if (text.contains(marker) && !file.toString().contains("bootstrap")) {
+                        found.computeIfAbsent(marker, key -> new java.util.TreeSet<>()).add(file.getFileName().toString());
+                    }
+                }
+            }
+        }
+        assertThat(found).containsOnlyKeys("@Scheduled", "@ApplicationModuleListener");
+        assertThat(found.get("@Scheduled")).containsExactly("AnalyticsHousekeepingTrigger.java");
+        assertThat(found.get("@ApplicationModuleListener")).containsExactly("WorkforceAuthorityChangeAuditRecordedListener.java");
+        var command = java.nio.file.Files.readString(base.resolve(
+                "io/github/piresrenan/orderhub/bootstrap/adapter/in/command/FirstOperatorBootstrapCommand.java"));
+        // Housekeeping is the only scheduled mutator; listeners only run for outstanding publications, which are
+        // not republished, and the ceremony publishes none. Migration is never run by the command.
+        assertThat(command).contains("\"orderhub.analytics.housekeeping.enabled\", \"false\"",
+                "\"spring.modulith.events.republish-outstanding-events-on-restart\", \"false\"",
+                "\"spring.flyway.enabled\", \"false\"", "\"logging.config\", LOGGING_CONFIG");
+    }
+
+    @Test
     void authorizationFirstOperatorContractIsASeparateNarrowNamedInterface() {
         var authorization = MODULES.getModuleByName("authorization").orElseThrow();
         var contract = authorization.getNamedInterfaces().getByName("first-operator-bootstrap").orElseThrow();
