@@ -23,6 +23,7 @@ import org.testcontainers.utility.DockerImageName;
  * Covers: the exact new index definition, unchanged columns/constraints, preserved business rows and a
  * plan that uses the index for the discovery scan shape.
  * Expected: exactly one additional index on users.tenant_memberships on both paths; rows are untouched.
+ * Pinned to target 45 so later forward migrations (V46+) are qualified by their own tests.
  * Prevents: V45 mutating tables or business state, path divergence and the discovery scan regressing to a
  * full-table sequential scan.
  */
@@ -50,7 +51,7 @@ class TenantMembershipDiscoveryIndexMigrationTest {
         var columns = columns(jdbc); var constraints = constraints(jdbc); var indexes = indexes(jdbc);
         var rows = jdbc.queryForList("SELECT * FROM users.tenant_memberships");
 
-        var result = Flyway.configure().dataSource(source).locations(HISTORY).load().migrate();
+        var result = Flyway.configure().dataSource(source).locations(HISTORY).target("45").load().migrate();
 
         assertThat(result.migrationsExecuted).isEqualTo(1);
         assertThat(result.targetSchemaVersion).isEqualTo("45");
@@ -60,13 +61,13 @@ class TenantMembershipDiscoveryIndexMigrationTest {
         assertThat(indexDefinition(jdbc)).isEqualTo(
                 "CREATE INDEX " + INDEX + " ON users.tenant_memberships USING btree (user_id, status, tenant_id)");
         assertThat(jdbc.queryForList("SELECT * FROM users.tenant_memberships")).isEqualTo(rows);
-        Flyway.configure().dataSource(source).locations(HISTORY).load().validate();
+        Flyway.configure().dataSource(source).locations(HISTORY).target("45").load().validate();
     }
 
     @Test
     void freshBaselineInstallationReachesTheSameIndexAndUsesItForTheScan() {
         var source = database("discovery_index_fresh");
-        var result = Flyway.configure().dataSource(source).locations(HISTORY, BASELINE).load().migrate();
+        var result = Flyway.configure().dataSource(source).locations(HISTORY, BASELINE).target("45").load().migrate();
         var jdbc = new JdbcTemplate(source);
         assertThat(result.targetSchemaVersion).isEqualTo("45");
         assertThat(jdbc.queryForList("SELECT version, type FROM public.flyway_schema_history ORDER BY installed_rank"))
@@ -89,7 +90,7 @@ class TenantMembershipDiscoveryIndexMigrationTest {
             }
         });
         assertThat(plan).contains(INDEX).doesNotContain("Sort");
-        Flyway.configure().dataSource(source).locations(HISTORY, BASELINE).load().validate();
+        Flyway.configure().dataSource(source).locations(HISTORY, BASELINE).target("45").load().validate();
     }
 
     private static String indexDefinition(JdbcTemplate jdbc) {

@@ -266,6 +266,13 @@ public class UsersConfiguration {
         /**
          * Composes the external identity resolve-or-create application use case.
          *
+         * <p>
+         * The same service instance also exposes the exclusive
+         * {@code EstablishNewExternalUserUseCase} used by the ADR-0022
+         * first-operator ceremony, so both contracts share one serialized
+         * provisioning scope.
+         * </p>
+         *
          * @param externalIdentityUserProvisioningCoordinator serialized
          *                                                    provisioning scope
          * @param resolveExternalIdentityUseCase              external identity

@@ -5,6 +5,8 @@ import java.util.Objects;
 import io.github.piresrenan.orderhub.users.application.port.in.BindExternalIdentityCommand;
 import io.github.piresrenan.orderhub.users.application.port.in.BindExternalIdentityUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.CreateUserUseCase;
+import io.github.piresrenan.orderhub.users.application.port.in.EstablishNewExternalUserUseCase;
+import io.github.piresrenan.orderhub.users.application.port.in.ExternalIdentityAlreadyBoundException;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityQuery;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveExternalIdentityUseCase;
 import io.github.piresrenan.orderhub.users.application.port.in.ResolveOrCreateExternalUserUseCase;
@@ -27,7 +29,7 @@ import io.github.piresrenan.orderhub.users.application.port.out.ExternalIdentity
  * scope's responsibility rather than this service's.</p>
  */
 public final class ResolveOrCreateExternalUserService
-        implements ResolveOrCreateExternalUserUseCase {
+        implements ResolveOrCreateExternalUserUseCase, EstablishNewExternalUserUseCase {
 
     private final ExternalIdentityUserProvisioningCoordinator coordinator;
     private final ResolveExternalIdentityUseCase resolver;
@@ -92,6 +94,34 @@ public final class ResolveOrCreateExternalUserService
                         query));
     }
 
+    /**
+     * Establishes a new User and binding for one exact external identity,
+     * refusing to reuse an existing binding.
+     *
+     * @param query exact external identity pair
+     * @return the newly created internal User identity
+     * @throws ExternalIdentityAlreadyBoundException when the pair is already bound
+     */
+    @Override
+    public ResolvedUserIdentity establishNew(
+            ResolveExternalIdentityQuery query) {
+
+        Objects.requireNonNull(
+                query,
+                "query");
+
+        return coordinator.executeSerialized(
+                query.issuer(),
+                query.subject(),
+                () -> {
+                    if (resolver.resolve(query).isPresent()) {
+                        throw new ExternalIdentityAlreadyBoundException();
+                    }
+                    return establish(
+                            query);
+                });
+    }
+
     /** Reuses the exact binding or establishes User and binding together within the serialized caller scope. */
     private ResolvedUserIdentity resolveOrEstablish(
             ResolveExternalIdentityQuery query) {
@@ -103,6 +133,14 @@ public final class ResolveOrCreateExternalUserService
         if (existing.isPresent()) {
             return existing.get();
         }
+
+        return establish(
+                query);
+    }
+
+    /** Creates the User and binds the exact pair inside the caller's serialized scope. */
+    private ResolvedUserIdentity establish(
+            ResolveExternalIdentityQuery query) {
 
         var created =
                 creator.create();
