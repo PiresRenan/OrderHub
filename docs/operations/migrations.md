@@ -40,6 +40,12 @@ Future schema or canonical-data changes belong in V45 and later. OH-023 (v1.0.0 
 amendment) adds `V45__index_tenant_memberships_by_user_status.sql`, an additive index for
 self-scoped Tenant discovery ([ADR-0021](../adr/ADR-0021-self-scoped-tenant-discovery.md)),
 so the v1.0.0 migration history is V1–V45.
+OH-024 adds `V46__establish_first_operator_bootstrap.sql`: the `bootstrap` schema holding the
+forward-only singleton ceremony row (seeded `OPEN`, with no identity) and its append-only
+success evidence ([ADR-0022](../adr/ADR-0022-retained-first-operator-bootstrap.md),
+[runbook](first-operator-bootstrap.md)). It seeds no User, binding, grant or secret.
+The 2026-09-24 OH-024 amendment (ADR-0020) makes the v1.0.0 migration history V1–V46;
+V1–V45 and B44 are unchanged.
 It builds with a plain `CREATE INDEX` inside the Flyway transaction, which blocks writes to
 `users.tenant_memberships` for the duration of the build. Both installation paths
 then apply those same migrations after reaching version 44. B44 is not regenerated for

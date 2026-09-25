@@ -46,6 +46,31 @@ Consequences for OH-022:
 - the amendment admits only OH-023 and sets no precedent for other deferred
   capabilities.
 
+## Scope amendment — OH-024 admitted to v1.0.0 (2026-09-24)
+
+The OH-023 amendment above qualified a **61-operation, V1–V45** baseline. That
+text is historical and remains accurate for that candidate.
+
+On 2026-09-24 the owner explicitly admitted OH-024, the retained first-operator
+bootstrap ([ADR-0022](ADR-0022-retained-first-operator-bootstrap.md), #55, parent
+#53), into v1.0.0 as a release-blocking **security and operability** amendment.
+Without it, a retained v1.0.0 deployment cannot establish its first Platform
+operator except through manual SQL, a backdoor or public signup, all of which
+are rejected.
+
+Consequences for OH-022:
+
+- the public HTTP contract stays at **61 operations**; OH-024 adds no route;
+- the accepted migrations become **V1–V46** (V46 is the bootstrap ceremony state
+  and evidence; V1–V45 and B44 are unchanged);
+- the final GO, OpenAPI artifact/checksum and release evidence must be produced
+  from the post-OH-024 `pre-release` tree; earlier qualifications are
+  historical only;
+- OH-022 still owns final qualification, promotion, the release tree, tag and
+  notes;
+- the amendment admits only OH-024 and sets no precedent for other deferred
+  capabilities.
+
 ## Decision
 
 Use Spring CORS processing on the existing business and bootstrap chains with an

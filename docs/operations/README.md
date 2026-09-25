@@ -10,6 +10,10 @@ Start with the [configuration reference](configuration.md),
 [security boundary](../security/README.md). For interactive synthetic business
 flows, use the [disposable development launcher](../development/local-runtime.md).
 
+A fresh retained environment gets its first Platform operator only through the offline,
+one-shot [first-operator bootstrap command](first-operator-bootstrap.md) (ADR-0022). No HTTP
+route, startup seed or manual SQL establishes it.
+
 ## Execution environments
 
 | Environment | Database / identity | Intended evidence |

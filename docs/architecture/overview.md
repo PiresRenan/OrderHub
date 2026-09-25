@@ -39,6 +39,7 @@ There is no outbound webhook worker or public event feed.
 | `orders` | Order state and create-operation idempotency | Customer create/read API; coordinates Catalog and Inventory |
 | `analytics` | Typed operational facts, pseudonym mapping and admitted retention | Consumes bounded Workforce source after durable notification |
 | `administration` | Thin HTTP coordination | Calls owner interfaces; does not become a shared domain or schema owner |
+| `bootstrap` | One-shot retained first-operator ceremony state and evidence (ADR-0022) | Offline command only; composes Users and Authorization owner contracts; nothing depends on it |
 | `api` | OpenAPI composition metadata | Reflects HTTP handlers; no persistence/business mutation |
 
 Schemas follow ownership rather than arbitrary request grouping. PostgreSQL
@@ -124,7 +125,8 @@ Design history: [persistence](../adr/ADR-0005-postgresql-persistence-and-transac
 [authorization](../adr/ADR-0011-identity-personas-and-scoped-authorization-kernel.md),
 [analytics](../adr/ADR-0014-privacy-safe-operational-analytics-foundation.md),
 [identity lifecycle](../adr/ADR-0017-tenant-identity-provisioning-and-account-lifecycle.md),
-[retention](../adr/ADR-0018-bounded-operational-data-lifecycle.md).
+[retention](../adr/ADR-0018-bounded-operational-data-lifecycle.md),
+[first-operator bootstrap](../adr/ADR-0022-retained-first-operator-bootstrap.md).
 Historical qualification checkpoints remain records of their own scope; this
 guide describes the current release candidate. [Client integration](../integration/README.md)
 defines direct browser, optional BFF and explicit POST-v1 M2M/payment/AI boundaries.
