@@ -1,6 +1,21 @@
 # ADR-0022 — Retained first-operator bootstrap
 
-Status: DESIGNED. Material review corrections are pending exact-candidate requalification.
+Status: TESTED. The corrected OH-024 candidate `14d40bf` (tree `dad65f0`) passed a
+foreground Maven Wrapper clean verify: 1,692 tests across 325 reports, with 0 failures,
+0 errors and 0 skips. It also passed:
+
+- javac `-Xlint:all` (0 warnings) and ECJ 3.43 (0 problems);
+- Spring Modulith verification;
+- the Node artifact-isolation and OpenAPI-text gates.
+
+V46 (sha256 `8cbc2697c4e8a56438629fe54bd1bfc25924236269ee1c974dfc3b29faaca20e`) is
+qualified on both the fresh-install and V45-upgrade paths. The generated contract has
+61 operations with the unchanged canonical LF OpenAPI sha256
+`ba175bc784ddd2d519b54cf9cbc7a8a28a51065bacb5d1210f4f7d4df7c1dc8a`. Twelve guard
+mutations (M1–M12) each made a test fail.
+
+This is OrderHub-isolated evidence with synthetic issuers. The cross-project Identity
+journey has not been executed.
 
 Review history: candidate `109e497` (tree `ecff8f2`) was promoted to TESTED. That
 qualification is **superseded**. An independent coordinator review of PR #56 found three
@@ -10,8 +25,8 @@ problems:
 2. A root-level logging override did not stop explicitly configured loggers.
 3. The command could apply schema migrations.
 
-The corrections below replace those mechanics. ADR-0022 returns to TESTED only with
-evidence from the corrected exact candidate.
+The corrections below replace those mechanics. The TESTED evidence above refers only to
+the corrected candidate.
 
 Task: OH-024, [Issue #55](https://github.com/PiresRenan/OrderHub/issues/55). Parent
 security program: [Issue #53](https://github.com/PiresRenan/OrderHub/issues/53).
