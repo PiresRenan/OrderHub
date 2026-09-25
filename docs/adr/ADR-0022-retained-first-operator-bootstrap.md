@@ -1,8 +1,15 @@
 # ADR-0022 — Retained first-operator bootstrap
 
-Status: DESIGNED. Implementation and focused qualification exist on the OH-024 task
-branch; the status moves to TESTED only after the integration candidate is qualified on
-its exact HEAD.
+Status: TESTED. The OH-024 implementation candidate `1545663` (tree `589bb4d`) passed a
+foreground Maven Wrapper clean verify: 1,683 tests across 324 reports, with 0 failures,
+0 errors and 0 skips. It also passed javac `-Xlint:all` (0 warnings), ECJ 3.43 (0
+problems), Spring Modulith verification and the Node artifact/OpenAPI gates. V46 is
+qualified on both the fresh-install and V45-upgrade paths, and its sha256 is
+`d56aad852a237e1460ff479a4e8b7c20854fd302d6e67313ca2c973b96140684`. The generated
+contract still has 61 operations, and its canonical LF OpenAPI sha256 is unchanged:
+`ba175bc784ddd2d519b54cf9cbc7a8a28a51065bacb5d1210f4f7d4df7c1dc8a`. Nine mutations (M1–M9)
+of the guards were each detected by a failing test. This is OrderHub-isolated evidence
+with synthetic issuers; the cross-project Identity journey is not yet executed.
 
 Task: OH-024, [Issue #55](https://github.com/PiresRenan/OrderHub/issues/55). Parent
 security program: [Issue #53](https://github.com/PiresRenan/OrderHub/issues/53).
