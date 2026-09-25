@@ -29,6 +29,14 @@ state. The v1 sequence becomes OH-019, OH-020, OH-021, OH-023, then OH-022 final
 qualification and promotion on the resulting 61-operation, V1–V45 tree. No other
 deferred capability is admitted by this precedent.
 
+**Security/operability amendment accepted 2026-09-24.** The owner additionally
+admitted OH-024, the retained first-operator bootstrap
+([ADR-0022](adr/ADR-0022-retained-first-operator-bootstrap.md), #55), because a
+retained v1.0.0 deployment must be able to establish its first Platform operator
+without manual SQL, a backdoor or public signup. The public contract stays at 61
+operations; the accepted migrations become V1–V46. OH-022 final qualification and
+promotion run on the post-OH-024 tree. No other deferred capability is admitted.
+
 ## POST-v1 / FUTURE EVOLUTION
 
 Independent machine principals, general Customer registration/CRUD, a complete
@@ -588,6 +596,16 @@ Direction:
 
 OH-013 establishes authorization primitives; later slices expand the privileged
 operational workflows without bypassing those primitives.
+
+### OH-024 — retained first-operator bootstrap (v1.0.0 amendment, in progress)
+
+[ADR-0022](adr/ADR-0022-retained-first-operator-bootstrap.md),
+[#55](https://github.com/PiresRenan/OrderHub/issues/55), parent #53. An offline,
+one-shot command establishes the first retained Platform operator from an exact trusted
+issuer + subject. It creates one User, one binding and only `PLATFORM_TENANTS_MANAGE`, plus
+append-only ceremony evidence, in one PostgreSQL transaction arbitrated by a forward-only
+singleton (V46). It adds no public operation (61 remain). Recovery and break-glass stay
+out of scope. Admitted to v1.0.0 by the 2026-09-24 security/operability amendment.
 
 ## Durable internal publication — implemented; external delivery deferred
 

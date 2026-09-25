@@ -6,6 +6,25 @@ The project follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Retained first-operator bootstrap (OH-024, v1 security/operability amendment)
+
+- The offline, one-shot command `bootstrap-first-operator` establishes the first
+  retained Platform operator from a deployment-owned receipt holding an exact trusted
+  issuer + subject. It creates one User, one exact binding and only
+  `PLATFORM_TENANTS_MANAGE`, plus append-only ceremony evidence, in one PostgreSQL
+  transaction.
+- V46 adds the `bootstrap` schema: a forward-only singleton (`OPEN -> COMPLETED`) and
+  single-success evidence. It seeds no identity or authority. A completed ceremony is
+  replayed from its stored operation id and request fingerprint, never from current
+  bindings or current issuer trust.
+- The command never migrates the schema. V46 must be applied by the deployment
+  migration step first. Its only output is one outcome line, and every log event is
+  discarded regardless of configured logger levels.
+- No HTTP route, startup seed or password handling is added. The public contract stays
+  at 61 operations.
+- Admitted to v1.0.0 by an explicit amendment (ADR-0020, ADR-0022). The accepted
+  migrations become V1–V46.
+
 ### Tenant discovery (OH-023, v1 scope amendment)
 
 - `GET /tenants` lets the authenticated internal User discover the Tenants in

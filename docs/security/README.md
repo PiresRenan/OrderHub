@@ -60,6 +60,12 @@ as an existence oracle. Its result is presentation context, never authority. A
 listed Tenant can be suspended immediately afterwards, and the next Tenant-scoped
 request is then denied.
 
+The first Platform operator of a retained environment is established only by the
+offline, one-shot command of [ADR-0022](../adr/ADR-0022-retained-first-operator-bootstrap.md).
+It consumes an exact trusted issuer + subject, never a password, and grants only
+`PLATFORM_TENANTS_MANAGE`. It adds no HTTP route, principal type or authentication bypass.
+Afterwards, the operator authenticates through the normal bearer chain like any other User.
+
 An authenticated malformed/missing required selector is a 400. Absent or
 ineligible membership and unavailable Tenant trust are denied without revealing
 Tenant existence. Missing/invalid bearer credentials take precedence over those

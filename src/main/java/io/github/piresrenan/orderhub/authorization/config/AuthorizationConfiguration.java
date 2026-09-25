@@ -133,6 +133,15 @@ public class AuthorizationConfiguration {
         };
     }
 
+    /** Composes the ADR-0022 first-operator grant, which only joins the bootstrap caller transaction. */
+    @Bean
+    io.github.piresrenan.orderhub.authorization.application.port.in.bootstrap.FirstOperatorPlatformAuthorityUseCase firstOperatorPlatformAuthorityUseCase(
+            JdbcTemplate jdbcTemplate, AdministrativeGrantRepository grants) {
+        return new io.github.piresrenan.orderhub.authorization.application.service.FirstOperatorPlatformAuthorityService(
+                new io.github.piresrenan.orderhub.authorization.adapter.out.persistence.postgresql.PostgreSqlFirstOperatorAuthorityRepository(jdbcTemplate),
+                grants);
+    }
+
     @Bean
     AuthorizeAdministrativeActionUseCase authorizeAdministrativeActionUseCase(
             AdministrativeGrantRepository grants) {
