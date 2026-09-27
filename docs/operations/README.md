@@ -3,7 +3,9 @@
 OrderHub is a stateless application over a shared PostgreSQL database. Its
 committed container and Kubernetes definitions provide a reproducible operating
 baseline; they do not provide production database hosting, backup automation,
-ingress/TLS, autoscaling or a measured availability/capacity guarantee.
+ingress, certificate issuance, autoscaling or a measured availability/capacity
+guarantee. The retained Kubernetes Service is HTTPS-only on `8443`; OrderHub
+terminates TLS with deployment-owned material ([ADR-0023](../adr/ADR-0023-retained-https-transport-boundary.md)).
 
 Start with the [configuration reference](configuration.md),
 [database installation and upgrade procedure](migrations.md) and
@@ -20,7 +22,7 @@ route, startup seed or manual SQL establishes it.
 | --- | --- | --- |
 | Disposable developer launcher | Owned PostgreSQL Testcontainer; ephemeral loopback RSA issuer and owner-service fixtures | Real authenticated Catalog/Inventory and Customer/Order flows. |
 | Compose | Private `postgres` service; mandatory external JWT settings | Packaged image, startup, probes, immutable filesystem and graceful shutdown. |
-| Kubernetes local/scale | Environment-provided database Secret and JWT ConfigMap; CI supplies a separate disposable database fixture | Admission, two replicas, Service endpoints, rollout and worker placement. |
+| Kubernetes local/scale | Environment-provided database Secret, `orderhub-tls` Secret and JWT ConfigMap; CI supplies a disposable database fixture and synthetic CA | Admission, two replicas, HTTPS Service endpoints, CA/SAN validation, leaf rotation, rollout and worker placement. |
 | Staging/production | Deployment-owned PostgreSQL, credentials, JWT provider and network controls | Must qualify the actual deployment. Repository fixtures do not supply these services. |
 
 Compose publishes application HTTP on `127.0.0.1`, with no PostgreSQL host port.
@@ -55,6 +57,29 @@ curl.exe --fail --silent --show-error http://127.0.0.1:8080/livez
 curl.exe --fail --silent --show-error http://127.0.0.1:8080/readyz
 curl.exe --fail --silent --show-error http://127.0.0.1:8080/actuator/health
 ```
+
+In the retained Kubernetes topology the same paths are served only over HTTPS on
+`8443`. Kubelet probes use `scheme: HTTPS` on that listener (the kubelet does not
+verify probe certificates; probes carry no credentials). Operators verify with the
+issuing CA and the Service identity, for example
+`curl --cacert <ca.crt> https://orderhub.<namespace>.svc:8443/readyz` from inside the
+cluster. Never add `--insecure`.
+
+### Retained TLS rotation and rollback
+
+- **Leaf or key rotation:** update the `orderhub-tls` Secret with same-SAN material
+  from a CA the BFF already trusts, then run
+  `kubectl rollout restart deployment/orderhub` and wait for `rollout status`.
+- **CA rotation:** first deploy BFF trust containing the old and new CAs, then
+  rotate the leaf, then retire the old CA.
+- **Rollback of bad TLS material:** first restore the previous known-good
+  `orderhub-tls` Secret content, then run `kubectl rollout restart`.
+  `kubectl rollout undo` restores only the Deployment revision, never the Secret, so
+  it is not a TLS-material rollback. Use it only for a Deployment-spec regression, and
+  only after the Secret is known-good. Replicas that cannot load their material never
+  become Ready, and `maxUnavailable: 0` keeps existing ones serving.
+- HTTP, trust-all and hostname-check disablement are never rollback options. See
+  [ADR-0023](../adr/ADR-0023-retained-https-transport-boundary.md).
 
 The healthy response is minimal, for example `{"status":"UP"}`. PostgreSQL
 loss makes readiness fail while a healthy JVM remains live. Removing an unready
