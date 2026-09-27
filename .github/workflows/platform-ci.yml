@@ -115,6 +115,50 @@ jobs:
           kind version
           kubectl version --client
 
+      # Synthetic, disposable PKI for retained HTTPS qualification (ADR-0023).
+      # Material lives outside the Docker build context and the repository; it
+      # is not a retained credential. The foreign CA exists only for negatives.
+      - name: Generate synthetic TLS material
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          dir=/tmp/orderhub-tls
+          mkdir -p "${dir}"
+          chmod 0700 "${dir}"
+          cd "${dir}"
+
+          sans="DNS:orderhub.orderhub-local.svc,DNS:orderhub.orderhub-local.svc.cluster.local"
+          sans="${sans},DNS:orderhub.orderhub-scale.svc,DNS:orderhub.orderhub-scale.svc.cluster.local"
+
+          for ca in ca foreign-ca; do
+            openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+              -subj "/CN=OrderHub CI synthetic ${ca}" \
+              -addext "basicConstraints=critical,CA:TRUE" \
+              -addext "keyUsage=critical,keyCertSign,cRLSign" \
+              -keyout "${ca}.key" -out "${ca}.crt" 2>/dev/null
+          done
+
+          for leaf in leaf rotated; do
+            openssl req -new -newkey rsa:2048 -nodes \
+              -subj "/CN=orderhub" \
+              -keyout "${leaf}.key" -out "${leaf}.csr" 2>/dev/null
+            printf '%s\n' \
+              "subjectAltName=${sans}" \
+              "basicConstraints=critical,CA:FALSE" \
+              "keyUsage=critical,digitalSignature,keyEncipherment" \
+              "extendedKeyUsage=serverAuth" > "${leaf}.ext"
+            openssl x509 -req -in "${leaf}.csr" -days 1 \
+              -CA ca.crt -CAkey ca.key -CAcreateserial \
+              -extfile "${leaf}.ext" -out "${leaf}.crt" 2>/dev/null
+          done
+
+          # One line of each synthetic private key is a canary for image and
+          # log absence checks.
+          sed -n 2p leaf.key > key-canary.txt
+          sed -n 2p rotated.key >> key-canary.txt
+          test "$(wc -l < key-canary.txt)" -eq 2
+
       # These checks require no running workload and catch malformed Compose or
       # Kustomize configuration before consuming resources on container builds.
       - name: Validate platform definitions
@@ -190,6 +234,17 @@ jobs:
 
           echo "${exposed_ports}" |
             grep --fixed-strings '"8080/tcp"'
+
+          echo "${exposed_ports}" |
+            grep --fixed-strings '"8443/tcp"'
+
+          # Synthetic private-key material must never enter the image.
+          docker run \
+            --rm \
+            --entrypoint sh \
+            --env KEY_CANARY="$(head -n 1 /tmp/orderhub-tls/key-canary.txt)" \
+            "${ORDERHUB_IMAGE}" \
+            -c '! grep -rqF -- "${KEY_CANARY}" /application /etc 2>/dev/null'
 
           docker run \
             --rm \
@@ -334,13 +389,38 @@ jobs:
             --dry-run=server \
             -k infra/kubernetes/overlays/local
 
+          # Fail closed: without the deployment-owned TLS Secret no replica
+          # may start, and therefore no plaintext fallback can serve traffic.
           kubectl apply \
             -k infra/kubernetes/overlays/local
+
+          if kubectl rollout status \
+            deployment/orderhub \
+            --namespace orderhub-local \
+            --timeout 30s
+          then
+            echo "OrderHub became available without its TLS Secret."
+            exit 1
+          fi
+
+          test -z "$(
+            kubectl get deployment orderhub \
+              --namespace orderhub-local \
+              --output jsonpath='{.status.readyReplicas}'
+          )"
+
+          kubectl create secret tls orderhub-tls \
+            --namespace orderhub-local \
+            --cert /tmp/orderhub-tls/leaf.crt \
+            --key /tmp/orderhub-tls/leaf.key \
+            --dry-run=client \
+            --output yaml |
+            kubectl apply --filename -
 
           kubectl rollout status \
             deployment/orderhub \
             --namespace orderhub-local \
-            --timeout 120s
+            --timeout 180s
 
           test "$(
             kubectl get deployment orderhub \
@@ -386,8 +466,146 @@ jobs:
 
           kubectl get \
             --raw \
-            '/api/v1/namespaces/orderhub-local/services/http:orderhub:8080/proxy/readyz' |
+            '/api/v1/namespaces/orderhub-local/services/https:orderhub:8443/proxy/readyz' |
             grep --quiet '"status":"UP"'
+
+          # The BFF-facing Service exposes exactly one HTTPS port.
+          test "$(
+            kubectl get service orderhub \
+              --namespace orderhub-local \
+              --output jsonpath='{range .spec.ports[*]}{.name}:{.port}:{.targetPort};{end}'
+          )" = "https:8443:https;"
+
+          # TLS material is a read-only, group-readable Secret mount.
+          test "$(
+            kubectl exec \
+              --namespace orderhub-local \
+              "${pod}" \
+              -- stat -L -c '%a' /etc/orderhub/tls/tls.key
+          )" = "440"
+
+          if kubectl exec \
+            --namespace orderhub-local \
+            "${pod}" \
+            -- sh -c 'touch /etc/orderhub/tls/ci-should-not-exist 2>/dev/null'
+          then
+            echo "TLS Secret mount unexpectedly accepted a write."
+            exit 1
+          fi
+
+          verify_service_tls() {
+            local expected_serial="$1"
+            local host=orderhub.orderhub-local.svc
+            local alternate="${host}.cluster.local"
+            local status
+
+            kubectl port-forward \
+              --namespace orderhub-local \
+              service/orderhub \
+              18443:8443 \
+              > /tmp/orderhub-port-forward.log 2>&1 &
+            local forward=$!
+
+            for attempt in $(seq 1 30); do
+              if curl --silent --output /dev/null \
+                --cacert /tmp/orderhub-tls/ca.crt \
+                --resolve "${host}:18443:127.0.0.1" \
+                "https://${host}:18443/livez"
+              then
+                break
+              fi
+              sleep 1
+            done
+
+            # Correct CA + canonical and alternate Service identities succeed.
+            for name in "${host}" "${alternate}"; do
+              curl --fail --silent --show-error \
+                --cacert /tmp/orderhub-tls/ca.crt \
+                --resolve "${name}:18443:127.0.0.1" \
+                "https://${name}:18443/readyz" |
+                grep --quiet '"status":"UP"'
+            done
+
+            # Wrong CA: certificate verification failure (curl exit 60).
+            status=0
+            curl --silent --output /dev/null \
+              --cacert /tmp/orderhub-tls/foreign-ca.crt \
+              --resolve "${host}:18443:127.0.0.1" \
+              "https://${host}:18443/readyz" || status=$?
+            test "${status}" -eq 60
+
+            # Wrong hostname: SAN mismatch (curl exit 60).
+            status=0
+            curl --silent --output /dev/null \
+              --cacert /tmp/orderhub-tls/ca.crt \
+              --resolve "orderhub.wrong-namespace.svc:18443:127.0.0.1" \
+              "https://orderhub.wrong-namespace.svc:18443/readyz" || status=$?
+            test "${status}" -eq 60
+
+            # No downgrade: plaintext HTTP on the Service port never succeeds.
+            if curl --silent --max-time 5 \
+              "http://127.0.0.1:18443/readyz" |
+              grep --quiet '"status":"UP"'
+            then
+              echo "Retained Service answered plaintext HTTP."
+              exit 1
+            fi
+
+            served_serial="$(
+              openssl s_client \
+                -connect 127.0.0.1:18443 \
+                -servername "${host}" \
+                -verify_return_error \
+                -verify_hostname "${host}" \
+                -CAfile /tmp/orderhub-tls/ca.crt \
+                < /dev/null 2>/dev/null |
+                openssl x509 -noout -serial
+            )"
+            test "${served_serial}" = "${expected_serial}"
+
+            kill "${forward}"
+            wait "${forward}" 2>/dev/null || true
+          }
+
+          verify_service_tls "$(openssl x509 -noout -serial -in /tmp/orderhub-tls/leaf.crt)"
+
+          # Leaf rotation: update the Secret, then an explicit rolling restart
+          # under maxUnavailable 0. Hot reload is intentionally not relied upon.
+          kubectl create secret tls orderhub-tls \
+            --namespace orderhub-local \
+            --cert /tmp/orderhub-tls/rotated.crt \
+            --key /tmp/orderhub-tls/rotated.key \
+            --dry-run=client \
+            --output yaml |
+            kubectl apply --filename -
+
+          kubectl rollout restart \
+            deployment/orderhub \
+            --namespace orderhub-local
+
+          kubectl rollout status \
+            deployment/orderhub \
+            --namespace orderhub-local \
+            --timeout 180s
+
+          test "$(
+            kubectl get deployment orderhub \
+              --namespace orderhub-local \
+              --output jsonpath='{.status.availableReplicas}'
+          )" = "2"
+
+          verify_service_tls "$(openssl x509 -noout -serial -in /tmp/orderhub-tls/rotated.crt)"
+
+          # Neither generation of synthetic key material may reach logs.
+          if kubectl logs \
+            --namespace orderhub-local \
+            --selector app.kubernetes.io/name=orderhub \
+            --tail=-1 |
+            grep --quiet --fixed-strings --file /tmp/orderhub-tls/key-canary.txt
+          then
+            echo "Private-key material appeared in OrderHub logs."
+            exit 1
+          fi
 
           endpoint_count="$(
             kubectl get endpointslice \
@@ -473,6 +691,14 @@ jobs:
             --namespace orderhub-scale \
             --timeout 120s
 
+          kubectl create secret tls orderhub-tls \
+            --namespace orderhub-scale \
+            --cert /tmp/orderhub-tls/leaf.crt \
+            --key /tmp/orderhub-tls/leaf.key \
+            --dry-run=client \
+            --output yaml |
+            kubectl apply --filename -
+
           kubectl apply \
             --dry-run=server \
             -k infra/kubernetes/overlays/scale
@@ -519,7 +745,7 @@ jobs:
 
           kubectl get \
             --raw \
-            '/api/v1/namespaces/orderhub-scale/services/http:orderhub:8080/proxy/readyz' |
+            '/api/v1/namespaces/orderhub-scale/services/https:orderhub:8443/proxy/readyz' |
             grep --quiet '"status":"UP"'
 
           endpoint_count="$(
@@ -547,3 +773,5 @@ jobs:
 
           kind delete cluster \
             --name orderhub-scale || true
+
+          rm -rf /tmp/orderhub-tls
