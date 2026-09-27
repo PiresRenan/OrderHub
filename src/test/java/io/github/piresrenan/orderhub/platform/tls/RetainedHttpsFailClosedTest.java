@@ -107,11 +107,11 @@ class RetainedHttpsFailClosedTest {
                 .map(entry -> "--" + entry.getKey() + "=" + entry.getValue())
                 .toArray(String[]::new);
 
-        try (var ignored = new SpringApplicationBuilder(OrderHubApplication.class)
+        var context = new SpringApplicationBuilder(OrderHubApplication.class)
                 .profiles("retained")
-                .run(arguments)) {
-            throw new AssertionError("Retained context started without usable TLS material");
-        }
+                .run(arguments);
+        context.close();
+        throw new AssertionError("Retained context started without usable TLS material");
     }
 
     private static String stackTrace(Throwable failure) {
