@@ -91,8 +91,17 @@ verification.
 
 ### Local and test topologies
 
-- **Compose, the disposable developer launcher and the default (no-profile) application**
-  remain plaintext HTTP on `8080`, bound to loopback. They never activate `retained`.
+- **Compose** remains plaintext HTTP on `8080` and publishes it only on host loopback
+  (`127.0.0.1`).
+- **The disposable development launcher** remains plaintext HTTP on `8080` and
+  explicitly binds `127.0.0.1`.
+- **The default (no-profile) application** remains plaintext HTTP on `8080`. Its bind
+  address is the framework or environment default unless it is explicitly configured,
+  because the shared `application.properties` does not set `server.address`. This path
+  is not the retained deployment authority.
+- None of these activate `retained`. The retained Kubernetes topology activates it
+  explicitly, which makes HTTPS on `8443` mandatory and leaves no plaintext application
+  listener.
 - **Kubernetes overlays `local` and `scale`** inherit the HTTPS-only base.
 - **CI** generates a disposable synthetic CA and leaf for each run.
 - **The offline first-operator bootstrap command** (ADR-0022) runs without a web server
