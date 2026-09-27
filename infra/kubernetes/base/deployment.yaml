@@ -74,9 +74,11 @@ spec:
           image: orderhub:1.0.0
           imagePullPolicy: IfNotPresent
 
+          # Retained transport (ADR-0023): the embedded server terminates TLS
+          # itself. No plaintext application listener exists in this topology.
           ports:
-            - name: http
-              containerPort: 8080
+            - name: https
+              containerPort: 8443
               protocol: TCP
 
           envFrom:
@@ -93,6 +95,11 @@ spec:
           # The application manifests declare this contract but do not own or
           # commit concrete database endpoints or credentials.
           env:
+            # Explicit env takes precedence over envFrom, so no ConfigMap can
+            # silently remove the retained TLS profile.
+            - name: SPRING_PROFILES_ACTIVE
+              value: retained
+
             - name: SPRING_DATASOURCE_URL
               valueFrom:
                 secretKeyRef:
@@ -132,12 +139,17 @@ spec:
               cpu: 500m
               memory: 512Mi
 
+          # Probes use the same TLS connector as application traffic. The
+          # kubelet does not verify serving certificates for HTTPS probes; the
+          # probes carry no credentials and are not a client trust path.
+          #
           # Startup gates the other probes, preventing normal JVM bootstrap from
           # being mistaken for either liveness or readiness failure.
           startupProbe:
             httpGet:
               path: /livez
-              port: http
+              port: https
+              scheme: HTTPS
             periodSeconds: 1
             timeoutSeconds: 1
             failureThreshold: 30
@@ -146,7 +158,8 @@ spec:
           readinessProbe:
             httpGet:
               path: /readyz
-              port: http
+              port: https
+              scheme: HTTPS
             periodSeconds: 2
             timeoutSeconds: 1
             failureThreshold: 3
@@ -157,7 +170,8 @@ spec:
           livenessProbe:
             httpGet:
               path: /livez
-              port: http
+              port: https
+              scheme: HTTPS
             periodSeconds: 10
             timeoutSeconds: 1
             failureThreshold: 3
@@ -167,8 +181,22 @@ spec:
             - name: tmp
               mountPath: /tmp
 
+            # Deployment-owned certificate and private key. Nothing in Git or
+            # the image supplies this material.
+            - name: orderhub-tls
+              mountPath: /etc/orderhub/tls
+              readOnly: true
+
       volumes:
         - name: tmp
           emptyDir:
             medium: Memory
             sizeLimit: 64Mi
+
+        # kubernetes.io/tls Secret with tls.crt and tls.key. Missing Secret
+        # blocks pod start; files are group-readable through fsGroup 10001.
+        - name: orderhub-tls
+          secret:
+            secretName: orderhub-tls
+            optional: false
+            defaultMode: 0440

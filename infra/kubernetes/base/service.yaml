@@ -12,8 +12,10 @@ spec:
     app.kubernetes.io/name: orderhub
     app.kubernetes.io/component: api
 
+  # The only BFF-facing transport is HTTPS (ADR-0023). Consumers address
+  # https://orderhub.<namespace>.svc:8443 and validate the certificate SAN.
   ports:
-    - name: http
-      port: 8080
-      targetPort: http
+    - name: https
+      port: 8443
+      targetPort: https
       protocol: TCP

@@ -109,7 +109,9 @@ COPY --from=build --chown=10001:10001 /workspace/extracted/application/ ./
 
 USER 10001:10001
 
-EXPOSE 8080
+# 8080: local/development HTTP (no profile). 8443: retained HTTPS listener
+# enabled by the retained profile with externally mounted TLS material.
+EXPOSE 8080 8443
 
 # Java remains PID 1 through exec-form ENTRYPOINT so Docker/Kubernetes SIGTERM
 # reaches the JVM directly and can trigger Spring Boot's graceful shutdown.
