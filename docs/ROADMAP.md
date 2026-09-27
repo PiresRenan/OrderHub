@@ -37,6 +37,13 @@ without manual SQL, a backdoor or public signup. The public contract stays at 61
 operations; the accepted migrations become V1–V46. OH-022 final qualification and
 promotion run on the post-OH-024 tree. No other deferred capability is admitted.
 
+**Security/operability amendment accepted 2026-09-27.** The owner admitted OH-027, the
+retained HTTPS transport boundary
+([ADR-0023](adr/ADR-0023-retained-https-transport-boundary.md), #60). The accepted BFF
+retained envelope requires BFF -> OrderHub over HTTPS, while the retained OrderHub
+Service was HTTP-only. 61 operations and V1–V46 remain. OH-022 final qualification and
+promotion run on the post-OH-027 tree. No other deferred capability is admitted.
+
 ## POST-v1 / FUTURE EVOLUTION
 
 Independent machine principals, general Customer registration/CRUD, a complete
@@ -624,7 +631,8 @@ principal is an unsupported security-escalation state.
 The retained Kubernetes Service becomes HTTPS-only on `8443`. OrderHub terminates TLS
 natively from a deployment-owned `orderhub-tls` Secret, and the `retained` profile fails
 closed without it. Local/Compose HTTP is unchanged. There is no public operation, migration,
-JWT or authorization change. Its v1.0.0 scope classification is an owner decision.
+JWT or authorization change. It was explicitly admitted to v1.0.0 on 2026-09-27 as a bounded
+retained security/operability amendment (ADR-0020). 61 operations and V1–V46 remain.
 
 ## Durable internal publication — implemented; external delivery deferred
 

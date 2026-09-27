@@ -1,15 +1,33 @@
 # ADR-0023 — Retained HTTPS transport boundary
 
-Status: PROPOSED. Accepted on the governed squash merge of the OH-027 pull request;
-qualification evidence is recorded there and in the promoted `pre-release` checks.
+Status: TESTED. The OH-027 candidate `f4e4429` (tree `837ddad`, PR #61) passed a
+Maven Wrapper clean verify on its exact HEAD: 1,710 tests across 328 reports, with
+0 failures, 0 errors and 0 skips. It also passed Branch Policy, CI and Platform CI
+(kind dev and scale profiles).
+
+Qualified behaviour:
+
+- Native retained HTTPS works: the correct CA succeeds for the canonical and
+  alternate SANs.
+- A wrong CA fails the handshake.
+- A wrong hostname fails the handshake.
+- Missing or malformed TLS material fails closed.
+- Plaintext HTTP to the retained port does not succeed.
+- Real-JWT behaviour over TLS is unchanged.
+- Leaf rotation through a Secret update and rolling restart passed in kind.
+
+The generated contract still has 61 operations, with canonical LF OpenAPI sha256
+`ba175bc784ddd2d519b54cf9cbc7a8a28a51065bacb5d1210f4f7d4df7c1dc8a`. Migrations remain
+V1–V46, and no business contract changed.
 
 Task: OH-027, [Issue #60](https://github.com/PiresRenan/OrderHub/issues/60).
 Cross-project context: OrderHub-Web-BFF BFF-013 (#14), BFF ADR-0009 D027 (retained
 security envelope: browser -> BFF, BFF -> Identity and BFF -> OrderHub over HTTPS).
 
-Classification: retained deployment transport capability. It adds no public operation
-(61 remain), no migration (V1–V46 remain) and no JWT or business-authority change. Its
-v1.0.0 scope classification is an owner decision recorded outside this ADR (ADR-0020).
+Classification: **v1.0.0 release-blocking retained security and operability
+amendment**, admitted explicitly by the owner on 2026-09-27 (recorded in ADR-0020). It
+adds no public operation (61 remain), no migration (V1–V46 remain) and no JWT or
+business-authority change.
 
 ## Problem
 

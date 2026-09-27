@@ -6,7 +6,7 @@ The project follows Semantic Versioning.
 
 ## [Unreleased]
 
-### Retained HTTPS transport boundary (OH-027)
+### Retained HTTPS transport boundary (OH-027, v1 security/operability amendment)
 
 - The retained Kubernetes Deployment activates the `retained` profile. OrderHub then
   terminates TLS on its embedded Tomcat listener (`8443`) from PEM material in the
@@ -16,6 +16,7 @@ The project follows Semantic Versioning.
   no HTTP fallback.
 - Local Compose and the development launcher remain plaintext HTTP on loopback `8080`.
 - No public operation, migration, JWT, authorization or Tenant change. See ADR-0023.
+- Admitted to v1.0.0 by an explicit amendment (ADR-0020, ADR-0023).
 
 ### Retained first-operator bootstrap (OH-024, v1 security/operability amendment)
 

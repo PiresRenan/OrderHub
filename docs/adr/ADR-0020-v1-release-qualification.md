@@ -71,6 +71,48 @@ Consequences for OH-022:
 - the amendment admits only OH-024 and sets no precedent for other deferred
   capabilities.
 
+## Scope amendment — OH-027 admitted to v1.0.0 (2026-09-27)
+
+The OH-024 amendment above established the post-OH-024 release authority:
+
+- **61 public operations**;
+- migrations **V1–V46**;
+- ADR-0021 and ADR-0022 both TESTED.
+
+That text is historical and remains accurate for that tree.
+
+On 2026-09-27 the owner explicitly admitted OH-027, the retained HTTPS transport
+boundary ([ADR-0023](ADR-0023-retained-https-transport-boundary.md), #60), into v1.0.0.
+It is a single, bounded, release-blocking **security and operability** amendment.
+
+The accepted OrderHub-Web-BFF retained envelope (BFF ADR-0009, D027) requires BFF ->
+OrderHub over HTTPS. The previously promoted OrderHub retained Kubernetes Service
+exposed only plaintext HTTP. A retained v1 topology with the accepted BFF therefore
+could not satisfy its governed transport contract without this correction.
+
+OH-027 adds none of the following: a business capability, public API, domain,
+migration, authorization rule, Tenant semantic or infrastructure product.
+
+Consequences for OH-022:
+
+- the public HTTP contract stays at **61 operations**, and the OpenAPI semantic
+  contract is unchanged;
+- the canonical LF OpenAPI sha256 stays
+  `ba175bc784ddd2d519b54cf9cbc7a8a28a51065bacb5d1210f4f7d4df7c1dc8a`, subject to
+  final verification;
+- migrations stay **V1–V46**;
+- JWT semantics, business authorization and Tenant authorization are unchanged;
+- the retained Kubernetes BFF-facing Service becomes **HTTPS-only** (`https:8443`,
+  TLS terminated by OrderHub);
+- ADR-0023 becomes part of the v1 release authority, alongside ADR-0021 and
+  ADR-0022;
+- the final GO must qualify the post-OH-027 `pre-release` tree;
+- all pre-OH-027 release qualifications are historical for retained transport;
+- OH-022 still exclusively owns the final GO, the `pre-release` -> `main` promotion,
+  the exact release tree, the immutable `v1.0.0` tag and the GitHub Release notes;
+- the amendment admits only OH-027 and sets no precedent for other deferred
+  capabilities.
+
 ## Decision
 
 Use Spring CORS processing on the existing business and bootstrap chains with an
