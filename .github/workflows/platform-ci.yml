@@ -567,7 +567,24 @@ jobs:
             wait "${forward}" 2>/dev/null || true
           }
 
+          # Synthetic key material must never reach logs. Each pod generation is
+          # inspected before it is replaced, so no generation's logs are lost.
+          verify_logs_free_of_key_material() {
+            if kubectl logs \
+              --namespace orderhub-local \
+              --selector app.kubernetes.io/name=orderhub \
+              --tail=-1 |
+              grep --quiet --fixed-strings --file /tmp/orderhub-tls/key-canary.txt
+            then
+              echo "Private-key material appeared in OrderHub logs."
+              exit 1
+            fi
+          }
+
           verify_service_tls "$(openssl x509 -noout -serial -in /tmp/orderhub-tls/leaf.crt)"
+
+          # Original pods, which loaded leaf.key, before the restart deletes them.
+          verify_logs_free_of_key_material
 
           # Leaf rotation: update the Secret, then an explicit rolling restart
           # under maxUnavailable 0. Hot reload is intentionally not relied upon.
@@ -596,16 +613,8 @@ jobs:
 
           verify_service_tls "$(openssl x509 -noout -serial -in /tmp/orderhub-tls/rotated.crt)"
 
-          # Neither generation of synthetic key material may reach logs.
-          if kubectl logs \
-            --namespace orderhub-local \
-            --selector app.kubernetes.io/name=orderhub \
-            --tail=-1 |
-            grep --quiet --fixed-strings --file /tmp/orderhub-tls/key-canary.txt
-          then
-            echo "Private-key material appeared in OrderHub logs."
-            exit 1
-          fi
+          # Replacement pods, which loaded rotated.key.
+          verify_logs_free_of_key_material
 
           endpoint_count="$(
             kubectl get endpointslice \
