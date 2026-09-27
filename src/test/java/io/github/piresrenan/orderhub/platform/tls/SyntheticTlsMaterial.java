@@ -223,10 +223,24 @@ public final class SyntheticTlsMaterial {
         var command = new ArrayList<String>(List.of(
                 Path.of(System.getProperty("java.home"), "bin", "keytool").toString()));
         command.addAll(List.of(arguments));
-        var process = new ProcessBuilder(command).redirectErrorStream(true).start();
-        var output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        if (!process.waitFor(60, TimeUnit.SECONDS) || process.exitValue() != 0) {
-            throw new IllegalStateException("keytool failed: " + arguments[0] + "\n" + output);
+        // Output goes to a file so the timeout is enforced before any read; a
+        // hung keytool cannot block the test JVM on an unclosed pipe.
+        var log = Files.createTempFile("orderhub-keytool", ".log");
+        try {
+            var process = new ProcessBuilder(command)
+                    .redirectErrorStream(true)
+                    .redirectOutput(log.toFile())
+                    .start();
+            if (!process.waitFor(60, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                throw new IllegalStateException("keytool timed out: " + arguments[0]);
+            }
+            if (process.exitValue() != 0) {
+                throw new IllegalStateException(
+                        "keytool failed: " + arguments[0] + "\n" + Files.readString(log));
+            }
+        } finally {
+            Files.deleteIfExists(log);
         }
     }
 }

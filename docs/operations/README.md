@@ -72,9 +72,12 @@ cluster. Never add `--insecure`.
   `kubectl rollout restart deployment/orderhub` and wait for `rollout status`.
 - **CA rotation:** first deploy BFF trust containing the old and new CAs, then
   rotate the leaf, then retire the old CA.
-- **Rollback:** restore the previous known-good Secret content and restart, or run
-  `kubectl rollout undo`. Replicas that cannot load their material never become
-  Ready, and `maxUnavailable: 0` keeps existing ones serving.
+- **Rollback of bad TLS material:** first restore the previous known-good
+  `orderhub-tls` Secret content, then run `kubectl rollout restart`.
+  `kubectl rollout undo` restores only the Deployment revision, never the Secret, so
+  it is not a TLS-material rollback. Use it only for a Deployment-spec regression, and
+  only after the Secret is known-good. Replicas that cannot load their material never
+  become Ready, and `maxUnavailable: 0` keeps existing ones serving.
 - HTTP, trust-all and hostname-check disablement are never rollback options. See
   [ADR-0023](../adr/ADR-0023-retained-https-transport-boundary.md).
 

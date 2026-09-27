@@ -105,7 +105,10 @@ Disabling validation is never a rotation step.
   `maxUnavailable: 0`.
 - **BFF trust not yet deployed:** keep or restore the leaf chained to the CA the BFF
   trusts.
-- **Failed rollout:** `kubectl rollout undo deployment/orderhub`.
+- **Failed rollout of a Deployment-spec change:** `kubectl rollout undo
+  deployment/orderhub`. This restores only the Deployment revision, never the
+  separately managed Secret. When TLS material is at fault, restoring the known-good
+  Secret is mandatory before any restart or undo.
 
 Retaining previous known-good material is a deployment prerequisite. Rollback never uses
 HTTP, trust-all or hostname-verification disablement.
