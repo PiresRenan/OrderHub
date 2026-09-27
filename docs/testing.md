@@ -35,7 +35,8 @@ must pass. A test run with failures or skips is not final qualification.
 | OpenAPI contract tests | Actual handler coverage, unique operation IDs, wire types/errors, UI and production defaults |
 | Baseline tests | Full schema/system data, accepted byte checksums, old-history upgrades and later migrations |
 | Local development acceptance | Real issuer + application + disposable DB, authorized stock, Customer Order/replay and denied personas |
-| Platform checks | Compose/image hardening, probes/shutdown, Restricted Kubernetes and replica placement |
+| Platform checks | Compose/image hardening, probes/shutdown, Restricted Kubernetes, replica placement, retained HTTPS (CA/SAN negatives, fail-closed Secret, rotation, key canaries) |
+| Retained TLS tests | Real Tomcat TLS from external PEM, wrong CA/hostname, plaintext refusal, fail-closed material, JWT semantics over HTTPS, manifest contract |
 
 Test methods explain Why / Covers / Prevents. Behavioral work uses RED before
 minimal GREEN, then targeted regression. Metadata/docs claims require source or

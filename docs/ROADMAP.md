@@ -617,6 +617,15 @@ succession and no public path to add a second Platform administrator. Credential
 the same principal is Identity-owned recovery. Permanent loss of the final authorized
 principal is an unsupported security-escalation state.
 
+### OH-027 — retained HTTPS transport boundary
+
+[ADR-0023](adr/ADR-0023-retained-https-transport-boundary.md),
+[#60](https://github.com/PiresRenan/OrderHub/issues/60), cross-project BFF-013 (D027).
+The retained Kubernetes Service becomes HTTPS-only on `8443`. OrderHub terminates TLS
+natively from a deployment-owned `orderhub-tls` Secret, and the `retained` profile fails
+closed without it. Local/Compose HTTP is unchanged. There is no public operation, migration,
+JWT or authorization change. Its v1.0.0 scope classification is an owner decision.
+
 ## Durable internal publication — implemented; external delivery deferred
 
 The existing Workforce authority-change notification uses Spring Modulith's

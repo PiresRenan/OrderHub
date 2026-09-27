@@ -226,7 +226,14 @@ writable temporary storage, dropped Linux capabilities and no privilege
 escalation; Kubernetes also disables automatic service-account token mounting
 and uses RuntimeDefault seccomp. These controls complement application policy.
 
-The repository does not supply production TLS termination, ingress/network
+Retained Kubernetes deployments terminate TLS in OrderHub itself on an HTTPS-only
+Service port `8443`, using a deployment-owned `orderhub-tls` Secret. Clients
+validate the issuing CA and the `orderhub.<namespace>.svc` SAN. TLS protects
+transport only: JWT validation, internal identity binding and authorization are
+unchanged, and no client certificate is required
+([ADR-0023](../adr/ADR-0023-retained-https-transport-boundary.md)).
+
+The repository does not supply certificate issuance/PKI, ingress/network
 policy, secret storage/rotation automation, PostgreSQL HA/backups, external
 identity-provider administration, or comprehensive detection/alert delivery.
 Configure and qualify those environment boundaries before exposing a retained
