@@ -137,10 +137,9 @@ public final class OrderHubReplicaWorker {
                             + "datasource="
                             + dataSource.getClass().getName();
 
-            Files.writeString(
+            ReplicaReadinessEvidence.publish(
                     readyPath,
-                    readinessEvidence,
-                    StandardCharsets.UTF_8);
+                    readinessEvidence);
 
             awaitStartGate(
                     startPath);
