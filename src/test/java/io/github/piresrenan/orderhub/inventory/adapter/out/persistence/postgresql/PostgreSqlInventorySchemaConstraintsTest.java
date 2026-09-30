@@ -8,7 +8,6 @@ import java.time.ZoneOffset;
 import java.util.UUID;
 
 import org.flywaydb.core.Flyway;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -143,9 +142,9 @@ class PostgreSqlInventorySchemaConstraintsTest {
         @BeforeEach
         void requireInventoryStructureAndCleanData() {
 
-            Assumptions.assumeTrue(
-                    inventoryStructureExists(),
-                    "V7 Inventory schema does not exist yet.");
+            assertThat(inventoryStructureExists())
+                    .as("V7 Inventory schema must exist before constraint tests")
+                    .isTrue();
 
             jdbcTemplate.update("""
                     TRUNCATE TABLE

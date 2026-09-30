@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -181,13 +183,15 @@ class RetainedTransportManifestTest {
         return new Yaml().load(Files.readString(path));
     }
 
-    @SuppressWarnings("unchecked")
     private static Map<String, Object> map(Object value) {
-        return (Map<String, Object>) value;
+        assertThat(value).isInstanceOf(Map.class);
+        var result = new LinkedHashMap<String, Object>();
+        ((Map<?, ?>) value).forEach((key, entry) -> result.put(String.class.cast(key), entry));
+        return result;
     }
 
-    @SuppressWarnings("unchecked")
     private static List<Object> list(Object value) {
-        return (List<Object>) value;
+        assertThat(value).isInstanceOf(List.class);
+        return new ArrayList<Object>((List<?>) value);
     }
 }
