@@ -160,8 +160,16 @@ Content-Type: application/json
     /platform/tenants/{tenantId}` and `PlatformTenantView`.
   - A Tenant with this id exists and its stored name equals the normalized requested name: return
     `200` with its current `PlatformTenantView`. Nothing is mutated and no evidence is appended.
-  - A Tenant with this id exists with another name: `409 administrative-state-conflict`. Nothing is
-    mutated.
+  - A Tenant with this id exists with another name: `409 administrative-state-conflict`, the only
+    conflict this operation returns. Nothing is mutated and no evidence is appended. Repeating the
+    identical request returns the same `409`, because no operation renames or deletes a Tenant.
+    OrderHub does not record which client request created a Tenant, so it cannot tell whether the
+    existing Tenant came from an earlier request that used this id with different facts (a client
+    defect) or from an unrelated request, and the Problem Details disclose neither. A client that
+    assigns a fresh random id to each creation intention and never changes the facts of a
+    dispatched intention reaches this state only through a defect or a practically impossible
+    collision. It must not repeat the request or silently create again under a new id; it may read
+    operation 2 to show the existing Tenant, and leaves the decision to the operator.
   - Missing `PLATFORM_TENANTS_MANAGE`: `403` before any lookup.
 - **Never an update.** The operation never changes the status, placement or name of an existing
   Tenant.
@@ -169,15 +177,18 @@ Content-Type: application/json
   row is returned, it reads the row and compares names. Two concurrent requests with the same id
   and name yield one `201` and one `200`; with different names, one `201` and one `409`. There is
   no process-local lock.
-- **Replay equivalence** is the id plus the normalized name. No rename operation exists. A future
+- **Replay equivalence** is the id plus the normalized name. The normalization is the existing one
+  of `Tenant.create` (surrounding Unicode whitespace removed) and is part of this contract: a change
+  to it must keep previously accepted requests equivalent. No rename operation exists. A future
   rename must preserve this equivalence in the same change, for example by persisting the creation
   name.
 - **Legacy creation.** `POST /platform/tenants` and `POST /platform/organizations` keep their exact
   behaviour and are marked `deprecated: true` in the generated contract, with the reason "not
   retry-safe; use the PUT form". Retry-safe consumers must not use them.
-- **Reconciliation.** After an unknown outcome the client either repeats the same `PUT` (converges
-  to exactly one Tenant) or reads operation 2 (`200` if created, `404` if not) without side
-  effects.
+- **Reconciliation.** After an unknown outcome the client either repeats the same `PUT`, which
+  converges to exactly one Tenant (`201` or `200`), or reads operation 2 without side effects:
+  `404` means not created and the same `PUT` may be sent; `200` with the same name means created;
+  `200` with another name is the `409` situation above.
 
 The existing issuance commands use a client `operationId` plus a request fingerprint because they
 create a server-assigned identifier together with a one-time secret that the client cannot know in
