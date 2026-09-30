@@ -113,6 +113,37 @@ Consequences for OH-022:
 - the amendment admits only OH-027 and sets no precedent for other deferred
   capabilities.
 
+## Proposed amendment — administration read model (OH-028), pending owner decision
+
+Status: PROPOSED with ADR-0024. Exactly one of the two variants below will be kept, as decided by
+the owner; the other will be deleted before acceptance. Until then, the OH-027 amendment above
+remains the release authority.
+
+On 2026-09-29 the owner decided that the product's first release includes an administration
+console. ADR-0024 proposes the OrderHub side: an administrative read model and retry-safe Platform
+creation. It is additive: no existing operation changes behaviour, and one additive migration (V47)
+is added.
+
+**Variant A — separate MINOR release (recommended).**
+
+- The v1.0.0 release authority is unchanged: **61 operations**, canonical LF OpenAPI sha256
+  `ba175bc784ddd2d519b54cf9cbc7a8a28a51065bacb5d1210f4f7d4df7c1dc8a`, migrations **V1–V46**,
+  ADR-0021/0022/0023 TESTED, and the post-OH-027 tree.
+- OH-022 qualifies, promotes and tags v1.0.0 from that authority without OH-028.
+- OH-028 is integrated after v1.0.0 and released as a MINOR version with its own qualification,
+  promotion, tag and notes under ADR-0003. Its checksum and operation count are recorded in ADR-0024
+  when TESTED.
+- This is not a scope amendment of v1.0.0 and sets no precedent for it.
+
+**Variant B — held v1.0.0.**
+
+- OH-028 is admitted to v1.0.0 as an explicit scope amendment, like OH-023.
+- The final v1.0.0 contract becomes 61 operations plus the ADR-0024 operations that the design
+  review freezes, and migrations become V1–V47.
+- Every earlier qualification, including the post-OH-027 one, becomes historical. The OH-022 final
+  GO waits for full qualification of the post-OH-028 `pre-release` tree.
+- The amendment admits only OH-028 and sets no precedent for other deferred capabilities.
+
 ## Decision
 
 Use Spring CORS processing on the existing business and bootstrap chains with an
