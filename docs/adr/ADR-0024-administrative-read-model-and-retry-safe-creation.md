@@ -1,15 +1,16 @@
 # ADR-0024 — Administrative read model and retry-safe Platform creation
 
-Status: PROPOSED — design review pending. Nothing is implemented. No operation, schema,
-migration or handler described here exists yet.
+Status: ACCEPTED — the design review approved this decision on 2026-09-30 with two conditions,
+both incorporated below (names are not unique; the Organization reads and the grant index are in
+scope). Nothing is implemented yet. The status becomes TESTED only with the qualification evidence
+of the implementation.
 
-Task: OH-028 (the canonical issue is opened only after design approval).
+Task: OH-028, [Issue #62](https://github.com/PiresRenan/OrderHub/issues/62).
 
-Classification: additive administrative HTTP contract for a first-party administration console
+Classification: **v1.0.0 release scope**, admitted by the 2026-09-30 scope amendment recorded in
+ADR-0020. It is an additive administrative HTTP contract for a first-party administration console
 that reaches OrderHub through a BFF client. It does not change the behaviour of any existing
-operation. Release versioning is recorded in the ADR-0020 amendment proposed with this ADR; the
-recommended outcome keeps the v1.0.0 release authority (61 operations, migrations V1–V46)
-unchanged and ships this contract in a later MINOR release.
+operation; the two existing creation operations only gain a `deprecated` marker.
 
 ## Context
 
@@ -18,6 +19,18 @@ console for Platform, Organization and Tenant workforce administration, includin
 activation. Authorization remains exclusively in OrderHub. The console must never guess the
 outcome of an administrative command: every command it issues needs either a retry identity or a
 side-effect-free read that reconciles an unknown outcome.
+
+On 2026-09-30 the owner further decided that:
+
+- Organization administration becomes operable in retained deployments: new installations give the
+  first operator the complete Platform administrative permission set, and Platform-scope grants can
+  be administered with self-grant prohibition and last-holder protection;
+- system functional roles make least-privilege Staff provisioning possible;
+- an optional, administrator-entered Staff label may be recorded at provisioning;
+- v1.0.0 is released only with these capabilities.
+
+Each of those three capabilities has its own ADR. This ADR covers only the read model and
+retry-safe creation.
 
 The current contract was built for API clients running known journeys, not for an interactive
 console.
@@ -35,15 +48,18 @@ console.
    intents and no read of the departments, positions and roles that `StaffProvisioningRequest`
    requires (`departmentId` and `positionId` are required; `initialRoleCode` is optional).
    Membership commands address an internal User UUID (`subjectId`) that no read discloses.
-4. **Creation is not retry-safe.** `platformCreateTenant` and `platformCreateOrganization` assign a
+4. **No read of one Organization or of its grants, and no Organization discovery.** An
+   Organization administrator cannot find the Organizations it administers, and a Platform
+   operator cannot read one Organization or its administrative grants.
+5. **Creation is not retry-safe.** `platformCreateTenant` and `platformCreateOrganization` assign a
    server-generated id on every call (`AdministrationController.createTenant`,
    `TenantAdministrationService.create`). A retry after a lost `201` creates a second resource, and
    no read tells the client whether the first attempt committed. Their `Location` headers name
    `/platform/tenants/{id}` and `/platform/organizations/{id}`, which are not served.
-5. The other administrative commands are already retry-safe or become reconcilable once reads
+6. The other administrative commands are already retry-safe or become reconcilable once reads
    exist (table "Reconciliation of existing commands" below).
 
-## Facts that bound the console (verified, not changed by this ADR)
+## Facts that bound the console (verified on `21788f05`)
 
 - **F1 — Platform authority in a retained deployment.** The first-operator ceremony grants exactly
   `PLATFORM_TENANTS_MANAGE` (ADR-0022; `FirstOperatorPlatformAuthorityService.INITIAL_PERMISSION`;
@@ -51,37 +67,33 @@ console.
   Platform-scope permission: `platformGrantOrganizationPermission` accepts only
   `ORGANIZATION_TENANTS_VIEW` at Organization scope. Operations that require
   `PLATFORM_ORGANIZATIONS_VIEW`, `PLATFORM_ORGANIZATIONS_MANAGE` or
-  `PLATFORM_ORGANIZATION_GRANTS_MANAGE` are therefore unreachable in a retained deployment. Without
-  an Organization, the placement operations and `organizationListTenants` have no target.
+  `PLATFORM_ORGANIZATION_GRANTS_MANAGE` are therefore unreachable in a retained deployment until
+  the Platform-authority capability decided on 2026-09-30 is implemented by its own ADR.
 - **F2 — Workforce catalog of a retained Tenant.** The only departments, positions and roles are
   those the first-Staff ceremony creates: department and position `INITIAL_GOVERNANCE_V1` (band
   `TENANT_GOVERNANCE`) and the Tenant role `INITIAL_TENANT_GOVERNANCE_V1` with 17 permissions
   (`PostgreSqlColdStartStaffRepository`, `ColdStartStaffAuthorizationService`). No migration seeds
-  system or built-in roles. No public operation creates departments, positions or roles, or assigns
-  a role after provisioning. Normal provisioning can therefore create either Staff holding the full
-  governance role or Staff with no effective permission.
-- **F3 — No human-readable Staff attribute.** OrderHub stores no name or label for Staff.
-  Membership commands address internal User UUIDs.
+  system roles yet; the system functional roles decided on 2026-09-30 are added by their own ADR.
+  No public operation creates departments, positions or roles, or assigns a role after
+  provisioning.
+- **F3 — No human-readable Staff attribute.** OrderHub stores no name or label for Staff; membership
+  commands address internal User UUIDs. The optional Staff label decided on 2026-09-30 is added to
+  the Staff directory (operation 4) by its own ADR.
 
-The owner decisions raised by F1–F3 are listed in "Questions for design review". This ADR does not
-resolve them silently.
+OH-028 neither depends on nor changes F1–F3. Its reads return whatever the other capabilities
+later create.
 
 ## Decision
 
 ### Scope
 
-**In (base set):** Platform Tenant list and detail; retry-safe Tenant creation; Tenant Staff
-directory; open provisioning intents; Tenant workforce catalog reads (departments, positions,
-roles); the caller's own administrative capabilities (subject to Q4); `deprecated` markers on the
-two non-retry-safe creation operations; one additive index (V47).
-
-**Conditional set (only if Q1 makes Organization administration operable):** Organization detail,
-retry-safe Organization creation, Organization grant list, self-scoped Organization discovery, and
-the grant index.
+**In:** the 13 operations below; `deprecated` markers on the two non-retry-safe creation
+operations; one additive migration (V47) with two indexes.
 
 **Out:** any Customer-related operation; creating or changing departments, positions or roles;
-assigning or revoking roles after provisioning; Platform-scope grant administration; any change to
-the behaviour, payload or status codes of an existing operation.
+assigning or revoking roles after provisioning; the first-operator ceremony change and Platform-scope
+grant administration; the seeding of system roles; the Staff label; any change to the behaviour,
+payload or status codes of an existing operation.
 
 ### Common rules
 
@@ -97,7 +109,8 @@ the behaviour, payload or status codes of an existing operation.
     the existing Workforce and Authorization composition. Every failure, including an absent
     Tenant, gives the existing uniform `403 identity-lifecycle-unavailable`. There is no Tenant or
     target existence oracle.
-  - *Self-scoped family*: no per-target error exists; filtering never produces 5xx.
+  - *Self-scoped family* (operations 9 and 13): no per-target error exists; filtering never
+    produces 5xx.
   - Malformed parameters give the existing 400 of the family. Persistence failure gives the
     existing sanitized 5xx.
 - **Pagination.** `limit` 1–100, default 50; an exclusive cursor named after its key; `next…` is
@@ -113,15 +126,18 @@ the behaviour, payload or status codes of an existing operation.
   Workforce → Users and Authorization). No cross-schema join. Spring Modulith verification stays
   green.
 - **Privacy.** No response contains a credential, secret digest, request fingerprint, correlation
-  id, issuer, subject or Customer data. No new personal-data field. Identifiers and names never
-  enter logs, metric labels or Problem Details.
-- **No new permission code.** The base set reuses `PLATFORM_TENANTS_MANAGE`, `TENANT_MEMBERS_VIEW`
-  and `TENANT_MEMBERS_MANAGE`. A new Platform permission such as a Tenant view permission is
-  rejected: the only retained Platform holder could never receive it (F1).
+  id, issuer, subject or Customer data. OH-028 adds no personal-data field. Identifiers and names
+  never enter logs, metric labels or Problem Details.
+- **No new permission code.** The operations reuse `PLATFORM_TENANTS_MANAGE`,
+  `PLATFORM_ORGANIZATIONS_VIEW`, `PLATFORM_ORGANIZATIONS_MANAGE`,
+  `PLATFORM_ORGANIZATION_GRANTS_MANAGE`, `TENANT_MEMBERS_VIEW` and `TENANT_MEMBERS_MANAGE`.
+- **Names are not unique.** `tenants.tenants` and `organizations.organizations` constrain only the
+  identifier (primary key) and the format of the name. Two Tenants or two Organizations may share a
+  name. Retry safety never relies on names: it comes from the client's per-intention identifier.
 
-### Operations — base set
+### Operations
 
-| # | Operation | operationId (proposed) | Authority | Success |
+| # | Operation | operationId | Authority | Success |
 |---|---|---|---|---|
 | 1 | `GET /platform/tenants?limit&afterId` | `platformListTenants` | `PLATFORM_TENANTS_MANAGE` | `200 PlatformTenantPage` |
 | 2 | `GET /platform/tenants/{tenantId}` | `platformGetTenant` | `PLATFORM_TENANTS_MANAGE` | `200 PlatformTenantView` |
@@ -131,12 +147,7 @@ the behaviour, payload or status codes of an existing operation.
 | 6 | `GET /administration/tenants/{tenantId}/workforce/departments?limit&afterId` | `identityListWorkforceDepartments` | `TENANT_MEMBERS_MANAGE` | `200 WorkforceDepartmentPage` |
 | 7 | `GET /administration/tenants/{tenantId}/workforce/positions?limit&afterId` | `identityListWorkforcePositions` | `TENANT_MEMBERS_MANAGE` | `200 WorkforcePositionPage` |
 | 8 | `GET /administration/tenants/{tenantId}/workforce/roles?limit&afterCode` | `identityListWorkforceRoles` | `TENANT_MEMBERS_MANAGE` | `200 WorkforceRolePage` |
-| 9 | `GET /identity/administrative-capabilities` | `identityAdministrativeCapabilities` | self (Q4) | `200 AdministrativeCapabilities` |
-
-### Operations — conditional set (Q1)
-
-| # | Operation | operationId (proposed) | Authority | Success |
-|---|---|---|---|---|
+| 9 | `GET /identity/administrative-capabilities` | `identityAdministrativeCapabilities` | self | `200 AdministrativeCapabilities` |
 | 10 | `GET /platform/organizations/{organizationId}` | `platformGetOrganization` | `PLATFORM_ORGANIZATIONS_VIEW` | `200 AdministrativeOrganization` |
 | 11 | `PUT /platform/organizations/{organizationId}` | `platformEstablishOrganization` | `PLATFORM_ORGANIZATIONS_MANAGE` | `201` or `200 AdministrativeOrganization` |
 | 12 | `GET /platform/organizations/{organizationId}/administrative-grants?limit&afterUserId` | `platformListOrganizationGrants` | `PLATFORM_ORGANIZATION_GRANTS_MANAGE` | `200 OrganizationGrantPage` |
@@ -151,9 +162,9 @@ Content-Type: application/json
 {"name": "<AdministrativeNameRequest.name>"}
 ```
 
-- **Identity.** The client assigns the Tenant id. It must be a canonical RFC 9562 UUID of version 4
-  or 7; the nil and max UUIDs and every other version are rejected with 400. The body is the
-  existing `AdministrativeNameRequest`.
+- **Identity.** The client assigns the Tenant id, one new id per creation intention. It must be a
+  canonical RFC 9562 UUID of version 4 or 7; the nil and max UUIDs and every other version are
+  rejected with 400. The body is the existing `AdministrativeNameRequest`.
 - **Outcomes.**
   - No Tenant with this id: create it ACTIVE and unattached, append the existing `CREATE_TENANT /
     APPLIED` evidence in the same transaction, and return `201` with `Location:
@@ -171,6 +182,8 @@ Content-Type: application/json
     collision. It must not repeat the request or silently create again under a new id; it may read
     operation 2 to show the existing Tenant, and leaves the decision to the operator.
   - Missing `PLATFORM_TENANTS_MANAGE`: `403` before any lookup.
+- **Names are not a retry guard.** A `PUT` with a new id and the name of an existing Tenant creates
+  another Tenant, as the existing `POST` does.
 - **Never an update.** The operation never changes the status, placement or name of an existing
   Tenant.
 - **Concurrency.** One transaction runs `INSERT … ON CONFLICT (id) DO NOTHING RETURNING`. When no
@@ -226,13 +239,14 @@ Staff profile creation time.
   `idx_authorization_role_assignments_subject_scope (tenant_id, user_id)` in one statement.
 - Every Staff of the Tenant is listed whatever its status. Customer-only memberships are never
   listed. No workforce-ceiling filtering is applied to reads; commands keep their ceilings.
+- Platform authority never reads a Tenant's Staff directory.
 
 **Operation 5, `OpenStaffProvisioning`:** `{intentId, kind, operationId, departmentId, positionId,
 initialRoleCode, issuedByUserId, issuedAt, expiresAt}` where `kind` is `INITIAL` or `STANDARD`.
 Open means not consumed, not cancelled and `expires_at` later than the database time of the read.
-The scan uses the new partial index V47 and keysets by `intent_id`. Expired rows are filtered after
-the scan and still advance the cursor. The kind comes from the Workforce issuance evidence in the
-same schema. No credential, digest, fingerprint or correlation id is returned.
+The scan uses the V47 partial index and keysets by `intent_id`. Expired rows are filtered after the
+scan and still advance the cursor. The kind comes from the Workforce issuance evidence in the same
+schema. No credential, digest, fingerprint or correlation id is returned.
 
 **Operations 6–8, workforce catalog:** departments `{id, code, name}` and positions `{id, code,
 title, authorityBand}` keyset by id inside the Tenant through their existing Tenant-scoped unique
@@ -248,17 +262,17 @@ for the caller only. It is presentation data, never authority, and must not be c
 authority. It returns the caller's own internal User id, which is already disclosed to its owner
 by other operations.
 
-**Conditional reads.** Operation 10 returns the existing `AdministrativeOrganization`. Operation 12
-returns one item per User, `{userId, permissionCodes}`, keyset by `userId` over a new index on
-administrative grants by scope. Operation 13 follows ADR-0021 exactly: the caller's Organization
-grants are scanned through the existing `UNIQUE (user_id, scope_type, scope_id, permission_code)`,
-one batched Organizations read keeps ACTIVE Organizations, and filtered rows advance the cursor.
+**Operations 10–13, Organizations:** operation 10 returns the existing `AdministrativeOrganization`.
+Operation 12 returns one item per User, `{userId, permissionCodes}`, keyset by `userId` over the V47
+grant index. Operation 13 follows ADR-0021 exactly: the caller's Organization grants are scanned
+through the existing `UNIQUE (user_id, scope_type, scope_id, permission_code)`, one batched
+Organizations read keeps ACTIVE Organizations, and filtered rows advance the cursor.
 
 ### Migration V47 (additive, forward-only)
 
-- Base: `CREATE INDEX ix_workforce_provisioning_intents_open ON workforce.staff_provisioning_intents
+- `CREATE INDEX ix_workforce_provisioning_intents_open ON workforce.staff_provisioning_intents
   (tenant_id, intent_id) WHERE consumed_at IS NULL AND cancelled_at IS NULL`.
-- Conditional (Q1): `CREATE INDEX ix_authorization_administrative_grants_scope ON
+- `CREATE INDEX ix_authorization_administrative_grants_scope ON
   access_control.administrative_grants (scope_type, scope_id, user_id)`.
 - V1–V46 and B44 remain byte-identical. V47 is qualified on the historical and fresh-install
   paths, with `EXPLAIN (ANALYZE, BUFFERS)` evidence on synthetic data as in ADR-0021. Each index
@@ -271,59 +285,27 @@ one batched Organizations read keeps ACTIVE Organizations, and filtered rows adv
 | `platformSuspendTenant`, `platformRecoverTenant` | desired state; read operation 2 |
 | `platformAttachTenant` | desired state (same Organization is success); read operation 2 |
 | `platformMoveTenant`, `platformDetachTenant` | precondition on the expected Organization; a repeat after success conflicts, so read operation 2 |
-| `platformSuspendOrganization`, `platformRecoverOrganization` | desired state; read operation 10 (Q1) |
-| `platformGrantOrganizationPermission`, `platformRevokeOrganizationPermission` | desired state; read operation 12 (Q1) |
+| `platformSuspendOrganization`, `platformRecoverOrganization` | desired state; read operation 10 |
+| `platformGrantOrganizationPermission`, `platformRevokeOrganizationPermission` | desired state; read operation 12 |
 | `identityIssueStaffProvisioning`, `identityIssueInitialStaffProvisioning` | client `operationId`; replay returns only the intent id; read operation 5 |
 | `identityCancelStaffProvisioning`, `identityCancelInitialStaffProvisioning` | `{changed}`; read operation 5 |
 | `identitySuspendMembership`, `identityRecoverMembership`, `identityTerminateMembership` | desired state, `{changed}`; read operation 4 |
 | `identityBootstrapStaff` | one-time proof; a repeat is "unavailable" even after success, so read `GET /tenants` (existing) |
 | `platformCreateTenant`, `platformCreateOrganization` | none; superseded by operations 3 and 11 |
 
-## Questions for design review (owner decisions)
+## Design review outcome (2026-09-30)
 
-**Q1 — Organization administration in a retained deployment (F1).**
-- (a) Keep it out of the console until a governed Platform-authority capability exists. The
-  conditional set is not implemented. No further OrderHub change.
-- (b) The first-operator ceremony establishes the complete Platform administrative permission set
-  on new installations. This amends ADR-0022 and changes the shape of the V46 evidence, which holds
-  one `granted_permission` constrained to `PLATFORM_TENANTS_MANAGE` and at most one success row,
-  through a new migration. Already completed ceremonies are not upgraded, because ADR-0022
-  (OH-026) forbids a second bootstrap.
-- (c) Platform-scope grant administration with anti-self-escalation and last-holder protection.
-  This also creates a path to a second Platform administrator. It is the largest security change
-  and still needs (b) or an equivalent root for its first holder.
-- Recommendation: (a) for OH-028; (b) or (c) only through a separate scope decision with its own
-  ADR.
-
-**Q2 — Least privilege for provisioned Staff (F2).**
-- (a) Accept that console-provisioned Staff receive the governance role or no role, as a recorded
-  risk.
-- (b) Seed system built-in functional roles through a data-only migration (for example catalog,
-  inventory, orders and audit roles). Role resolution already falls back from the Tenant to system
-  roles (`PostgreSqlRoleDefinitionRepository.findByCodeAndScope`: `tenant_id = ? OR tenant_id IS
-  NULL`), and `RoleDelegationPolicy` delegates non-`SYSTEM_LOCKED` roles inside the actor's band and
-  envelope. These roles would therefore be assignable through the existing `initialRoleCode` within
-  the governance position's ceiling. The end-to-end path is not yet proven and would be the RED of
-  that change.
-- (c) Workforce catalog administration, which is explicitly post-v1.
-- Recommendation: (b) if least privilege is required at launch, through a separate scope decision;
-  otherwise (a) with the limitation stated in the release notes.
-
-**Q3 — Human-readable Staff identification (F3).**
-- (a) None. The directory shows `subjectId`, placement, roles, statuses and `staffSince`;
-  administrators correlate people out of band.
-- (b) An optional administrator-entered label frozen at provisioning and materialized on the Staff
-  profile. This is a new personal-data field and needs a purpose, necessity, retention and access
-  review, an additive optional request field and a migration.
-- (c) Labels supplied by the identity provider and joined by the client. This needs an account
-  directory on the identity provider, which is outside this repository's decisions.
-- Recommendation: (a) for OH-028; (b) only with an explicit privacy decision.
-
-**Q4 — Capabilities read (operation 9).** Include it (recommended): it avoids probing with
-commands or reads that return 403 for most users, and it gives a user their own internal id for
-Organization grant workflows. The alternative is probing.
-
-**Q5 — Release version.** See the ADR-0020 amendment.
+- **Organization administration in a retained deployment (F1):** the owner chose both the
+  first-operator Platform permission set for new installations and Platform-scope grant
+  administration. That capability has its own ADR. Operations 10–13 and the grant index are in
+  OH-028.
+- **Least privilege for provisioned Staff (F2):** the owner chose system functional roles, assigned
+  through the existing `initialRoleCode`. Own ADR. Operation 8 lists them once they exist.
+- **Staff identification (F3):** the owner chose an optional administrator-entered label. Own ADR,
+  including its privacy review; it adds the label to operation 4.
+- **Capabilities read (operation 9):** included.
+- **Release version:** v1.0.0 is held until these capabilities are integrated (ADR-0020
+  amendment of 2026-09-30).
 
 ## Alternatives rejected
 
@@ -333,7 +315,10 @@ Organization grant workflows. The alternative is probing.
   operation.
 - **A creation-operation registry keyed by a client `operationId`.** More durable state and a
   special resource just for reconciliation. The resource id already serves as the identity.
-- **New view permission codes for Platform reads.** Unreachable in a retained deployment (F1).
+- **Unique names as a retry guard.** Names are not unique today, and a legitimate second Tenant may
+  share a name. Retry safety belongs to the identifier.
+- **New view permission codes for Platform reads.** They add authority vocabulary without need; the
+  existing manage and view permissions already bound each read.
 - **Platform access to Tenant Staff directories.** Platform privilege does not imply access to
   Tenant-private workforce data.
 - **Unpaged lists, cross-schema joins, cached lists, or lists carried in tokens or sessions.**
@@ -347,19 +332,19 @@ Organization grant workflows. The alternative is probing.
 - Uniform `403` in the Tenant administration family keeps Tenant and target existence private.
 - Client-assigned Tenant and Organization ids are restricted to random or time-ordered random UUID
   versions. Authorization never depends on an identifier being secret.
-- The directory and catalog expose only internal identifiers and Tenant-configured names. No new
-  personal data is collected (Q3 (b) would change this and requires its own review).
+- The directory and catalog expose only internal identifiers and Tenant-configured names. OH-028
+  collects no new personal data.
 - `no-store` on every response. No identifier or name in logs, metric labels or Problem Details.
 
 ## Executable validation (plan)
 
 Real PostgreSQL and real signed JWTs through the production security composition:
 
-- RED first: each new route returns 404 or 405 on the current tree; `PUT` retry after a lost
-  response currently duplicates a Tenant through `POST`.
-- Creation: new, replay, conflicting name, invalid UUID versions, missing permission,
-  concurrent identical and conflicting requests, evidence written exactly once, `Location`
-  dereferenceable.
+- RED first: each new route returns 404 or 405 on the current tree; two `POST` creations with the
+  same name create two Tenants, which the `PUT` form must make retry-safe by id.
+- Creation: new, replay, conflicting name, same name under a new id (a second resource), invalid
+  UUID versions, missing permission, concurrent identical and conflicting requests, evidence
+  written exactly once, `Location` dereferenceable.
 - Authorization and isolation: every family's denial paths, including absent, suspended and
   foreign Tenants returning the identical `403`; Platform cannot read Staff directories.
 - Pagination: limit bounds, cursor continuation, empty and short pages with continuation for
@@ -380,7 +365,7 @@ Real PostgreSQL and real signed JWTs through the production security composition
 - The canonical OpenAPI checksum changes. Consumers repin only after the integrated tree is
   qualified and the new checksum is published.
 - One additive migration (V47).
-- F1–F3 remain true unless the owner decides otherwise under Q1–Q3.
+- OH-028 does not resolve F1–F3; the owner-decided capabilities that do have their own ADRs.
 
 ## Rollback
 

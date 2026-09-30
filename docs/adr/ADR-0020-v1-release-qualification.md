@@ -113,36 +113,49 @@ Consequences for OH-022:
 - the amendment admits only OH-027 and sets no precedent for other deferred
   capabilities.
 
-## Proposed amendment — administration read model (OH-028), pending owner decision
+## Scope amendment — administration capabilities admitted to v1.0.0 (2026-09-30)
 
-Status: PROPOSED with ADR-0024. Exactly one of the two variants below will be kept, as decided by
-the owner; the other will be deleted before acceptance. Until then, the OH-027 amendment above
-remains the release authority.
+The OH-027 amendment above established the post-OH-027 release authority:
+
+- **61 public operations**, canonical LF OpenAPI sha256
+  `ba175bc784ddd2d519b54cf9cbc7a8a28a51065bacb5d1210f4f7d4df7c1dc8a`;
+- migrations **V1–V46**;
+- ADR-0021, ADR-0022 and ADR-0023 TESTED.
+
+That text is historical and remains accurate for that tree.
 
 On 2026-09-29 the owner decided that the product's first release includes an administration
-console. ADR-0024 proposes the OrderHub side: an administrative read model and retry-safe Platform
-creation. It is additive: no existing operation changes behaviour, and one additive migration (V47)
-is added.
+console for Platform, Organization and Tenant workforce administration. On 2026-09-30 the owner
+decided that OrderHub v1.0.0 is released only with the capabilities that console needs, and that
+no release of the post-OH-027 contract is made. This is one explicit, bounded scope amendment. It
+admits exactly these capabilities, each specified by its own ADR:
 
-**Variant A — separate MINOR release (recommended).**
+- **OH-028 — administrative read model and retry-safe Platform creation**
+  ([ADR-0024](ADR-0024-administrative-read-model-and-retry-safe-creation.md),
+  [#62](https://github.com/PiresRenan/OrderHub/issues/62));
+- **first-operator Platform authority for new installations and Platform-scope grant
+  administration**, with self-grant prohibition, last-holder protection, a closed list of grantable
+  permissions and append-only evidence;
+- **system functional roles** assignable through the existing Staff provisioning within the current
+  delegation policy;
+- **an optional administrator-entered Staff label**, a new personal-data field with its own privacy
+  review.
 
-- The v1.0.0 release authority is unchanged: **61 operations**, canonical LF OpenAPI sha256
-  `ba175bc784ddd2d519b54cf9cbc7a8a28a51065bacb5d1210f4f7d4df7c1dc8a`, migrations **V1–V46**,
-  ADR-0021/0022/0023 TESTED, and the post-OH-027 tree.
-- OH-022 qualifies, promotes and tags v1.0.0 from that authority without OH-028.
-- OH-028 is integrated after v1.0.0 and released as a MINOR version with its own qualification,
-  promotion, tag and notes under ADR-0003. Its checksum and operation count are recorded in ADR-0024
-  when TESTED.
-- This is not a scope amendment of v1.0.0 and sets no precedent for it.
+The last three are recorded here when their ADRs pass design review.
 
-**Variant B — held v1.0.0.**
+Consequences for OH-022:
 
-- OH-028 is admitted to v1.0.0 as an explicit scope amendment, like OH-023.
-- The final v1.0.0 contract becomes 61 operations plus the ADR-0024 operations that the design
-  review freezes, and migrations become V1–V47.
-- Every earlier qualification, including the post-OH-027 one, becomes historical. The OH-022 final
-  GO waits for full qualification of the post-OH-028 `pre-release` tree.
-- The amendment admits only OH-028 and sets no precedent for other deferred capabilities.
+- the final v1.0.0 contract is the post-OH-027 contract plus the operations these ADRs freeze;
+  migrations are V1–V46 plus the forward-only migrations they add, starting at V47; V1–V46 and B44
+  stay byte-identical;
+- the final OpenAPI artifact, checksum and release evidence are regenerated from the `pre-release`
+  tree that integrates all admitted capabilities;
+- every earlier qualification, including the post-OH-027 one, is historical for the final release;
+- the OH-022 final GO waits for full qualification of that tree;
+- OH-022 still owns final qualification, promotion to `main`, the exact release tree, the
+  immutable `v1.0.0` tag and the release notes;
+- Customer-related operations and every other deferred capability stay outside; the amendment
+  admits only the capabilities listed above and sets no precedent.
 
 ## Decision
 
