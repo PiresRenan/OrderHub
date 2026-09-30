@@ -177,9 +177,15 @@ Content-Type: application/json
   row is returned, it reads the row and compares names. Two concurrent requests with the same id
   and name yield one `201` and one `200`; with different names, one `201` and one `409`. There is
   no process-local lock.
-- **Replay equivalence** is the id plus the normalized name. The normalization is the existing one
-  of `Tenant.create` (surrounding Unicode whitespace removed) and is part of this contract: a change
-  to it must keep previously accepted requests equivalent. No rename operation exists. A future
+- **Replay equivalence** is the id plus the normalized name, compared as exact code points. The
+  normalization is the existing `String.strip()` of `Tenant.create` and `Organization.create`: it
+  removes leading and trailing code points for which `Character.isWhitespace` is true, which are
+  U+0009–U+000D, U+001C–U+0020, U+1680, U+2000–U+2006, U+2008–U+200A, U+2028, U+2029, U+205F and
+  U+3000. This is exactly the whitespace class of the published `AdministrativeNameRequest`
+  pattern. Clients that compare names must use that class, not a platform trim: JavaScript
+  `String.prototype.trim()` keeps U+001C–U+001F and removes U+00A0, U+2007, U+202F and U+FEFF. The
+  normalization and the published pattern are part of this contract and change together, only in
+  a way that keeps previously accepted requests equivalent. No rename operation exists. A future
   rename must preserve this equivalence in the same change, for example by persisting the creation
   name.
 - **Legacy creation.** `POST /platform/tenants` and `POST /platform/organizations` keep their exact
