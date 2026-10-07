@@ -44,6 +44,17 @@ retained envelope requires BFF -> OrderHub over HTTPS, while the retained OrderH
 Service was HTTP-only. 61 operations and V1–V46 remain. OH-022 final qualification and
 promotion run on the post-OH-027 tree. No other deferred capability is admitted.
 
+**Scope amendment accepted 2026-09-30.** The owner decided that v1.0.0 is released only with
+the capabilities a first-party administration console needs, and that the post-OH-027 contract
+is not released on its own. The amendment admits exactly: OH-028, the administrative read model
+and retry-safe Platform creation
+([ADR-0024](adr/ADR-0024-administrative-read-model-and-retry-safe-creation.md), #62);
+first-operator Platform authority for new installations with Platform-scope grant
+administration; system functional roles; and an optional administrator-entered Staff label.
+OH-028 is frozen by ADR-0024; each of the other three is frozen when its own ADR passes design
+review (ADR-0020). OH-022 final qualification and promotion run on the tree that integrates all
+four. Customer-related and every other deferred capability stay outside.
+
 ## POST-v1 / FUTURE EVOLUTION
 
 Independent machine principals, general Customer registration/CRUD, a complete
@@ -633,6 +644,17 @@ natively from a deployment-owned `orderhub-tls` Secret, and the `retained` profi
 closed without it. Local/Compose HTTP is unchanged. There is no public operation, migration,
 JWT or authorization change. It was explicitly admitted to v1.0.0 on 2026-09-27 as a bounded
 retained security/operability amendment (ADR-0020). 61 operations and V1–V46 remain.
+
+### OH-028 — administrative read model and retry-safe Platform creation (v1.0.0 amendment)
+
+[ADR-0024](adr/ADR-0024-administrative-read-model-and-retry-safe-creation.md),
+[#62](https://github.com/PiresRenan/OrderHub/issues/62). Bounded reads for a first-party
+administration console (Platform Tenants, Tenant Staff directory, open provisioning intents,
+workforce catalog, the caller's administrative capabilities, Organization detail, grants and
+discovery) and retry-safe Tenant/Organization creation by client-assigned identifier. Existing
+operations keep their behaviour; the two non-retry-safe creation operations are marked
+deprecated. Admitted to v1.0.0 by the 2026-09-30 scope amendment (ADR-0020). Design accepted;
+implementation pending.
 
 ## Durable internal publication — implemented; external delivery deferred
 

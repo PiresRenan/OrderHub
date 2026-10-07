@@ -113,6 +113,53 @@ Consequences for OH-022:
 - the amendment admits only OH-027 and sets no precedent for other deferred
   capabilities.
 
+## Scope amendment — administration capabilities admitted to v1.0.0 (2026-09-30)
+
+The OH-027 amendment above established the post-OH-027 release authority:
+
+- **61 public operations**, canonical LF OpenAPI sha256
+  `ba175bc784ddd2d519b54cf9cbc7a8a28a51065bacb5d1210f4f7d4df7c1dc8a`;
+- migrations **V1–V46**;
+- ADR-0021, ADR-0022 and ADR-0023 TESTED.
+
+That text is historical and remains accurate for that tree.
+
+On 2026-09-29 the owner decided that the product's first release includes an administration
+console for Platform, Organization and Tenant workforce administration. On 2026-09-30 the owner
+decided that OrderHub v1.0.0 is released only with the capabilities that console needs, and that
+no release of the post-OH-027 contract is made. This is one explicit, bounded scope amendment. It
+admits exactly these capabilities:
+
+- **OH-028 — administrative read model and retry-safe Platform creation**
+  ([ADR-0024](ADR-0024-administrative-read-model-and-retry-safe-creation.md),
+  [#62](https://github.com/PiresRenan/OrderHub/issues/62));
+- **first-operator Platform authority for new installations and Platform-scope grant
+  administration**, with self-grant prohibition, last-holder protection, a closed list of grantable
+  permissions and append-only evidence;
+- **system functional roles** assignable through the existing Staff provisioning within the current
+  delegation policy;
+- **an optional administrator-entered Staff label**, a new personal-data field with its own privacy
+  review.
+
+Only OH-028 is specified and frozen, by ADR-0024. The other three are admitted by the owner's
+decision but are not frozen yet: each is frozen by its own ADR (planned as ADR-0025, ADR-0026 and
+ADR-0027) when that ADR passes design review, and is recorded here at that point. Until then they
+define no operation, migration or data field, and the final OH-022 qualification waits for them.
+
+Consequences for OH-022:
+
+- the final v1.0.0 contract is the post-OH-027 contract plus the operations these ADRs freeze;
+  migrations are V1–V46 plus the forward-only migrations they add, starting at V47; V1–V46 and B44
+  stay byte-identical;
+- the final OpenAPI artifact, checksum and release evidence are regenerated from the `pre-release`
+  tree that integrates all admitted capabilities;
+- every earlier qualification, including the post-OH-027 one, is historical for the final release;
+- the OH-022 final GO waits for full qualification of that tree;
+- OH-022 still owns final qualification, promotion to `main`, the exact release tree, the
+  immutable `v1.0.0` tag and the release notes;
+- Customer-related operations and every other deferred capability stay outside; the amendment
+  admits only the capabilities listed above and sets no precedent.
+
 ## Decision
 
 Use Spring CORS processing on the existing business and bootstrap chains with an
