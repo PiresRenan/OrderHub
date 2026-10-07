@@ -287,8 +287,9 @@ Organizations read keeps ACTIVE Organizations, and filtered rows advance the cur
 | `platformMoveTenant`, `platformDetachTenant` | precondition on the expected Organization; a repeat after success conflicts, so read operation 2 |
 | `platformSuspendOrganization`, `platformRecoverOrganization` | desired state; read operation 10 |
 | `platformGrantOrganizationPermission`, `platformRevokeOrganizationPermission` | desired state; read operation 12 |
-| `identityIssueStaffProvisioning`, `identityIssueInitialStaffProvisioning` | client `operationId`; replay returns only the intent id; read operation 5 |
-| `identityCancelStaffProvisioning`, `identityCancelInitialStaffProvisioning` | `{changed}`; read operation 5 |
+| `identityIssueStaffProvisioning` | client `operationId`; replay returns only the intent id; read operation 5 |
+| `identityCancelStaffProvisioning` | `{changed}`; read operation 5 |
+| `identityIssueInitialStaffProvisioning`, `identityCancelInitialStaffProvisioning` | Platform cold-start ceremony (explicit `PLATFORM_TENANTS_MANAGE`), so no read applies: operation 5 requires `TENANT_MEMBERS_MANAGE`, and Platform authority never reads a Tenant's Staff directory. Issue keeps its client `operationId`, and a matching replay returns only the intent id, never the credential. After a lost first response: replay to obtain the intent id, cancel it (desired state, `{changed}`), then issue again with a new `operationId` |
 | `identitySuspendMembership`, `identityRecoverMembership`, `identityTerminateMembership` | desired state, `{changed}`; read operation 4 |
 | `identityBootstrapStaff` | one-time proof; a repeat is "unavailable" even after success, so read `GET /tenants` (existing) |
 | `platformCreateTenant`, `platformCreateOrganization` | none; superseded by operations 3 and 11 |

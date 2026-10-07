@@ -128,7 +128,7 @@ On 2026-09-29 the owner decided that the product's first release includes an adm
 console for Platform, Organization and Tenant workforce administration. On 2026-09-30 the owner
 decided that OrderHub v1.0.0 is released only with the capabilities that console needs, and that
 no release of the post-OH-027 contract is made. This is one explicit, bounded scope amendment. It
-admits exactly these capabilities, each specified by its own ADR:
+admits exactly these capabilities:
 
 - **OH-028 — administrative read model and retry-safe Platform creation**
   ([ADR-0024](ADR-0024-administrative-read-model-and-retry-safe-creation.md),
@@ -141,7 +141,10 @@ admits exactly these capabilities, each specified by its own ADR:
 - **an optional administrator-entered Staff label**, a new personal-data field with its own privacy
   review.
 
-The last three are recorded here when their ADRs pass design review.
+Only OH-028 is specified and frozen, by ADR-0024. The other three are admitted by the owner's
+decision but are not frozen yet: each is frozen by its own ADR (planned as ADR-0025, ADR-0026 and
+ADR-0027) when that ADR passes design review, and is recorded here at that point. Until then they
+define no operation, migration or data field, and the final OH-022 qualification waits for them.
 
 Consequences for OH-022:
 

@@ -51,8 +51,9 @@ and retry-safe Platform creation
 ([ADR-0024](adr/ADR-0024-administrative-read-model-and-retry-safe-creation.md), #62);
 first-operator Platform authority for new installations with Platform-scope grant
 administration; system functional roles; and an optional administrator-entered Staff label.
-Each has its own ADR (ADR-0020). OH-022 final qualification and promotion run on the tree that
-integrates all four. Customer-related and every other deferred capability stay outside.
+OH-028 is frozen by ADR-0024; each of the other three is frozen when its own ADR passes design
+review (ADR-0020). OH-022 final qualification and promotion run on the tree that integrates all
+four. Customer-related and every other deferred capability stay outside.
 
 ## POST-v1 / FUTURE EVOLUTION
 
@@ -653,7 +654,7 @@ workforce catalog, the caller's administrative capabilities, Organization detail
 discovery) and retry-safe Tenant/Organization creation by client-assigned identifier. Existing
 operations keep their behaviour; the two non-retry-safe creation operations are marked
 deprecated. Admitted to v1.0.0 by the 2026-09-30 scope amendment (ADR-0020). Design accepted;
-implementation in progress.
+implementation pending.
 
 ## Durable internal publication — implemented; external delivery deferred
 
