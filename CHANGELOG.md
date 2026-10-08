@@ -6,6 +6,15 @@ The project follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Base image security update (OH-029, security)
+
+- Both `eclipse-temurin` base images (build and runtime) move from `21.0.12_8` to the
+  official `21.0.12.1_1` images, pinned by digest. They ship `libssl3t64` and `openssl`
+  `3.0.13-0ubuntu3.16` (Ubuntu USN-8847-1, CVE-2026-84782) and the Java 21.0.12.1 security
+  update.
+- No package-manager step is added. No application code, public contract, migration or
+  configuration change.
+
 ### Retained HTTPS transport boundary (OH-027, v1 security/operability amendment)
 
 - The retained Kubernetes Deployment activates the `retained` profile. OrderHub then

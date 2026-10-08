@@ -5,7 +5,7 @@
 # build command so the Dockerfile is not unnecessarily tied to one CPU
 # architecture.
 
-FROM eclipse-temurin:21.0.12_8-jdk-noble@sha256:75ce56643243c3db632be2ef259625fb42ee3be1334389659f7a1a61acb78783 AS build
+FROM eclipse-temurin:21.0.12.1_1-jdk-noble@sha256:b468c3fc688b14450571494f588bd939378e7fd542ed5a73f8efc13f17872a87 AS build
 
 WORKDIR /workspace
 
@@ -72,7 +72,7 @@ RUN --mount=type=cache,id=orderhub-maven,target=/root/.m2,sharing=locked \
         --destination extracted
 
 
-FROM eclipse-temurin:21.0.12_8-jre-noble@sha256:96975602e131485862eb8cd32927face8a06d7591a5e865944b634a701d9df72 AS runtime
+FROM eclipse-temurin:21.0.12.1_1-jre-noble@sha256:000fd431958bc81a24abe1e8e5f0f0fd3ae365a594bd50aadb20696805f9408c AS runtime
 
 ARG APP_VERSION=1.0.0
 ARG VCS_REF=development
